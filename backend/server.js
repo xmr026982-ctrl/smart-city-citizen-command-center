@@ -9,6 +9,7 @@ const { initializeSocket } = require("./socket/socket");
 const authRoutes = require("./routes/authRoutes");
 const testRoutes = require("./routes/testRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const issueRoutes = require("./routes/issueRoutes");
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/issues", issueRoutes);
 
 app.get("/", (req, res) => {
   res.json({
