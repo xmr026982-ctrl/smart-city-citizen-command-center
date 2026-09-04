@@ -1,6 +1,103 @@
 const mongoose = require("mongoose");
 const Issue = require("../models/Issue");
 
+const createIssue = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      category,
+      location,
+      photos
+    } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: "Issue title is required."
+      });
+    }
+
+    const allowedCategories = [
+      "road_damage",
+      "garbage",
+      "water_leakage",
+      "street_light",
+      "encroachment",
+      "drainage",
+      "other"
+    ];
+
+    if (category && !allowedCategories.includes(category)) {
+      return res.status(400).json({
+        message: "Invalid issue category."
+      });
+    }
+
+    const issue = await Issue.create({
+      title: title.trim(),
+      description: description || "",
+      category: category || "other",
+      location: location || {
+        type: "Point",
+        coordinates: [0, 0]
+      },
+      photos: Array.isArray(photos) ? photos : [],
+      reportedBy: req.user._id,
+      status: "submitted"
+    });
+
+    // Increment citizen contribution statistics
+    await mongoose.model("User").findByIdAndUpdate(
+      req.user._id,
+      {
+        $inc: {
+          "contributionStats.reportsCount": 1
+        }
+      }
+    );
+
+    const populatedIssue = await Issue.findById(issue._id)
+      .populate("reportedBy", "name email ward")
+      .populate("assignedTo", "name email role");
+
+    const { getIO } = require("../socket/socket");
+
+    // Notify admins
+    getIO()
+      .to("admin-room")
+      .emit("issue-created", {
+        issue: populatedIssue
+      });
+
+    // Notify moderators
+    getIO()
+      .to("moderator-room")
+      .emit("issue-created", {
+        issue: populatedIssue
+      });
+
+    // Notify the citizen who created the issue
+    getIO()
+      .to(`user-${req.user._id}`)
+      .emit("notification", {
+        type: "issue-created",
+        message: "Your civic issue has been submitted successfully.",
+        issueId: populatedIssue._id
+      });
+
+    res.status(201).json({
+      message: "Issue created successfully.",
+      issue: populatedIssue
+    });
+  } catch (error) {
+    console.error("Create issue error:", error);
+
+    res.status(500).json({
+      message: "Failed to create issue."
+    });
+  }
+};
+
 const getIssues = async (req, res) => {
   try {
     const {
@@ -164,107 +261,6 @@ const updateIssueStatus = async (req, res) => {
 
     res.status(500).json({
       message: "Failed to update issue status."
-    });
-  }
-};
-
-const createIssue = async (req, res) => {
-  try {
-    const {
-      title,
-      description,
-      category,
-      latitude,
-      longitude
-    } = req.body;
-
-    if (!title) {
-      return res.status(400).json({
-        message: "Issue title is required."
-      });
-    }
-
-    if (
-      latitude === undefined ||
-      longitude === undefined
-    ) {
-      return res.status(400).json({
-        message: "Location is required."
-      });
-    }
-
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-
-    if (
-      !Number.isFinite(lat) ||
-      !Number.isFinite(lng) ||
-      lat < -90 ||
-      lat > 90 ||
-      lng < -180 ||
-      lng > 180
-    ) {
-      return res.status(400).json({
-        message: "Invalid latitude or longitude."
-      });
-    }
-
-    const allowedCategories = [
-      "road_damage",
-      "garbage",
-      "water_leakage",
-      "street_light",
-      "encroachment",
-      "drainage",
-      "other"
-    ];
-
-    const issueCategory = category || "other";
-
-    if (!allowedCategories.includes(issueCategory)) {
-      return res.status(400).json({
-        message: "Invalid issue category."
-      });
-    }
-
-    const issue = await Issue.create({
-      title: title.trim(),
-      description: description || "",
-      category: issueCategory,
-
-      location: {
-        type: "Point",
-        coordinates: [lng, lat]
-      },
-
-      reportedBy: req.user._id,
-      status: "submitted"
-    });
-
-    const populatedIssue = await Issue.findById(issue._id)
-      .populate("reportedBy", "name email ward")
-      .populate("assignedTo", "name email role");
-
-    // Notify admin and moderators in real time.
-    const { getIO } = require("../socket/socket");
-
-    getIO().to("admin-room").emit("new-issue", {
-      issue: populatedIssue
-    });
-
-    getIO().to("moderator-room").emit("new-issue", {
-      issue: populatedIssue
-    });
-
-    res.status(201).json({
-      message: "Issue reported successfully.",
-      issue: populatedIssue
-    });
-  } catch (error) {
-    console.error("Create issue error:", error);
-
-    res.status(500).json({
-      message: "Failed to create issue."
     });
   }
 };

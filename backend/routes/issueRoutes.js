@@ -12,7 +12,7 @@ const {
 
 const router = express.Router();
 
-// Any logged-in user can report an issue.
+// Citizens can create issues
 router.post(
   "/",
   protect,
@@ -20,7 +20,7 @@ router.post(
   createIssue
 );
 
-// Admin and moderators can manage issues.
+// Admin and moderators can manage issues
 router.get(
   "/",
   protect,

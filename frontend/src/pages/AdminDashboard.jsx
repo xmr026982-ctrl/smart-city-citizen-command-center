@@ -50,15 +50,39 @@ const AdminDashboard = () => {
       );
     };
 
+    const handleIssueCreated = (data) => {
+      setIssues((currentIssues) => {
+        const alreadyExists = currentIssues.some(
+          (issue) => issue._id === data.issue._id
+        );
+
+        if (alreadyExists) {
+          return currentIssues;
+        }
+
+        return [data.issue, ...currentIssues];
+      });
+    };
+
     socket.on(
       "issue-status-updated",
       handleIssueStatusUpdated
+    );
+
+    socket.on(
+      "issue-created",
+      handleIssueCreated
     );
 
     return () => {
       socket.off(
         "issue-status-updated",
         handleIssueStatusUpdated
+      );
+
+      socket.off(
+        "issue-created",
+        handleIssueCreated
       );
 
       disconnectSocket();

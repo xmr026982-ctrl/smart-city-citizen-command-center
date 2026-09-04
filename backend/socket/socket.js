@@ -59,7 +59,6 @@ const initializeSocket = (server) => {
       `Socket connected: ${socket.id} | ${socket.user.role}`
     );
 
-    // Join rooms based on the authenticated user's role.
     if (socket.user.role === "admin") {
       socket.join("admin-room");
     }
@@ -68,10 +67,8 @@ const initializeSocket = (server) => {
       socket.join("moderator-room");
     }
 
-    // Admins can also receive moderator events.
-    if (socket.user.role === "admin") {
-      socket.join("moderator-room");
-    }
+    // Every authenticated user gets a private room
+    socket.join(`user-${socket.user._id}`);
 
     socket.on("disconnect", () => {
       console.log(
