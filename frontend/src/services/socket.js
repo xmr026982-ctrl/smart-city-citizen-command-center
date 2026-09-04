@@ -7,20 +7,24 @@ const socket = io(SOCKET_URL, {
   transports: ["websocket"]
 });
 
-export const connectAdminSocket = () => {
+export const connectSocket = () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    console.error(
+      "Cannot connect Socket.io: token missing."
+    );
+
+    return;
+  }
+
+  socket.auth = {
+    token
+  };
+
   if (!socket.connected) {
     socket.connect();
   }
-
-  socket.emit("join-admin");
-};
-
-export const connectModeratorSocket = () => {
-  if (!socket.connected) {
-    socket.connect();
-  }
-
-  socket.emit("join-moderators");
 };
 
 export const disconnectSocket = () => {

@@ -5,7 +5,7 @@ import socket, {
   disconnectSocket
 } from "../services/socket";
 
-const AdminDashboard = () => {
+const ModeratorPanel = () => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -36,11 +36,6 @@ const AdminDashboard = () => {
     connectSocket();
 
     const handleIssueStatusUpdated = (data) => {
-      console.log(
-        "Real-time issue update:",
-        data
-      );
-
       setIssues((currentIssues) =>
         currentIssues.map((issue) =>
           issue._id === data.issue._id
@@ -71,8 +66,6 @@ const AdminDashboard = () => {
         `/issues/${issueId}/status`,
         { status }
       );
-
-      // The Socket.io event will update the UI.
     } catch (err) {
       console.error(err);
 
@@ -85,8 +78,8 @@ const AdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="p-8">
-        Loading issues...
+      <div className="min-h-screen bg-slate-950 text-white p-8">
+        Loading moderator panel...
       </div>
     );
   }
@@ -95,16 +88,16 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-slate-950 text-white p-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">
-          Admin Dashboard
+          Moderator Panel
         </h1>
 
         <p className="text-slate-400 mt-2">
-          Real-time civic issue management
+          Monitor and manage civic issues in real time.
         </p>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/30 p-4 text-red-400">
+        <div className="mb-6 p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
           {error}
         </div>
       )}
@@ -112,7 +105,7 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
           <p className="text-slate-400">
-            Total Issues
+            Total
           </p>
 
           <p className="text-3xl font-bold mt-2">
@@ -169,7 +162,7 @@ const AdminDashboard = () => {
       <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
         <div className="p-5 border-b border-slate-800">
           <h2 className="text-xl font-semibold">
-            Issue Management
+            Civic Issues
           </h2>
         </div>
 
@@ -182,32 +175,30 @@ const AdminDashboard = () => {
             {issues.map((issue) => (
               <div
                 key={issue._id}
-                className="p-5 hover:bg-slate-800/40 transition"
+                className="p-5"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex flex-col lg:flex-row lg:justify-between gap-4">
                   <div>
-                    <h3 className="font-semibold text-lg">
+                    <h3 className="text-lg font-semibold">
                       {issue.title}
                     </h3>
 
-                    <p className="text-slate-400 text-sm mt-1">
+                    <p className="text-slate-400 mt-1">
                       {issue.description}
                     </p>
 
-                    <div className="flex flex-wrap gap-3 mt-3 text-sm">
-                      <span className="text-slate-400">
-                        Category:{" "}
-                        <span className="text-white">
-                          {issue.category}
-                        </span>
+                    <div className="text-sm text-slate-400 mt-3">
+                      Category:{" "}
+                      <span className="text-white">
+                        {issue.category}
                       </span>
+                    </div>
 
-                      <span className="text-slate-400">
-                        Reported by:{" "}
-                        <span className="text-white">
-                          {issue.reportedBy?.name ||
-                            "Unknown"}
-                        </span>
+                    <div className="text-sm text-slate-400 mt-1">
+                      Citizen:{" "}
+                      <span className="text-white">
+                        {issue.reportedBy?.name ||
+                          "Unknown"}
                       </span>
                     </div>
                   </div>
@@ -225,7 +216,7 @@ const AdminDashboard = () => {
                           e.target.value
                         )
                       }
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm"
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
                     >
                       <option value="submitted">
                         Submitted
@@ -258,4 +249,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard;
+export default ModeratorPanel;
