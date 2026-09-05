@@ -24,6 +24,14 @@ export const connectSocket = () => {
 
   if (!socket.connected) {
     socket.connect();
+
+    socket.on("connect", () => {
+      console.log("SOCKET CONNECTED:", socket.id);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("SOCKET ERROR:", error.message);
+    });
   }
 };
 

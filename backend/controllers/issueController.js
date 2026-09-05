@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Issue = require("../models/Issue");
+const Notification = require("../models/Notification");
 
 const createIssue = async (req, res) => {
   try {
@@ -60,7 +61,26 @@ const createIssue = async (req, res) => {
       .populate("reportedBy", "name email ward")
       .populate("assignedTo", "name email role");
 
+    const notification = await Notification.create({
+      user: req.user._id,
+      type: "issue_created",
+      title: "Issue Submitted",
+      message: `Your civic issue "${issue.title}" has been submitted successfully.`,
+      issue: issue._id,
+      isRead: false
+    });
+
+    console.log(
+      "NOTIFICATION CREATED:",
+      notification._id
+    );
+
     const { getIO } = require("../socket/socket");
+
+    console.log(
+      "EMITTING NOTIFICATION TO:",
+      `user-${req.user._id}`
+    );
 
     // Notify admins
     getIO()
@@ -80,9 +100,7 @@ const createIssue = async (req, res) => {
     getIO()
       .to(`user-${req.user._id}`)
       .emit("notification", {
-        type: "issue-created",
-        message: "Your civic issue has been submitted successfully.",
-        issueId: populatedIssue._id
+        notification
       });
 
     res.status(201).json({

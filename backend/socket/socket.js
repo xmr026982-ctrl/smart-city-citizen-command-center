@@ -56,7 +56,7 @@ const initializeSocket = (server) => {
 
   io.on("connection", (socket) => {
     console.log(
-      `Socket connected: ${socket.id} | ${socket.user.role}`
+      `Socket connected: ${socket.id} | ${socket.user.role} | user-${socket.user._id}`
     );
 
     if (socket.user.role === "admin") {
