@@ -35,23 +35,24 @@ function MapView() {
         attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
         url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
       />
-
+      
       <Marker
-        position={[22.5726, 88.3639]}
+        position={[22.575467, 88.427178]}
         icon={defaultIcon}
       >
       <Popup>
-         📍 You are here
+         💼 Internship Location
       </Popup>
      </Marker>
      <Marker
-        position={[22.57552106681359, 88.42715011092969]}
+        position={[22.656237, 88.424959]}
         icon={defaultIcon}
       >
         <Popup>
-           💼 Internship Location
+           📍 My Home
         </Popup>
      </Marker>
+    
     </MapContainer>
   );
 }
