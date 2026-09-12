@@ -3,6 +3,8 @@ import {
   TileLayer,
   Marker,
   Popup,
+  LayersControl,
+  LayerGroup,
 } from "react-leaflet";
 
 import L from "leaflet";
@@ -31,28 +33,50 @@ function MapView() {
         height: "100vh",
       }}
     >
-      <TileLayer
-        attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
-        url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
-      />
-      
-      <Marker
-        position={[22.575467, 88.427178]}
-        icon={defaultIcon}
-      >
-      <Popup>
-         💼 Internship Location
-      </Popup>
-     </Marker>
-     <Marker
-        position={[22.656237, 88.424959]}
-        icon={defaultIcon}
-      >
-        <Popup>
-           📍 My Home
-        </Popup>
-     </Marker>
-    
+      <LayersControl position="topright">
+
+        {/* Street Map */}
+        <LayersControl.BaseLayer checked name="Street Map">
+          <TileLayer
+            attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
+            url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+          />
+        </LayersControl.BaseLayer>
+
+        {/* Satellite */}
+        <LayersControl.BaseLayer name="Satellite">
+          <TileLayer
+            attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
+            url={`https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`}
+          />
+        </LayersControl.BaseLayer>
+
+        {/* Issues */}
+        <LayersControl.Overlay checked name="Issues">
+          <LayerGroup>
+
+            <Marker
+              position={[22.575467, 88.427178]}
+              icon={defaultIcon}
+            >
+              <Popup>
+                🚧 Road Damage
+              </Popup>
+            </Marker>
+
+            <Marker
+              position={[22.656237, 88.424959]}
+              icon={defaultIcon}
+            >
+              <Popup>
+                🗑️ Garbage Issue
+              </Popup>
+            </Marker>
+
+          </LayerGroup>
+        </LayersControl.Overlay>
+
+      </LayersControl>
     </MapContainer>
   );
 }
