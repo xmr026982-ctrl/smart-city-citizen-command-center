@@ -1,0 +1,817 @@
+/* =========================================================
+   PREMIUM CITIZEN ISSUE CENTER
+========================================================= */
+
+.issue-management-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 42px clamp(18px, 4vw, 64px) 70px;
+  color: #eaf2ff !important;
+  background:
+    radial-gradient(
+      circle at 8% 0%,
+      rgba(68, 123, 255, 0.13),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 94% 12%,
+      rgba(0, 212, 181, 0.08),
+      transparent 28%
+    ),
+    linear-gradient(135deg, #070c15 0%, #0a111e 55%, #071018 100%);
+}
+
+/* Prevent global styles from damaging this page */
+
+.issue-management-page *,
+.issue-management-page *::before,
+.issue-management-page *::after {
+  box-sizing: border-box;
+}
+
+.issue-management-page h1,
+.issue-management-page h2,
+.issue-management-page h3,
+.issue-management-page p,
+.issue-management-page strong,
+.issue-management-page label,
+.issue-management-page span {
+  font-family: inherit;
+}
+
+.issue-management-page h1,
+.issue-management-page h2,
+.issue-management-page h3,
+.issue-management-page strong {
+  color: #f1f6ff !important;
+}
+
+.issue-management-page p {
+  color: #9eafc7 !important;
+}
+
+/* =========================================================
+   SHARED PREMIUM SURFACES
+========================================================= */
+
+.issue-hero-content,
+.issue-hero-card,
+.issue-highlight-card,
+.issue-form-section,
+.issue-form,
+.issue-photo-upload {
+  border: 1px solid rgba(153, 181, 224, 0.13);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(19, 30, 48, 0.94),
+      rgba(10, 18, 31, 0.91)
+    );
+  box-shadow:
+    0 25px 70px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(24px);
+}
+
+/* =========================================================
+   HERO SECTION
+========================================================= */
+
+.issue-page-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+  gap: 24px;
+  max-width: 1480px;
+  margin: 0 auto 24px;
+}
+
+.issue-hero-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 350px;
+  padding: clamp(32px, 5vw, 66px);
+  border-radius: 30px;
+  overflow: hidden;
+  position: relative;
+}
+
+.issue-hero-content::after {
+  content: "";
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: -130px;
+  bottom: -150px;
+  border-radius: 50%;
+  background: rgba(79, 132, 255, 0.13);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.issue-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: #7daaff !important;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  line-height: 1.5;
+}
+
+.issue-hero-content h1 {
+  max-width: 780px;
+  margin: 0;
+  color: #f5f8ff !important;
+  font-size: clamp(2.7rem, 5vw, 5.1rem);
+  font-weight: 850 !important;
+  line-height: 0.99;
+  letter-spacing: -0.065em;
+}
+
+.issue-hero-content p {
+  max-width: 650px;
+  margin: 25px 0 24px;
+  color: #aabbd2 !important;
+  font-size: 1rem;
+  line-height: 1.85;
+}
+
+.issue-hero-status,
+.issue-form-secure-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #c5d4e9 !important;
+  font-size: 0.82rem;
+}
+
+.issue-status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  display: inline-block;
+  border-radius: 50%;
+  background: #42e6b5;
+  box-shadow: 0 0 16px rgba(66, 230, 181, 0.7);
+}
+
+/* Impact card */
+
+.issue-hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 350px;
+  padding: 36px;
+  border-radius: 30px;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 80% 5%,
+      rgba(92, 151, 255, 0.25),
+      transparent 35%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(31, 66, 119, 0.94),
+      rgba(12, 26, 45, 0.97)
+    );
+}
+
+.issue-hero-card::before {
+  content: "";
+  position: absolute;
+  width: 190px;
+  height: 190px;
+  right: -85px;
+  top: -80px;
+  border: 1px solid rgba(165, 198, 255, 0.16);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 25px rgba(165, 198, 255, 0.035),
+    0 0 0 50px rgba(165, 198, 255, 0.025);
+}
+
+.issue-hero-card-label {
+  align-self: flex-start;
+  margin-bottom: auto;
+  color: #a8c5ff !important;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.issue-hero-card strong {
+  max-width: 300px;
+  color: #f7faff !important;
+  font-size: clamp(1.8rem, 3vw, 2.55rem);
+  font-weight: 850 !important;
+  line-height: 1.1;
+  letter-spacing: -0.05em;
+}
+
+.issue-hero-card p {
+  max-width: 320px;
+  margin: 18px 0 0;
+  color: #c1d1e7 !important;
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+/* =========================================================
+   HIGHLIGHT CARDS
+========================================================= */
+
+.issue-highlights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1480px;
+  margin: 0 auto 24px;
+}
+
+.issue-highlight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  min-height: 132px;
+  padding: 25px;
+  border-radius: 22px;
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    background 0.25s ease;
+}
+
+.issue-highlight-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(125, 170, 255, 0.3);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(24, 38, 61, 0.98),
+      rgba(12, 22, 37, 0.95)
+    );
+}
+
+.issue-highlight-number {
+  flex-shrink: 0;
+  padding-top: 2px;
+  color: #7eafff !important;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.issue-highlight-card h2 {
+  margin: 0 0 9px;
+  color: #edf4ff !important;
+  font-size: 1rem;
+  font-weight: 800 !important;
+  line-height: 1.35;
+}
+
+.issue-highlight-card p {
+  margin: 0;
+  color: #9aacc5 !important;
+  font-size: 0.84rem;
+  line-height: 1.7;
+}
+
+/* =========================================================
+   MAIN FORM SECTION
+========================================================= */
+
+.issue-form-section {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: clamp(25px, 4vw, 46px);
+  border-radius: 30px;
+}
+
+.issue-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.issue-section-heading h2 {
+  max-width: 700px;
+  margin: 0;
+  color: #f1f6ff !important;
+  font-size: clamp(1.9rem, 3.2vw, 3rem);
+  font-weight: 850 !important;
+  line-height: 1.08;
+  letter-spacing: -0.05em;
+}
+
+.issue-section-heading p {
+  margin: 13px 0 0;
+  color: #9eafc7 !important;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.issue-form-secure-label {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(66, 230, 181, 0.16);
+  border-radius: 999px;
+  background: rgba(66, 230, 181, 0.045);
+  color: #c7d7e9 !important;
+}
+
+/* Form and upload columns */
+
+.issue-form-wrapper {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.issue-form,
+.issue-photo-upload {
+  min-width: 0;
+  padding: clamp(22px, 3vw, 32px);
+  border-radius: 24px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(7, 14, 26, 0.84),
+      rgba(10, 18, 31, 0.72)
+    );
+}
+
+/* =========================================================
+   FORM FIELDS
+========================================================= */
+
+.issue-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 20px;
+}
+
+.issue-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 10px;
+}
+
+.issue-field-full {
+  grid-column: 1 / -1;
+}
+
+.issue-field label {
+  display: block;
+  margin: 0;
+  color: #dce8fa !important;
+  font-size: 0.82rem;
+  font-weight: 800 !important;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+
+.issue-field label span,
+.issue-form-footer p span {
+  color: #ff9baa !important;
+}
+
+.issue-field input,
+.issue-field select,
+.issue-field textarea {
+  width: 100%;
+  border: 1px solid rgba(145, 173, 216, 0.19);
+  border-radius: 14px;
+  outline: none;
+  padding: 15px 16px;
+  color: #edf4ff !important;
+  background: #111b2b !important;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.issue-field input,
+.issue-field select {
+  min-height: 55px;
+}
+
+.issue-field textarea {
+  min-height: 158px;
+  resize: vertical;
+}
+
+.issue-field input::placeholder,
+.issue-field textarea::placeholder {
+  color: #71849f !important;
+  opacity: 1;
+}
+
+.issue-field select {
+  cursor: pointer;
+  color-scheme: dark;
+  appearance: auto;
+}
+
+/* Dropdown readability fix */
+
+.issue-field select option {
+  color: #edf4ff !important;
+  background: #111b2b !important;
+  padding: 12px;
+}
+
+.issue-field input:focus,
+.issue-field select:focus,
+.issue-field textarea:focus {
+  border-color: #719fff;
+  background: #15243b !important;
+  box-shadow:
+    0 0 0 4px rgba(113, 159, 255, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.issue-field small {
+  color: #7f92ad !important;
+  font-size: 0.75rem;
+  line-height: 1.55;
+}
+
+/* =========================================================
+   FORM FOOTER
+========================================================= */
+
+.issue-form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(145, 173, 216, 0.1);
+}
+
+.issue-form-footer p {
+  margin: 0;
+  color: #7f92ad !important;
+  font-size: 0.78rem;
+}
+
+.issue-submit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 50px;
+  border: 1px solid rgba(205, 225, 255, 0.18);
+  border-radius: 999px;
+  padding: 13px 21px;
+  color: #07111f !important;
+  background: linear-gradient(135deg, #a9c8ff, #7daaff);
+  box-shadow: 0 8px 24px rgba(92, 143, 255, 0.12);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 850;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+
+.issue-submit-button span {
+  color: #07111f !important;
+}
+
+.issue-submit-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 30px rgba(92, 143, 255, 0.22);
+}
+
+.issue-submit-button:active {
+  transform: translateY(0);
+}
+
+.issue-form-success {
+  margin-top: 20px;
+  padding: 15px 17px;
+  border: 1px solid rgba(66, 230, 181, 0.24);
+  border-radius: 14px;
+  color: #91efd0 !important;
+  background: rgba(66, 230, 181, 0.07);
+  font-size: 0.83rem;
+  line-height: 1.7;
+}
+
+/* =========================================================
+   PHOTO UPLOAD
+========================================================= */
+
+.issue-photo-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 22px;
+}
+
+.issue-photo-heading h3 {
+  margin: 0 0 8px;
+  color: #edf4ff !important;
+  font-size: 1.15rem;
+  font-weight: 850 !important;
+  line-height: 1.3;
+}
+
+.issue-photo-heading p {
+  max-width: 280px;
+  margin: 0;
+  color: #9eafc7 !important;
+  font-size: 0.83rem;
+  line-height: 1.7;
+}
+
+.issue-photo-heading > span {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(155, 180, 216, 0.12);
+  border-radius: 999px;
+  color: #b4c8e6 !important;
+  background: rgba(155, 180, 216, 0.08);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.issue-upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 245px;
+  padding: 28px 22px;
+  border: 1px dashed rgba(126, 175, 255, 0.4);
+  border-radius: 20px;
+  text-align: center;
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(126, 175, 255, 0.1),
+      transparent 55%
+    ),
+    rgba(126, 175, 255, 0.035);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.issue-upload-box:hover {
+  border-color: #86b2ff;
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(126, 175, 255, 0.16),
+      transparent 55%
+    ),
+    rgba(126, 175, 255, 0.07);
+  transform: translateY(-2px);
+}
+
+.issue-upload-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 17px;
+  border: 1px solid rgba(143, 184, 255, 0.15);
+  border-radius: 17px;
+  color: #9bbfff !important;
+  background: rgba(143, 184, 255, 0.12);
+  font-size: 1.8rem;
+}
+
+.issue-upload-box strong {
+  color: #edf4ff !important;
+  font-size: 0.95rem;
+  font-weight: 850 !important;
+}
+
+.issue-upload-box p {
+  margin: 10px 0;
+  color: #9eafc7 !important;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.issue-upload-box small {
+  color: #71849f !important;
+  font-size: 0.73rem;
+  line-height: 1.5;
+}
+
+/* Selected files */
+
+.issue-selected-files {
+  margin-top: 22px;
+}
+
+.issue-selected-files-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  color: #dce8fa !important;
+  font-size: 0.82rem;
+}
+
+.issue-selected-files-heading strong {
+  color: #dce8fa !important;
+}
+
+.issue-selected-files-heading span {
+  color: #8eb6ff !important;
+}
+
+.issue-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.issue-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(145, 173, 216, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.issue-file-item > div {
+  min-width: 0;
+}
+
+.issue-file-item strong,
+.issue-file-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.issue-file-item strong {
+  color: #dce8fa !important;
+  font-size: 0.78rem;
+}
+
+.issue-file-item small {
+  margin-top: 5px;
+  color: #71849f !important;
+  font-size: 0.7rem;
+}
+
+.issue-remove-file {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 29px;
+  height: 29px;
+  border: 1px solid rgba(255, 139, 155, 0.14);
+  border-radius: 50%;
+  color: #ff9baa !important;
+  background: rgba(255, 139, 155, 0.08);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.issue-remove-file:hover {
+  background: rgba(255, 139, 155, 0.17);
+  transform: scale(1.05);
+}
+
+.issue-upload-warning {
+  margin: 12px 0 0;
+  color: #ffb56f !important;
+  font-size: 0.78rem;
+}
+
+/* =========================================================
+   RESPONSIVE DESIGN
+========================================================= */
+
+@media (max-width: 1150px) {
+  .issue-page-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-hero-content,
+  .issue-hero-card {
+    min-height: auto;
+  }
+
+  .issue-hero-card {
+    min-height: 260px;
+  }
+
+  .issue-form-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 850px) {
+  .issue-highlights {
+    grid-template-columns: 1fr;
+  }
+
+  .issue-highlight-card {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 650px) {
+  .issue-management-page {
+    padding: 20px 14px 45px;
+  }
+
+  .issue-hero-content,
+  .issue-hero-card,
+  .issue-form-section {
+    border-radius: 22px;
+  }
+
+  .issue-hero-content {
+    padding: 30px 24px;
+  }
+
+  .issue-hero-content h1 {
+    font-size: clamp(2.5rem, 12vw, 4rem);
+  }
+
+  .issue-hero-content p {
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .issue-hero-card {
+    padding: 28px;
+  }
+
+  .issue-section-heading {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .issue-section-heading h2 {
+    font-size: 2rem;
+  }
+
+  .issue-form,
+  .issue-photo-upload {
+    padding: 21px;
+  }
+
+  .issue-form-grid {
+    grid-template-columns: 1fr;
+    gap: 21px;
+  }
+
+  .issue-field-full {
+    grid-column: auto;
+  }
+
+  .issue-form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .issue-submit-button {
+    width: 100%;
+  }
+
+  .issue-photo-heading {
+    flex-direction: column;
+  }
+
+  .issue-photo-heading > span {
+    align-self: flex-start;
+  }
+}
