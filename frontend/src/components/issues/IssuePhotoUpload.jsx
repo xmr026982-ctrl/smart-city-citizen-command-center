@@ -1,12 +1,37 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 function IssuePhotoUpload() {
+  const fileInputRef = useRef(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [error, setError] = useState("");
+
+  const MAX_FILES = 5;
+  const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+  const allowedTypes = ["image/png", "image/jpeg", "image/jpg"];
 
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
+    setError("");
 
-    setSelectedFiles(files);
+    if (files.length === 0) return;
+
+    if (selectedFiles.length + files.length > MAX_FILES) {
+      setError("You can upload a maximum of 5 photos.");
+      return;
+    }
+
+    const invalidFile = files.find(
+      (file) =>
+        !allowedTypes.includes(file.type) || file.size > MAX_FILE_SIZE
+    );
+
+    if (invalidFile) {
+      setError("Only PNG, JPG or JPEG images up to 5 MB each are allowed.");
+      return;
+    }
+
+    setSelectedFiles((previousFiles) => [...previousFiles, ...files]);
   };
 
   const removeFile = (fileIndex) => {
@@ -15,79 +40,106 @@ function IssuePhotoUpload() {
     );
   };
 
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
-    <div className="issue-photo-upload">
+    <div className="issue-photo-content">
       <div className="issue-photo-heading">
-        <div>
-          <h3>Attach photos</h3>
-
-          <p>
-            Add photos that help explain the issue. This step is
-            optional.
-          </p>
-        </div>
-
-        <span>Optional</span>
+        <h3>Attach photos</h3>
+        <p>
+          Optional supporting evidence. Clear photos help the response team
+          understand the issue more accurately.
+        </p>
+        <span className="optional-badge">Optional evidence</span>
       </div>
 
-      <label htmlFor="issuePhotos" className="issue-upload-box">
-        <div className="issue-upload-icon">＋</div>
+      <div
+        className="upload-box"
+        role="button"
+        tabIndex={0}
+        onClick={openFilePicker}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openFilePicker();
+          }
+        }}
+      >
+        <div className="upload-icon">＋</div>
 
-        <strong>Upload issue photos</strong>
+        <h4>
+          {selectedFiles.length > 0
+            ? "Add more photos"
+            : "Upload issue photos"}
+        </h4>
 
-        <p>Click to select images from your device</p>
+        <p>Click or press Enter to select images from your device</p>
 
-        <small>PNG, JPG or JPEG · Maximum 5 photos</small>
-      </label>
+        <div className="upload-note">
+          PNG, JPG or JPEG · Maximum 5 photos
+        </div>
 
-      <input
-        id="issuePhotos"
-        type="file"
-        accept="image/png, image/jpeg, image/jpg"
-        multiple
-        onChange={handleFileChange}
-        hidden
-      />
+        <div className="image-size-requirement">
+          Maximum file size: 5 MB per image
+        </div>
+
+        <div className="image-size-requirement">
+          Recommended resolution: 1200 × 800 px
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/jpg"
+          multiple
+          hidden
+          onChange={handleFileChange}
+        />
+      </div>
+
+      {error && <p className="error-message">{error}</p>}
 
       {selectedFiles.length > 0 && (
-        <div className="issue-selected-files">
-          <div className="issue-selected-files-heading">
+        <div className="selected-photo-list">
+          <div className="selected-photo-header">
             <strong>Selected photos</strong>
-
-            <span>{selectedFiles.length}/5</span>
+            <span>
+              {selectedFiles.length}/{MAX_FILES}
+            </span>
           </div>
 
-          <div className="issue-file-list">
-            {selectedFiles.slice(0, 5).map((file, index) => (
-              <div
-                className="issue-file-item"
-                key={`${file.name}-${index}`}
-              >
+          {selectedFiles.map((file, index) => (
+            <div
+              className="selected-photo-item"
+              key={`${file.name}-${index}`}
+            >
+              <div className="selected-photo-info">
+                <span className="selected-photo-number">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
                 <div>
                   <strong>{file.name}</strong>
-
                   <small>
-                    {(file.size / 1024).toFixed(1)} KB
+                    {(file.size / (1024 * 1024)).toFixed(2)} MB
                   </small>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => removeFile(index)}
-                  className="issue-remove-file"
-                  aria-label={`Remove ${file.name}`}
-                >
-                  ×
-                </button>
               </div>
-            ))}
-          </div>
 
-          {selectedFiles.length > 5 && (
-            <p className="issue-upload-warning">
-              Only the first 5 photos will be used.
-            </p>
-          )}
+              <button
+                type="button"
+                className="remove-photo-button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeFile(index);
+                }}
+                aria-label={`Remove ${file.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -1,5 +1,11 @@
-.app-shell {
-  min-height: 100vh;
+/* App-level only — intentionally minimal to avoid conflicts with issue.css */
+
+#root {
   width: 100%;
-  background: #080d16;
+  min-height: 100vh;
+}
+
+.app-container {
+  width: 100%;
+  min-height: 100vh;
 }
