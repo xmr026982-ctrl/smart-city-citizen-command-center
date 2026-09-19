@@ -1,0 +1,237 @@
+/* =========================================================
+   SMART CITY DESIGN TOKENS
+   PREMIUM WHITE — DEFAULT
+   PREMIUM DARK — OPTIONAL
+   ========================================================= */
+
+:root {
+  /* =======================================================
+     BRAND
+     ======================================================= */
+
+  --sc-accent: #2563eb;
+  --sc-accent-hover: #1d4ed8;
+  --sc-accent-strong: #1e40af;
+  --sc-accent-soft: #eff6ff;
+  --sc-accent-soft-strong: #dbeafe;
+
+  --sc-cyan: #0891b2;
+  --sc-violet: #7c3aed;
+
+  /* =======================================================
+     BACKGROUND
+     ======================================================= */
+
+  --sc-bg: #f5f7fb;
+  --sc-bg-elevated: #ffffff;
+
+  --sc-bg-glow-primary: rgba(191, 219, 254, 0.46);
+  --sc-bg-glow-secondary: rgba(224, 231, 255, 0.44);
+
+  /* =======================================================
+     SURFACES
+     ======================================================= */
+
+  --sc-surface: #ffffff;
+  --sc-surface-raised: #ffffff;
+  --sc-surface-soft: #f8fafc;
+  --sc-surface-muted: #f1f5f9;
+
+  --sc-glass: rgba(255, 255, 255, 0.78);
+  --sc-glass-strong: rgba(255, 255, 255, 0.92);
+  --sc-glass-border: rgba(255, 255, 255, 0.82);
+
+  /* =======================================================
+     TEXT
+     ======================================================= */
+
+  --sc-text-primary: #0f172a;
+  --sc-text-secondary: #475569;
+  --sc-text-muted: #64748b;
+  --sc-text-subtle: #94a3b8;
+  --sc-text-disabled: #cbd5e1;
+  --sc-text-inverse: #ffffff;
+
+  /* =======================================================
+     BORDERS
+     ======================================================= */
+
+  --sc-border: #e2e8f0;
+  --sc-border-soft: #edf1f6;
+  --sc-border-strong: #cbd5e1;
+  --sc-border-accent: rgba(37, 99, 235, 0.3);
+
+  /* =======================================================
+     STATUS
+     ======================================================= */
+
+  --sc-success: #059669;
+  --sc-success-soft: #ecfdf5;
+  --sc-success-border: #a7f3d0;
+
+  --sc-warning: #d97706;
+  --sc-warning-soft: #fffbeb;
+  --sc-warning-border: #fde68a;
+
+  --sc-danger: #dc2626;
+  --sc-danger-soft: #fef2f2;
+  --sc-danger-border: #fecaca;
+
+  --sc-info: #0284c7;
+  --sc-info-soft: #f0f9ff;
+  --sc-info-border: #bae6fd;
+
+  /* =======================================================
+     SHADOWS
+     ======================================================= */
+
+  --sc-shadow-xs:
+    0 1px 2px rgba(15, 23, 42, 0.04);
+
+  --sc-shadow-sm:
+    0 4px 14px rgba(15, 23, 42, 0.05);
+
+  --sc-shadow-md:
+    0 12px 35px rgba(15, 23, 42, 0.07),
+    0 2px 8px rgba(15, 23, 42, 0.025);
+
+  --sc-shadow-lg:
+    0 24px 65px rgba(15, 23, 42, 0.1),
+    0 6px 20px rgba(15, 23, 42, 0.04);
+
+  --sc-shadow-accent:
+    0 12px 30px rgba(37, 99, 235, 0.2);
+
+  /* =======================================================
+     FOCUS
+     ======================================================= */
+
+  --sc-focus-ring: rgba(37, 99, 235, 0.38);
+
+  /* =======================================================
+     LAYOUT
+     ======================================================= */
+
+  --sc-radius-xs: 8px;
+  --sc-radius-sm: 10px;
+  --sc-radius-md: 14px;
+  --sc-radius-lg: 18px;
+  --sc-radius-xl: 24px;
+  --sc-radius-2xl: 30px;
+  --sc-radius-pill: 999px;
+
+  --sc-sidebar-width: 272px;
+  --sc-navbar-height: 76px;
+
+  /* =======================================================
+     MOTION
+     ======================================================= */
+
+  --sc-ease:
+    cubic-bezier(0.22, 1, 0.36, 1);
+
+  --sc-duration-fast: 140ms;
+  --sc-duration-normal: 220ms;
+  --sc-duration-slow: 360ms;
+
+  /* =======================================================
+     Z-INDEX
+     ======================================================= */
+
+  --sc-z-base: 1;
+  --sc-z-dropdown: 50;
+  --sc-z-sticky: 60;
+  --sc-z-overlay: 90;
+  --sc-z-modal: 100;
+  --sc-z-toast: 200;
+
+  /* =======================================================
+     SCROLLBAR
+     ======================================================= */
+
+  --sc-scroll-track: #eef2f7;
+  --sc-scroll-thumb: #cbd5e1;
+  --sc-scroll-thumb-hover: #94a3b8;
+}
+
+/* =========================================================
+   PREMIUM DARK
+   Future dashboard settings will activate this through:
+
+   document.documentElement.dataset.theme = "premium-dark"
+   ========================================================= */
+
+html[data-theme="premium-dark"] {
+  --sc-accent: #60a5fa;
+  --sc-accent-hover: #93c5fd;
+  --sc-accent-strong: #bfdbfe;
+  --sc-accent-soft: rgba(59, 130, 246, 0.12);
+  --sc-accent-soft-strong: rgba(96, 165, 250, 0.18);
+
+  --sc-cyan: #22d3ee;
+  --sc-violet: #a78bfa;
+
+  --sc-bg: #070a0f;
+  --sc-bg-elevated: #0b1018;
+
+  --sc-bg-glow-primary: rgba(37, 99, 235, 0.13);
+  --sc-bg-glow-secondary: rgba(124, 58, 237, 0.1);
+
+  --sc-surface: #0d131c;
+  --sc-surface-raised: #111923;
+  --sc-surface-soft: #121a25;
+  --sc-surface-muted: #17212e;
+
+  --sc-glass: rgba(13, 19, 28, 0.78);
+  --sc-glass-strong: rgba(13, 19, 28, 0.94);
+  --sc-glass-border: rgba(148, 163, 184, 0.12);
+
+  --sc-text-primary: #f8fafc;
+  --sc-text-secondary: #cbd5e1;
+  --sc-text-muted: #94a3b8;
+  --sc-text-subtle: #64748b;
+  --sc-text-disabled: #475569;
+  --sc-text-inverse: #0f172a;
+
+  --sc-border: #1e293b;
+  --sc-border-soft: #17212e;
+  --sc-border-strong: #334155;
+  --sc-border-accent: rgba(96, 165, 250, 0.28);
+
+  --sc-success: #34d399;
+  --sc-success-soft: rgba(16, 185, 129, 0.1);
+  --sc-success-border: rgba(52, 211, 153, 0.22);
+
+  --sc-warning: #fbbf24;
+  --sc-warning-soft: rgba(245, 158, 11, 0.1);
+  --sc-warning-border: rgba(251, 191, 36, 0.22);
+
+  --sc-danger: #f87171;
+  --sc-danger-soft: rgba(239, 68, 68, 0.1);
+  --sc-danger-border: rgba(248, 113, 113, 0.22);
+
+  --sc-info: #38bdf8;
+  --sc-info-soft: rgba(14, 165, 233, 0.1);
+  --sc-info-border: rgba(56, 189, 248, 0.22);
+
+  --sc-shadow-xs:
+    0 1px 2px rgba(0, 0, 0, 0.28);
+
+  --sc-shadow-sm:
+    0 6px 18px rgba(0, 0, 0, 0.24);
+
+  --sc-shadow-md:
+    0 18px 45px rgba(0, 0, 0, 0.3);
+
+  --sc-shadow-lg:
+    0 28px 75px rgba(0, 0, 0, 0.4);
+
+  --sc-shadow-accent:
+    0 14px 35px rgba(37, 99, 235, 0.18);
+
+  --sc-focus-ring: rgba(96, 165, 250, 0.42);
+
+  --sc-scroll-track: #0b1018;
+  --sc-scroll-thumb: #334155;
+  --sc-scroll-thumb-hover: #475569;
+}

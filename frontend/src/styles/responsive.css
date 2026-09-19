@@ -1,0 +1,42 @@
+/* =========================================================
+   SMART CITY RESPONSIVE SYSTEM
+   ========================================================= */
+
+@media (max-width: 1200px) {
+  :root {
+    --sc-sidebar-width: 248px;
+  }
+
+  .page-container {
+    width: min(100% - 40px, 1280px);
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --sc-sidebar-width: 0px;
+    --sc-navbar-height: 68px;
+  }
+
+  .page-container {
+    width: min(100% - 32px, 100%);
+    padding-block: 26px;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .page-container {
+    width: min(100% - 24px, 100%);
+    padding-block: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-container {
+    width: min(100% - 20px, 100%);
+  }
+}

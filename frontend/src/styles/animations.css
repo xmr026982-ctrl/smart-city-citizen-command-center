@@ -1,0 +1,216 @@
+/* =========================================================
+   SMART CITY MOTION SYSTEM
+   Subtle • Premium • Operational
+   ========================================================= */
+
+@keyframes sc-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sc-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sc-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sc-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.62;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes sc-status-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(5, 150, 105, 0.28);
+  }
+
+  70% {
+    box-shadow:
+      0 0 0 7px rgba(5, 150, 105, 0);
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(5, 150, 105, 0);
+  }
+}
+
+@keyframes sc-shimmer {
+  0% {
+    background-position: -500px 0;
+  }
+
+  100% {
+    background-position: 500px 0;
+  }
+}
+
+@keyframes sc-border-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* =========================================================
+   ANIMATION UTILITIES
+   ========================================================= */
+
+.animate-fade-in {
+  animation: sc-fade-in var(--sc-duration-slow) ease both;
+}
+
+.animate-fade-up {
+  animation: sc-fade-up 480ms var(--sc-ease) both;
+}
+
+.animate-scale-in {
+  animation: sc-scale-in 360ms var(--sc-ease) both;
+}
+
+.animate-slide-right {
+  animation: sc-slide-right 360ms var(--sc-ease) both;
+}
+
+.animate-slide-left {
+  animation: sc-slide-left 360ms var(--sc-ease) both;
+}
+
+.animate-pulse {
+  animation: sc-pulse 2s ease-in-out infinite;
+}
+
+.animate-status-pulse {
+  animation: sc-status-pulse 2s ease-out infinite;
+}
+
+/* =========================================================
+   STAGGER HELPERS
+   ========================================================= */
+
+.stagger-1 {
+  animation-delay: 40ms;
+}
+
+.stagger-2 {
+  animation-delay: 80ms;
+}
+
+.stagger-3 {
+  animation-delay: 120ms;
+}
+
+.stagger-4 {
+  animation-delay: 160ms;
+}
+
+.stagger-5 {
+  animation-delay: 200ms;
+}
+
+.stagger-6 {
+  animation-delay: 240ms;
+}
+
+/* =========================================================
+   INTERACTIVE MOTION
+   ========================================================= */
+
+.sc-interactive {
+  transition:
+    transform var(--sc-duration-normal) var(--sc-ease),
+    box-shadow var(--sc-duration-normal) var(--sc-ease),
+    border-color var(--sc-duration-normal) ease,
+    background-color var(--sc-duration-normal) ease;
+}
+
+.sc-interactive:hover {
+  transform: translateY(-2px);
+}
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-up,
+  .animate-scale-in,
+  .animate-slide-right,
+  .animate-slide-left,
+  .animate-pulse,
+  .animate-status-pulse {
+    animation: none;
+  }
+
+  .sc-interactive {
+    transition: none;
+  }
+
+  .sc-interactive:hover {
+    transform: none;
+  }
+}
