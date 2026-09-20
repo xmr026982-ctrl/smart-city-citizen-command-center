@@ -41,7 +41,7 @@ function ReportIssue() {
 
   const steps = [
     { n: "01", title: "Describe the issue", body: "Tell us what happened with a clear and simple description." },
-    { n: "02", title: "Add the location", body: "Provide the affected ward so the right department can respond." },
+    { n: "02", title: "Add the location", body: "Provide the affected area so the right department can respond." },
     { n: "03", title: "Attach evidence", body: "Upload photos to help the team understand the problem faster." },
   ];
 
@@ -53,9 +53,12 @@ function ReportIssue() {
           <h1>Report a city issue</h1>
           <p>
             Help improve your city by reporting problems around you. Share the
-            details, add the location, and track the progress of your report from
-            one place.
+            details, add the location, and track the progress of your report from one place.
           </p>
+          <div className="hero-live">
+            <span className="live-dot" />
+            Every report helps build a better city
+          </div>
         </div>
         <aside className="impact-card">
           <p className="eyebrow">Your impact</p>
@@ -66,7 +69,7 @@ function ReportIssue() {
 
       <section className="step-grid">
         {steps.map((step) => (
-          <article key={step.n} className="step-card panel">
+          <article key={step.n} className="step-card">
             <p className="eyebrow">{step.n}</p>
             <h3>{step.title}</h3>
             <p>{step.body}</p>
@@ -75,9 +78,20 @@ function ReportIssue() {
       </section>
 
       <section className="panel" style={{ padding: 32 }}>
-        <p className="eyebrow">New report</p>
-        <h2 style={{ margin: "12px 0 8px" }}>Tell us what needs attention</h2>
-        <div className="report-layout" style={{ marginTop: 24 }}>
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">New report</p>
+            <h2 style={{ margin: "12px 0 8px" }}>Tell us what needs attention</h2>
+            <p style={{ color: "var(--muted)", maxWidth: 520 }}>
+              Complete the details below. Required fields are marked in red.
+            </p>
+          </div>
+          <span className="citizen-chip">
+            <span className="live-dot" />
+            Citizen report
+          </span>
+        </div>
+        <div className="report-layout">
           <CitizenReportForm photos={photos} onSubmit={handleSubmit} />
           <aside className="photo-panel">
             <IssuePhotoUpload files={photos} onChange={setPhotos} />

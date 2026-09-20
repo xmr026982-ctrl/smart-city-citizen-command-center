@@ -1,8 +1,5 @@
 @media (max-width: 960px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
+  .app-shell { grid-template-columns: 1fr; }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
@@ -11,32 +8,11 @@
     transform: translateX(-100%);
     transition: transform 200ms var(--ease);
   }
-
-  .sidebar.open {
-    transform: none;
-  }
-
-  .menu-btn {
-    display: grid;
-    place-items: center;
-  }
-
-  .hero-grid,
-  .report-layout,
-  .step-grid,
-  .stats-grid,
-  .form-grid {
+  .sidebar.open { transform: none; }
+  .menu-btn { display: grid; place-items: center; }
+  .hero-grid, .report-layout, .step-grid, .stats-grid, .form-grid, .intel-grid, .category-grid {
     grid-template-columns: 1fr;
   }
-
-  .span-2 {
-    grid-column: auto;
-  }
-
-  .page-wrap,
-  .topbar,
-  .hero-card {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
+  .span-2 { grid-column: auto; }
+  .page-wrap, .topbar, .hero-card { padding-left: 16px; padding-right: 16px; }
 }

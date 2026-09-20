@@ -5,6 +5,7 @@ const NAV = {
   citizen: [
     { to: "/citizen/report", label: "Report Issue" },
     { to: "/citizen/my-reports", label: "My Reports" },
+    { to: "/citizen/saved", label: "Saved Reports" },
   ],
   staff: [
     { to: "/staff/queue", label: "Work Queue" },
@@ -33,25 +34,20 @@ function Sidebar({ open, onClose }) {
           <small>Issue Command</small>
         </span>
       </div>
-
       <nav className="sidebar-nav" onClick={onClose}>
         {items.map((item) => (
           <NavLink
             key={item.label}
             to={item.to}
             end={item.to === "/staff"}
-            className={({ isActive }) =>
-              `sidebar-link${isActive ? " active" : ""}`
-            }
+            className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}
           >
             {item.label}
           </NavLink>
         ))}
       </nav>
-
       <p className="sidebar-note">
-        Person 4 — Issue Management only. Auth, map, dashboard and community stay
-        with their owners.
+        Person 4 — Issue Management only. Auth, map, dashboard and community stay with their owners.
       </p>
     </aside>
   );
