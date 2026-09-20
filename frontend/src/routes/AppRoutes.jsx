@@ -1,83 +1,61 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import Layout from "../components/layout/Layout";
+import RoleRoute from "./RoleRoute";
+import ReportIssue from "../pages/citizen/ReportIssue";
+import MyReports from "../pages/citizen/MyReports";
+import CitizenIssueDetails from "../pages/citizen/CitizenIssueDetails";
+import SavedReports from "../pages/citizen/SavedReports";
+import StaffWorkQueue from "../pages/staff/StaffWorkQueue";
+import AssignedIssues from "../pages/staff/AssignedIssues";
+import StaffDashboard from "../pages/staff/StaffDashboard";
+import StaffIssueDetails from "../pages/staff/StaffIssueDetails";
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import AllIssues from "../pages/admin/AllIssues";
+import ManageAssignments from "../pages/admin/ManageAssignments";
+import IssueAnalytics from "../pages/admin/IssueAnalytics";
+import IssueAuditLogs from "../pages/admin/IssueAuditLogs";
+import AdminIssueDetails from "../pages/admin/AdminIssueDetails";
+import NotFound from "../pages/common/NotFound";
+import { useAuth } from "../store/authStore";
 
-function PlaceholderPage({ title }) {
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: "40px",
-        background: "var(--sc-bg)",
-        color: "var(--sc-text-primary)",
-      }}
-    >
-      <section
-        style={{
-          width: "min(100%, 720px)",
-          padding: "40px",
-          borderRadius: "var(--sc-radius-xl)",
-          background: "var(--sc-surface)",
-          border: "1px solid var(--sc-border)",
-          boxShadow: "var(--sc-shadow-lg)",
-          textAlign: "center",
-        }}
-      >
-        <p
-          style={{
-            marginBottom: "10px",
-            color: "var(--sc-accent)",
-            fontSize: "12px",
-            fontWeight: 700,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-          }}
-        >
-          Smart City Command Center
-        </p>
-
-        <h1>{title}</h1>
-
-        <p>
-          This module is being connected to the new Smart City interface.
-        </p>
-      </section>
-    </main>
-  );
+function HomeRedirect() {
+  const user = useAuth();
+  if (user.role === "staff") return <Navigate to="/staff/queue" replace />;
+  if (user.role === "admin") return <Navigate to="/admin/command" replace />;
+  return <Navigate to="/citizen/report" replace />;
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<Navigate to="/dashboard" replace />}
-      />
+      <Route element={<Layout />}>
+        <Route path="/" element={<HomeRedirect />} />
 
-      <Route
-        path="/dashboard"
-        element={<PlaceholderPage title="City Dashboard" />}
-      />
+        <Route element={<RoleRoute allow={["citizen"]} />}>
+          <Route path="/citizen/report" element={<ReportIssue />} />
+          <Route path="/citizen/my-reports" element={<MyReports />} />
+          <Route path="/citizen/saved" element={<SavedReports />} />
+          <Route path="/citizen/issues/:id" element={<CitizenIssueDetails />} />
+        </Route>
 
-      <Route
-        path="/issues"
-        element={<PlaceholderPage title="Issue Management" />}
-      />
+        <Route element={<RoleRoute allow={["staff"]} />}>
+          <Route path="/staff" element={<StaffDashboard />} />
+          <Route path="/staff/queue" element={<StaffWorkQueue />} />
+          <Route path="/staff/assigned" element={<AssignedIssues />} />
+          <Route path="/staff/issues/:id" element={<StaffIssueDetails />} />
+        </Route>
 
-      <Route
-        path="/issues/my-reports"
-        element={<PlaceholderPage title="My Reports" />}
-      />
+        <Route element={<RoleRoute allow={["admin"]} />}>
+          <Route path="/admin/command" element={<AdminDashboard />} />
+          <Route path="/admin/queue" element={<AllIssues />} />
+          <Route path="/admin/assignments" element={<ManageAssignments />} />
+          <Route path="/admin/analytics" element={<IssueAnalytics />} />
+          <Route path="/admin/audit" element={<IssueAuditLogs />} />
+          <Route path="/admin/issues/:id" element={<AdminIssueDetails />} />
+        </Route>
 
-      <Route
-        path="/issues/:issueId"
-        element={<PlaceholderPage title="Issue Details" />}
-      />
-
-      <Route
-        path="*"
-        element={<Navigate to="/dashboard" replace />}
-      />
+        <Route path="*" element={<NotFound />} />
+      </Route>
     </Routes>
   );
 }

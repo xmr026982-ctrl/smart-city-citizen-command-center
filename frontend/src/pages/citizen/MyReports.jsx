@@ -1,135 +1,42 @@
-import { useState } from "react";
-import IssueCard from "../components/issues/IssueCard";
-import IssueFilters from "../components/issues/IssueFilters";
-import IssueDetailsDrawer from "../components/issues/IssueDetailsDrawer";
-import "../styles/issue.css";
+import { useMemo, useState } from "react";
+import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
+import IssueFilters from "../../components/issues/shared/IssueFilters";
+import IssueList from "../../components/issues/shared/IssueList";
+import PageHeader from "../../components/layout/PageHeader";
+import { useAuth } from "../../store/authStore";
+import { useIssues } from "../../store/issueStore";
 
 function MyReports() {
-  // Temporary mock data – replace later with real API
-  const [reports] = useState([
-    {
-      id: "ISS-2401",
-      title: "Broken streetlight near Central Park",
-      category: "Street Lighting",
-      location: "Sector 12, Main Road",
-      status: "In Progress",
-      createdAt: "12 Sep 2026",
-      updatedAt: "15 Sep 2026",
-      description:
-        "The streetlight has been non-functional for the past week. The area becomes very dark after sunset, creating safety concerns for pedestrians and residents.",
-    },
-    {
-      id: "ISS-2398",
-      title: "Water leakage on 3rd Avenue",
-      category: "Water Supply",
-      location: "Near City Mall",
-      status: "Acknowledged",
-      createdAt: "10 Sep 2026",
-      updatedAt: "11 Sep 2026",
-      description:
-        "Continuous water leakage from a broken pipe is flooding the footpath and wasting water.",
-    },
-    {
-      id: "ISS-2385",
-      title: "Garbage pile-up behind market",
-      category: "Waste Management",
-      location: "Old Market Lane",
-      status: "Resolved",
-      createdAt: "05 Sep 2026",
-      updatedAt: "14 Sep 2026",
-      description:
-        "Large pile of uncollected garbage has been accumulating behind the market for several days.",
-    },
-  ]);
+  const user = useAuth();
+  const issues = useIssues();
+  const [filter, setFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
 
-  const [filter, setFilter] = useState("All");
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
-  const filteredReports =
-    filter === "All"
-      ? reports
-      : reports.filter((r) => r.status === filter);
-
-  const openDrawer = (report) => {
-    setSelectedReport(report);
-    setIsDrawerOpen(true);
-  };
-
-  const closeDrawer = () => {
-    setIsDrawerOpen(false);
-    setSelectedReport(null);
-  };
+  const mine = useMemo(
+    () => issues.filter((issue) => issue.reporterId === user.id || issue.reportedBy === user.name),
+    [issues, user]
+  );
+  const filtered = filter === "all" ? mine : mine.filter((issue) => issue.status === filter);
+  const selected = issues.find((issue) => issue.id === selectedId) || null;
 
   return (
-    <main className="issue-management-page">
-      {/* Hero */}
-      <section className="issue-page-hero" style={{ gridTemplateColumns: "1fr" }}>
-        <div
-          className="issue-hero-content"
-          style={{ minHeight: "auto", padding: "56px 64px" }}
-        >
-          <span className="issue-eyebrow">CITIZEN SERVICES / MY REPORTS</span>
-          <h1 style={{ fontSize: "clamp(36px, 4.5vw, 58px)", margin: "28px 0 18px" }}>
-            Your submitted reports
-          </h1>
-          <p style={{ maxWidth: "640px", marginBottom: 0 }}>
-            Track every civic issue you have reported. View live status, updates,
-            and history in one clean place.
-          </p>
-        </div>
-      </section>
-
-      {/* Filters + List */}
-      <section className="issue-form-section" style={{ marginTop: 32, padding: "36px 40px" }}>
-        <div className="issue-section-heading" style={{ marginBottom: 28 }}>
-          <div>
-            <span className="issue-eyebrow">YOUR ACTIVITY</span>
-            <h2 style={{ fontSize: "clamp(28px, 3.2vw, 40px)", margin: "14px 0 8px" }}>
-              {filteredReports.length} report{filteredReports.length !== 1 ? "s" : ""}
-            </h2>
-            <p style={{ margin: 0 }}>Filter by current status</p>
-          </div>
-        </div>
-
-        <IssueFilters activeFilter={filter} onFilterChange={setFilter} />
-
-        <div style={{ marginTop: 36, display: "grid", gap: 18 }}>
-          {filteredReports.length === 0 ? (
-            <div
-              style={{
-                padding: "48px 32px",
-                textAlign: "center",
-                border: "1px dashed #cbd5e1",
-                borderRadius: 20,
-                background: "#f8fafc",
-                color: "#64748b",
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 15 }}>
-                No reports found for this status.
-              </p>
-            </div>
-          ) : (
-            filteredReports.map((report) => (
-              <div
-                key={report.id}
-                onClick={() => openDrawer(report)}
-                style={{ cursor: "pointer" }}
-              >
-                <IssueCard report={report} />
-              </div>
-            ))
-          )}
-        </div>
-      </section>
-
-      {/* Details Drawer */}
-      <IssueDetailsDrawer
-        report={selectedReport}
-        isOpen={isDrawerOpen}
-        onClose={closeDrawer}
+    <main className="page-stack">
+      <PageHeader
+        eyebrow="Citizen services / My reports"
+        title="Your submitted reports"
+        description="Track every civic issue you have reported. View live status and history in one place."
       />
+      <section className="panel" style={{ padding: 28 }}>
+        <p className="eyebrow">Your activity</p>
+        <h2 style={{ margin: "10px 0 16px" }}>
+          {filtered.length} report{filtered.length === 1 ? "" : "s"}
+        </h2>
+        <IssueFilters value={filter} onChange={setFilter} />
+        <div style={{ marginTop: 24 }}>
+          <IssueList issues={filtered} onSelect={(issue) => setSelectedId(issue.id)} />
+        </div>
+      </section>
+      <IssueDetailsDrawer issue={selected} onClose={() => setSelectedId(null)} />
     </main>
   );
 }

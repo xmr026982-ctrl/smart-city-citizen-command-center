@@ -1,0 +1,97 @@
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-label {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.req {
+  color: var(--danger);
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+  transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+
+.input,
+.select {
+  height: 44px;
+  padding: 0 14px;
+}
+
+.textarea {
+  min-height: 140px;
+  padding: 12px 14px;
+  resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(30, 58, 95, 0.1);
+}
+
+.input.invalid,
+.select.invalid,
+.textarea.invalid {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.1);
+}
+
+.field-error {
+  margin-top: 10px;
+  border: 1px solid color-mix(in oklab, var(--danger) 25%, white);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  transition: transform 150ms var(--ease), background 150ms var(--ease);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.btn-secondary {
+  background: var(--card);
+  color: var(--fg);
+  border-color: var(--border);
+}

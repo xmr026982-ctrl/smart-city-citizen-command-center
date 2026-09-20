@@ -1,0 +1,41 @@
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--card);
+}
+
+.issue-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.issue-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  font-weight: 600;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.issue-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.issue-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.issue-table tbody tr {
+  cursor: pointer;
+}
+
+.issue-table tbody tr:hover {
+  background: var(--bg);
+}
