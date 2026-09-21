@@ -188,56 +188,50 @@ export default function Contact() {
 
               <div className="form-group">
 
-                <label>Issue Type</label>
+               <select required>
+    <option value="">
+      Select a topic
+    </option>
 
-                <select required>
+    <option value="account">
+      Account / Sign In Problem
+    </option>
 
-                  <option value="">
-                    Select an issue
-                  </option>
+    <option value="registration">
+      Registration / Sign Up Problem
+    </option>
 
-                  <option>
-                    Road / Street
-                  </option>
+    <option value="password">
+      Password / Account Recovery
+    </option>
 
-                  <option>
-                    Garbage / Waste
-                  </option>
+    <option value="technical">
+      Technical Problem
+    </option>
 
-                  <option>
-                    Water Supply
-                  </option>
+    <option value="website">
+      Website / App Problem
+    </option>
 
-                  <option>
-                    Electricity
-                  </option>
+    <option value="feedback">
+      Feedback / Suggestion
+    </option>
 
-                  <option>
-                    Public Transport
-                  </option>
+    <option value="other">
+      Other
+    </option>
+  </select>
+</div>
 
-                  <option>
-                    Other
-                  </option>
+<div className="form-group">
+  <label>Message</label>
 
-                </select>
-
-              </div>
-
-
-              <div className="form-group">
-
-                <label>Message</label>
-
-                <textarea
-                  rows="4"
-                  placeholder="Describe your problem..."
-                  required
-                ></textarea>
-
-              </div>
-
-
+  <textarea
+    rows="4"
+    placeholder="Describe your problem or question..."
+    required
+  ></textarea>
+</div>
               <div className="modal-actions">
 
                 <button
