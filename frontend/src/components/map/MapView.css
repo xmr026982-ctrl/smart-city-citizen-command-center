@@ -1,38 +1,244 @@
-/* =========================================
-   GLOBAL
-========================================= */
+/* =====================================================
+   GLOBAL RESET
+===================================================== */
 
 html,
 body,
 #root {
   margin: 0;
   padding: 0;
-
   width: 100%;
   height: 100%;
 }
 
-
-/* =========================================
+/* =====================================================
    MAIN MAP
-========================================= */
+===================================================== */
 
-.map-view {
+.map-view-container {
   position: relative;
-
   width: 100%;
   height: 100vh;
-
   margin: 0;
   padding: 0;
+  overflow: hidden;
 
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
 }
 
+.map-view-container .leaflet-container {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  z-index: 1;
+}
 
-/* =========================================
-   SEARCH BOX
-========================================= */
+/* =====================================================
+   STYLISH CUSTOM LEAFLET MARKERS
+===================================================== */
+
+.custom-leaflet-marker {
+  background: transparent;
+  border: none;
+}
+
+/* Base Pin */
+
+.custom-marker-pin {
+  width: 36px;
+  height: 36px;
+  border-radius: 50% 50% 50% 0;
+
+  position: absolute;
+  transform: rotate(-45deg);
+
+  left: 50%;
+  top: 50%;
+
+  margin: -18px 0 0 -18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+
+  transition:
+    transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    box-shadow 0.25s ease;
+
+  animation: dropPin 0.4s ease-out;
+}
+
+/* Hover Zoom */
+
+.custom-marker-pin:hover {
+  transform: rotate(-45deg) scale(1.22);
+  z-index: 999;
+
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* Icon Inside Pin */
+
+.marker-symbol {
+  transform: rotate(45deg);
+  font-size: 17px;
+  display: block;
+  user-select: none;
+}
+
+/* Drop Animation */
+
+@keyframes dropPin {
+  0% {
+    opacity: 0;
+    transform: translateY(-25px) rotate(-45deg) scale(0.6);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(-45deg) scale(1);
+  }
+}
+
+/* =====================================================
+   CATEGORY MARKER ICONS
+===================================================== */
+
+.custom-category-icon {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-category-icon-inner {
+  width: 28px;
+  height: 28px;
+
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(255, 255, 255, 0.96);
+  border: 2px solid rgba(255, 255, 255, 0.95);
+
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.18),
+    0 2px 5px rgba(0, 0, 0, 0.12);
+
+  font-size: 16px;
+  line-height: 1;
+
+  user-select: none;
+}
+
+/* =====================================================
+   MARKER COLOR VARIANTS
+===================================================== */
+
+.marker-selected {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.6);
+}
+
+.marker-clicked {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+}
+
+.marker-command {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
+}
+
+.marker-hospital,
+.marker-pharmacy {
+  background: linear-gradient(135deg, #10b981, #047857);
+  border: 2px solid #ffffff;
+}
+
+.marker-shop,
+.marker-restaurant {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: 2px solid #ffffff;
+}
+
+.marker-bank {
+  background: linear-gradient(135deg, #06b6d4, #0e7490);
+  border: 2px solid #ffffff;
+}
+
+.marker-school {
+  background: linear-gradient(135deg, #ec4899, #be185d);
+  border: 2px solid #ffffff;
+}
+
+.marker-other {
+  background: linear-gradient(135deg, #64748b, #334155);
+  border: 2px solid #ffffff;
+}
+
+/* =====================================================
+   USER LIVE POSITION PULSE MARKER
+===================================================== */
+
+.user-location-pulse-marker {
+  width: 20px;
+  height: 20px;
+
+  background-color: #2563eb;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.8);
+
+  position: relative;
+}
+
+.user-location-pulse-marker::after {
+  content: "";
+
+  position: absolute;
+
+  width: 100%;
+  height: 100%;
+
+  top: -3px;
+  left: -3px;
+
+  border-radius: 50%;
+  border: 3px solid #3b82f6;
+
+  animation: radarPulse 1.8s infinite ease-out;
+}
+
+@keyframes radarPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* =====================================================
+   FLOATING SEARCH BOX
+===================================================== */
 
 .map-search-box {
   position: absolute !important;
@@ -42,17 +248,20 @@ body,
 
   transform: translateX(-50%) !important;
 
-  width: 370px !important;
+  width: 380px !important;
 
   z-index: 2000 !important;
 
   pointer-events: auto !important;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-
-/* =========================================
+/* =====================================================
    SEARCH FORM
-========================================= */
+===================================================== */
 
 .map-search-box form {
   width: 100%;
@@ -63,26 +272,43 @@ body,
 
   box-sizing: border-box;
 
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.88);
 
-  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border-radius: 16px;
 
   overflow: hidden;
 
+  border: 1px solid rgba(255, 255, 255, 0.6);
+
   box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.20);
+    0 10px 30px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+
+  transition:
+    all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.map-search-box form:focus-within {
+  background: #ffffff;
 
-/* =========================================
+  border-color: #3b82f6;
+
+  box-shadow:
+    0 12px 35px rgba(59, 130, 246, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* =====================================================
    SEARCH INPUT
-========================================= */
+===================================================== */
 
 .map-search-box input {
   flex: 1;
 
   min-width: 0;
-
   width: 100%;
   height: 100%;
 
@@ -95,108 +321,206 @@ body,
 
   background: transparent;
 
-  color: #333;
+  color: #1e293b;
 
   font-size: 15px;
+  font-weight: 500;
 }
 
 .map-search-box input::placeholder {
-  color: #777;
+  color: #94a3b8;
 }
 
-
-/* =========================================
+/* =====================================================
    SEARCH BUTTON
-========================================= */
+===================================================== */
 
 .map-search-box form > button {
   flex-shrink: 0;
 
-  width: 58px;
+  width: 54px;
   height: 100%;
 
   padding: 0;
 
   border: none;
 
-  background: #ffffff;
+  background: transparent;
 
-  color: #333;
+  color: #3b82f6;
 
-  font-size: 21px;
+  font-size: 20px;
 
   cursor: pointer;
 
   display: flex;
   align-items: center;
   justify-content: center;
+
+  transition: all 0.2s ease;
 }
 
 .map-search-box form > button:hover {
-  background: #f1f5f9;
+  background: rgba(59, 130, 246, 0.08);
+  transform: scale(1.05);
 }
 
+/* =====================================================
+   CLEAR BUTTON
+===================================================== */
 
-/* =========================================
+.clear-btn {
+  background: transparent;
+  border: none;
+
+  cursor: pointer;
+
+  padding: 4px 8px;
+
+  font-size: 12px;
+
+  opacity: 0.5;
+
+  transition: opacity 0.2s ease;
+}
+
+.clear-btn:hover {
+  opacity: 1;
+}
+
+/* =====================================================
+   MY LOCATION BUTTON
+===================================================== */
+
+.my-location-btn {
+  width: 100%;
+
+  padding: 10px 14px;
+
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+
+  color: #ffffff;
+
+  border: none;
+  border-radius: 12px;
+
+  font-weight: 600;
+  font-size: 13.5px;
+
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+
+  transition: all 0.25s ease;
+}
+
+.my-location-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+}
+
+.my-location-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* =====================================================
    SEARCH RESULTS
-========================================= */
+===================================================== */
 
 .search-results {
   width: 100%;
 
-  margin-top: 6px;
+  margin-top: 4px;
 
   box-sizing: border-box;
 
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
 
-  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+
+  border-radius: 16px;
 
   overflow-x: hidden;
   overflow-y: auto;
 
-  max-height: 300px;
+  max-height: 280px;
 
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+
+  animation: fadeInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 
-/* =========================================
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+/* =====================================================
    SEARCH RESULT ITEM
-========================================= */
+===================================================== */
 
 .search-result-item {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
 
   width: 100%;
-  min-height: 48px;
 
   box-sizing: border-box;
 
   margin: 0;
-  padding: 12px 14px;
+  padding: 12px 16px;
 
   border: none;
-  border-bottom: 1px solid #eeeeee;
+  border-bottom: 1px solid #f1f5f9;
 
   outline: none;
 
-  background: #ffffff;
+  background: transparent;
 
-  color: #333;
+  color: #334155;
 
   text-align: left;
 
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.4;
 
   cursor: pointer;
 
-  white-space: normal;
-
-  overflow: hidden;
+  transition:
+    background 0.2s ease,
+    padding-left 0.2s ease;
 }
 
 .search-result-item:last-child {
@@ -204,251 +528,559 @@ body,
 }
 
 .search-result-item:hover {
-  background: #f2f2f2;
+  background: #f8fafc;
+  padding-left: 18px;
 }
 
-
-/* =========================================
-   LEAFLET ZOOM CONTROL
-========================================= */
-
-.map-view .leaflet-control-zoom {
-  margin-left: 15px !important;
-  margin-top: 15px !important;
-
-  border: none !important;
-
-  border-radius: 12px !important;
-
-  overflow: hidden;
-
-  box-shadow:
-    0 5px 18px rgba(0, 0, 0, 0.18) !important;
+.result-icon {
+  flex-shrink: 0;
 }
 
+.result-info {
+  display: flex;
+  flex-direction: column;
 
-/* =========================================
-   ZOOM BUTTONS
-========================================= */
+  gap: 2px;
 
-.map-view .leaflet-control-zoom a {
-  width: 38px !important;
-  height: 38px !important;
-
-  line-height: 38px !important;
-
-  border: none !important;
-
-  background: rgba(255, 255, 255, 0.96) !important;
-
-  color: #333 !important;
-
-  font-size: 20px !important;
-
-  transition: 0.2s ease;
+  min-width: 0;
 }
 
-.map-view .leaflet-control-zoom a:hover {
-  background: #f1f5f9 !important;
+.result-info strong {
+  color: #0f172a;
+  font-size: 14px;
 }
 
-
-/* =========================================
-   LAYERS CONTROL
-========================================= */
-
-.map-view .leaflet-control-layers {
-  margin-top: 15px !important;
-  margin-right: 15px !important;
-
-  border: none !important;
-
-  border-radius: 14px !important;
-
-  background: rgba(255, 255, 255, 0.96) !important;
-
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.18) !important;
+.result-info small {
+  color: #64748b;
+  font-size: 11.5px;
 }
 
+/* =====================================================
+   NEARBY SERVICES
+===================================================== */
 
-/* =========================================
-   LAYER BUTTON
-========================================= */
+.nearby-panel {
+  background: rgba(255, 255, 255, 0.92);
 
-.map-view .leaflet-control-layers-toggle {
-  width: 52px !important;
-  height: 52px !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 
-  background-color: #ffffff !important;
+  border-radius: 14px;
 
-  background-size: 27px 27px !important;
+  padding: 12px;
 
-  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 8px;
 }
 
+.nearby-header {
+  font-size: 12px;
 
-/* =========================================
-   EXPANDED LAYER PANEL
-========================================= */
+  font-weight: 700;
 
-.map-view .leaflet-control-layers-expanded {
-  padding: 14px 16px !important;
+  color: #475569;
 
-  min-width: 180px;
-
-  border-radius: 14px !important;
+  display: flex;
+  justify-content: space-between;
 }
 
+.nearby-filters {
+  display: flex;
+  flex-wrap: wrap;
 
-/* =========================================
-   LAYER LABELS
-========================================= */
+  gap: 6px;
+}
 
-.map-view .leaflet-control-layers label {
-  padding: 7px 3px;
+.nearby-filters button {
+  padding: 5px 10px;
+
+  border-radius: 20px;
+
+  border: 1px solid #e2e8f0;
+
+  background: #ffffff;
+
+  font-size: 11px;
+  font-weight: 500;
+
+  color: #475569;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.nearby-filters button:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.nearby-filters button.active {
+  background: #eff6ff;
+
+  color: #2563eb;
+
+  border-color: #3b82f6;
+
+  font-weight: 600;
+}
+
+.nearby-count {
+  font-size: 11px;
+
+  color: #64748b;
+
+  text-align: right;
+}
+
+.nearby-hint {
+  display: block;
+
+  font-size: 11px;
+
+  color: #64748b;
+}
+
+.nearby-error-wrapper {
+  color: #dc2626;
+
+  font-size: 12px;
+}
+
+.retry-btn {
+  margin-left: 8px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #2563eb;
+
+  cursor: pointer;
+
+  font-weight: 600;
+}
+
+/* =====================================================
+   ROUTING BUTTON
+===================================================== */
+
+.route-btn {
+  width: 100%;
+
+  border: none;
+  border-radius: 8px;
+
+  padding: 8px 12px;
+
+  background: #2563eb;
+
+  color: #ffffff;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.route-btn:hover {
+  background: #1d4ed8;
+
+  transform: translateY(-1px);
+}
+
+.route-btn:active {
+  transform: translateY(0);
+}
+
+/* =====================================================
+   ROUTE PANEL
+===================================================== */
+
+.route-panel {
+  margin-top: 10px;
+
+  padding: 12px;
+
+  border-radius: 12px;
+
+  background: rgba(255, 255, 255, 0.94);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.route-header {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin-bottom: 8px;
 
   font-size: 14px;
 
-  color: #333;
+  font-weight: 700;
+
+  color: #1e293b;
+}
+
+.route-loading {
+  font-size: 12px;
+
+  color: #64748b;
+
+  padding: 5px 0;
+}
+
+.route-destination {
+  font-size: 13px;
+
+  font-weight: 600;
+
+  color: #334155;
+
+  margin-bottom: 10px;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+.route-details {
+  display: flex;
+
+  align-items: center;
+
+  gap: 16px;
+
+  margin-bottom: 10px;
+
+  font-size: 13px;
+
+  color: #475569;
+}
+
+.clear-route-btn {
+  width: 100%;
+
+  border: 1px solid #cbd5e1;
+
+  border-radius: 7px;
+
+  padding: 7px 10px;
+
+  background: #ffffff;
+
+  color: #475569;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.clear-route-btn:hover {
+  background: #f1f5f9;
+
+  border-color: #94a3b8;
+}
+
+.route-error {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 8px;
+
+  color: #dc2626;
+
+  font-size: 12px;
+
+  line-height: 1.4;
+}
+
+.retry-route-btn {
+  flex-shrink: 0;
+
+  border: none;
+
+  border-radius: 6px;
+
+  padding: 5px 9px;
+
+  background: #2563eb;
+
+  color: #ffffff;
+
+  font-size: 11px;
+
+  font-weight: 600;
 
   cursor: pointer;
 }
 
-.map-view .leaflet-control-layers label:hover {
-  background: #f5f7fa;
+.retry-route-btn:hover {
+  background: #1d4ed8;
+}
+
+/* =====================================================
+   LEAFLET POPUP
+===================================================== */
+
+.map-view-container .leaflet-popup-content-wrapper {
+  padding: 4px;
+
+  border-radius: 16px;
+
+  background: rgba(255, 255, 255, 0.96);
+
+  backdrop-filter: blur(10px);
+
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.map-view-container .leaflet-popup-content {
+  margin: 12px 16px;
+
+  font-size: 13.5px;
+
+  color: #334155;
+
+  line-height: 1.5;
+}
+
+.map-view-container .leaflet-popup-close-button {
+  padding: 8px 10px !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 18px !important;
+
+  transition: color 0.2s ease;
+}
+
+.map-view-container .leaflet-popup-close-button:hover {
+  color: #0f172a !important;
+}
+
+/* =====================================================
+   CLICKED LOCATION POPUP
+===================================================== */
+
+.clicked-popup-wrapper {
+  min-width: 190px;
+
+  text-align: center;
+}
+
+.popup-divider {
+  margin: 8px 0;
+
+  border: none;
+
+  border-top: 1px solid #e2e8f0;
+}
+
+.popup-coordinates {
+  text-align: left;
+
+  font-size: 13px;
+
+  line-height: 1.7;
+}
+
+.copy-btn {
+  margin-top: 10px;
+
+  width: 100%;
+
+  padding: 8px 10px;
+
+  border: none;
 
   border-radius: 7px;
+
+  background: #2563eb;
+
+  color: #ffffff;
+
+  cursor: pointer;
+
+  font-weight: 600;
 }
 
+.copy-btn.copied {
+  background: #16a34a;
+}
 
-/* =========================================
-   POPUP
-========================================= */
+/* =====================================================
+   NEARBY PLACE POPUP
+===================================================== */
 
-.map-view .leaflet-popup-content-wrapper {
-  padding: 0;
+.nearby-place-popup {
+  min-width: 190px;
+}
 
-  border-radius: 13px;
+.category-tag {
+  text-transform: capitalize;
+
+  color: #475569;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: #64748b;
+}
+
+/* =====================================================
+   LEAFLET MAP CONTROLS
+===================================================== */
+
+.map-view-container .leaflet-control-zoom {
+  margin-left: 20px !important;
+
+  margin-top: 20px !important;
+
+  border: none !important;
+
+  border-radius: 14px !important;
+
+  overflow: hidden;
 
   box-shadow:
-    0 7px 25px rgba(0, 0, 0, 0.20);
+    0 8px 25px rgba(0, 0, 0, 0.12) !important;
 }
 
-.map-view .leaflet-popup-content {
-  margin: 14px 18px;
+.map-view-container .leaflet-control-zoom a {
+  width: 40px !important;
 
-  font-size: 14px;
+  height: 40px !important;
 
-  color: #333;
+  line-height: 40px !important;
+
+  border: none !important;
+
+  background: rgba(255, 255, 255, 0.9) !important;
+
+  backdrop-filter: blur(8px);
+
+  color: #1e293b !important;
+
+  font-size: 18px !important;
+
+  font-weight: bold;
 }
 
+/* =====================================================
+   LEAFLET LAYERS
+===================================================== */
 
-/* =========================================
-   POPUP CLOSE BUTTON
-========================================= */
+.map-view-container .leaflet-control-layers {
+  margin-top: 20px !important;
 
-.map-view .leaflet-popup-close-button {
-  padding: 7px 9px !important;
+  margin-right: 20px !important;
 
-  color: #777 !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
 
-  font-size: 20px !important;
+  border-radius: 16px !important;
+
+  background: rgba(255, 255, 255, 0.9) !important;
+
+  backdrop-filter: blur(12px);
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.12) !important;
 }
 
-.map-view .leaflet-popup-close-button:hover {
-  color: #111 !important;
-}
+/* =====================================================
+   LEAFLET ATTRIBUTION
+===================================================== */
 
-
-/* =========================================
-   POPUP STRONG TEXT
-========================================= */
-
-.map-view .leaflet-popup-content strong {
-  font-size: 15px;
-
-  color: #222;
-}
-
-
-/* =========================================
-   MAP ATTRIBUTION
-========================================= */
-
-.map-view .leaflet-control-attribution {
-  padding: 3px 7px;
+.map-view-container .leaflet-control-attribution {
+  padding: 4px 8px;
 
   font-size: 10px;
 
-  background: rgba(255, 255, 255, 0.8) !important;
+  color: #64748b;
+
+  background: rgba(255, 255, 255, 0.85) !important;
+
+  backdrop-filter: blur(4px);
+
+  border-top-left-radius: 8px;
 }
 
+/* =====================================================
+   LEAFLET Z-INDEX
+===================================================== */
 
-/* =========================================
-   MOBILE
-========================================= */
+.map-view-container .leaflet-pane {
+  z-index: 400;
+}
+
+.map-view-container .leaflet-top,
+.map-view-container .leaflet-bottom {
+  z-index: 1000;
+}
+
+.map-search-box {
+  z-index: 2000 !important;
+}
+
+/* =====================================================
+   ROUTE LINE
+===================================================== */
+
+.map-view-container .leaflet-overlay-pane svg {
+  overflow: visible;
+}
+
+/* =====================================================
+   RESPONSIVE DESIGN
+===================================================== */
 
 @media (max-width: 768px) {
-
   .map-search-box {
     top: 15px !important;
 
-    width: calc(100% - 120px) !important;
-  }
-
-  .map-search-box form {
-    height: 48px;
-  }
-
-  .map-search-box input {
-    font-size: 14px;
-  }
-
-  .map-view .leaflet-control-layers {
-    margin-right: 10px !important;
-    margin-top: 10px !important;
-  }
-
-  .map-view .leaflet-control-zoom {
-    margin-left: 10px !important;
-    margin-top: 10px !important;
+    width: calc(100% - 40px) !important;
   }
 }
 
-
-/* =========================================
-   SMALL MOBILE
-========================================= */
-
 @media (max-width: 480px) {
-
   .map-search-box {
     top: 12px !important;
 
-    width: calc(100% - 100px) !important;
+    width: calc(100% - 30px) !important;
   }
 
-  .map-search-box form {
-    height: 44px;
-
-    border-radius: 11px;
-  }
-
-  .map-search-box input {
-    padding: 0 12px;
-
-    font-size: 13px;
-  }
-
-  .map-search-box form > button {
-    width: 45px;
-
-    font-size: 18px;
-  }
-
-  .map-view .leaflet-control-layers-toggle {
-    width: 46px !important;
-    height: 46px !important;
+  .route-details {
+    gap: 10px;
   }
 }

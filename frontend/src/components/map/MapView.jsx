@@ -1,3 +1,11 @@
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+
 import {
   MapContainer,
   TileLayer,
@@ -6,6 +14,10 @@ import {
   LayersControl,
   LayerGroup,
   useMap,
+  useMapEvents,
+  Circle,
+  CircleMarker,
+  Polyline,
 } from "react-leaflet";
 
 import L from "leaflet";
@@ -13,76 +25,277 @@ import "leaflet/dist/leaflet.css";
 
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-import { useState } from "react";
+import markerRetina from "leaflet/dist/images/marker-icon-2x.png";
 
 import "./MapView.css";
 
 /* =====================================================
-   DEFAULT MARKER ICON
+   LEAFLET DEFAULT ICON FIX
 ===================================================== */
 
-const defaultIcon = L.icon({
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerRetina,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
-
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
 });
 
 /* =====================================================
-   USER LOCATION ICON
+   KOLKATA BOUNDS
 ===================================================== */
 
-const userIcon = L.icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-
-  iconSize: [30, 46],
-  iconAnchor: [15, 46],
-  popupAnchor: [1, -40],
-});
+export const KOLKATA_BOUNDS = {
+  south: 22.35,
+  north: 22.8,
+  west: 88.15,
+  east: 88.6,
+};
 
 /* =====================================================
-   SEARCH LOCATION COMPONENT
+   CONSTANTS
 ===================================================== */
 
-function SearchLocation() {
+const DEFAULT_POSITION = [22.5726, 88.3639];
+
+const NEARBY_RADIUS = 1000;
+
+const OVERPASS_SERVERS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+const OSRM_SERVER =
+  "https://router.project-osrm.org/route/v1/driving";
+
+/* =====================================================
+   CATEGORY ICONS
+===================================================== */
+
+const CATEGORY_ICONS = {
+  shop: "🛍️",
+  hospital: "🏥",
+  pharmacy: "💊",
+  bank: "🏦",
+  restaurant: "🍴",
+  school: "🏫",
+  other: "📍",
+};
+
+const getCategoryIcon = (category) =>
+  CATEGORY_ICONS[category] || CATEGORY_ICONS.other;
+
+/* =====================================================
+   KOLKATA CHECK
+===================================================== */
+
+const isInsideKolkata = (latitude, longitude) => {
+  return (
+    latitude >= KOLKATA_BOUNDS.south &&
+    latitude <= KOLKATA_BOUNDS.north &&
+    longitude >= KOLKATA_BOUNDS.west &&
+    longitude <= KOLKATA_BOUNDS.east
+  );
+};
+
+/* =====================================================
+   CATEGORY ICON CACHE
+===================================================== */
+
+const iconCache = new Map();
+
+const createCategoryLeafletIcon = (category) => {
+  if (iconCache.has(category)) {
+    return iconCache.get(category);
+  }
+
+  const icon = L.divIcon({
+    html: `
+      <div class="leaflet-category-icon-inner">
+        ${getCategoryIcon(category)}
+      </div>
+    `,
+    className: "custom-category-icon",
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+
+  iconCache.set(category, icon);
+
+  return icon;
+};
+
+/* =====================================================
+   ROUTE LAYER
+===================================================== */
+
+function RouteLayer({ routeCoordinates }) {
   const map = useMap();
 
-  /* =========================
+  useEffect(() => {
+    if (!routeCoordinates || routeCoordinates.length < 2) {
+      return;
+    }
+
+    const bounds = L.latLngBounds(routeCoordinates);
+
+    map.fitBounds(bounds, {
+      padding: [60, 60],
+      maxZoom: 16,
+      animate: true,
+      duration: 1,
+    });
+  }, [routeCoordinates, map]);
+
+  if (!routeCoordinates || routeCoordinates.length < 2) {
+    return null;
+  }
+
+  return (
+    <Polyline
+      positions={routeCoordinates}
+      pathOptions={{
+        color: "#2563eb",
+        weight: 6,
+        opacity: 0.85,
+        lineCap: "round",
+        lineJoin: "round",
+      }}
+    />
+  );
+}
+
+/* =====================================================
+   MAP CONTROLLER
+===================================================== */
+
+function MapController({
+  onMapClick,
+  targetPosition,
+}) {
+  const map = useMap();
+
+  const previousPositionRef = useRef(null);
+
+  useMapEvents({
+    click(event) {
+      const { lat, lng } = event.latlng;
+
+      if (!isInsideKolkata(lat, lng)) {
+        alert(
+          "Please select a location inside Kolkata boundaries."
+        );
+        return;
+      }
+
+      onMapClick({
+        position: [lat, lng],
+        latitude: lat,
+        longitude: lng,
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!targetPosition) {
+      return;
+    }
+
+    const [latitude, longitude] =
+      targetPosition;
+
+    const previous =
+      previousPositionRef.current;
+
+    if (
+      !previous ||
+      previous[0] !== latitude ||
+      previous[1] !== longitude
+    ) {
+      map.flyTo(targetPosition, 16, {
+        duration: 1.5,
+      });
+
+      previousPositionRef.current =
+        targetPosition;
+    }
+  }, [targetPosition, map]);
+
+  return null;
+}
+
+/* =====================================================
+   MAIN MAP COMPONENT
+===================================================== */
+
+export default function MapView() {
+  /* ===================================================
+     BASIC
+  =================================================== */
+
+  const defaultPosition = useMemo(
+    () => DEFAULT_POSITION,
+    []
+  );
+
+  const MAPTILER_KEY =
+    import.meta.env.VITE_MAPTILER_KEY;
+
+  /* ===================================================
+     ABORT CONTROLLERS
+  =================================================== */
+
+  const nearbyAbortRef = useRef(null);
+  const searchAbortRef = useRef(null);
+  const routeAbortRef = useRef(null);
+
+  /* ===================================================
+     CACHE
+  =================================================== */
+
+  const nearbyCacheRef = useRef(
+    new Map()
+  );
+
+  /* ===================================================
      SEARCH STATE
-  ========================= */
+  =================================================== */
 
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState([]);
+  const [mapTarget, setMapTarget] =
+    useState(null);
 
-  const [loading, setLoading] =
-    useState(false);
-
-  const [results, setResults] =
-    useState([]);
-
-  /* =========================
+  /* ===================================================
      USER LOCATION
-  ========================= */
+  =================================================== */
 
   const [userLocation, setUserLocation] =
     useState(null);
 
+  const [locationAccuracy, setLocationAccuracy] =
+    useState(0);
+
   const [locationLoading, setLocationLoading] =
     useState(false);
 
-  /* =========================
+  /* ===================================================
      SELECTED LOCATION
-  ========================= */
+  =================================================== */
 
   const [selectedLocation, setSelectedLocation] =
     useState(null);
 
-  /* =========================
-     NEARBY PLACES
-  ========================= */
+  const [clickedLocation, setClickedLocation] =
+    useState(null);
+
+  const [copied, setCopied] = useState(false);
+
+  /* ===================================================
+     NEARBY
+  =================================================== */
 
   const [nearbyPlaces, setNearbyPlaces] =
     useState([]);
@@ -90,337 +303,763 @@ function SearchLocation() {
   const [nearbyLoading, setNearbyLoading] =
     useState(false);
 
-  /* =========================
-     CATEGORY
-  ========================= */
+  const [nearbyError, setNearbyError] =
+    useState("");
 
   const [nearbyCategory, setNearbyCategory] =
-    useState("all");
+    useState(null);
 
-  /* =========================
-     MAPTILER KEY
-  ========================= */
+  /* ===================================================
+     ROUTING
+  =================================================== */
 
-  const MAPTILER_KEY =
-    import.meta.env.VITE_MAPTILER_KEY;
+  const [routeCoordinates, setRouteCoordinates] =
+    useState([]);
 
-  /* =====================================================
-     GET USER LOCATION
-  ===================================================== */
+  const [routeLoading, setRouteLoading] =
+    useState(false);
 
-  const getUserLocation = () => {
-    if (!navigator.geolocation) {
-      alert(
-        "Geolocation is not supported by your browser."
+  const [routeError, setRouteError] =
+    useState("");
+
+  const [routeInfo, setRouteInfo] =
+    useState(null);
+
+  const [routeDestination, setRouteDestination] =
+    useState(null);
+
+  /* ===================================================
+     CLEANUP
+  =================================================== */
+
+  useEffect(() => {
+    return () => {
+      nearbyAbortRef.current?.abort();
+      searchAbortRef.current?.abort();
+      routeAbortRef.current?.abort();
+    };
+  }, []);
+
+  /* ===================================================
+     FORMAT DISTANCE
+  =================================================== */
+
+  const formatDistance = useCallback(
+    (meters) => {
+      if (!meters) {
+        return "0 m";
+      }
+
+      if (meters < 1000) {
+        return `${Math.round(meters)} m`;
+      }
+
+      return `${(meters / 1000).toFixed(1)} km`;
+    },
+    []
+  );
+
+  /* ===================================================
+     FORMAT DURATION
+  =================================================== */
+
+  const formatDuration = useCallback(
+    (seconds) => {
+      if (!seconds) {
+        return "0 min";
+      }
+
+      const totalMinutes = Math.round(
+        seconds / 60
       );
 
-      return;
-    }
+      if (totalMinutes < 60) {
+        return `${totalMinutes} min`;
+      }
 
-    setLocationLoading(true);
+      const hours = Math.floor(
+        totalMinutes / 60
+      );
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitude =
-          position.coords.latitude;
+      const minutes = totalMinutes % 60;
 
-        const longitude =
-          position.coords.longitude;
+      if (minutes === 0) {
+        return `${hours} hr`;
+      }
 
-        const location = [
-          latitude,
-          longitude,
-        ];
+      return `${hours} hr ${minutes} min`;
+    },
+    []
+  );
 
-        setUserLocation(location);
+  /* ===================================================
+     GET ROUTE
+  =================================================== */
 
+  const getRoute = useCallback(
+    async (destination) => {
+      if (!destination) {
+        return;
+      }
+
+      if (!userLocation) {
+        alert(
+          "Please click 'My Location' first to get your current location."
+        );
+        return;
+      }
+
+      const [
+        userLatitude,
+        userLongitude,
+      ] = userLocation;
+
+      const {
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+        name = "Destination",
+      } = destination;
+
+      if (
+        !isInsideKolkata(
+          destinationLatitude,
+          destinationLongitude
+        )
+      ) {
+        alert(
+          "Destination is outside Kolkata boundaries."
+        );
+        return;
+      }
+
+      /* Cancel previous route request */
+      routeAbortRef.current?.abort();
+
+      const controller =
+        new AbortController();
+
+      routeAbortRef.current = controller;
+
+      setRouteLoading(true);
+      setRouteError("");
+      setRouteCoordinates([]);
+      setRouteInfo(null);
+
+      setRouteDestination({
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+        name,
+      });
+
+      try {
         /*
-          Move map to current GPS location
+          OSRM coordinate order:
+
+          longitude,latitude
         */
 
-        map.flyTo(
-          location,
-          16,
-          {
-            duration: 1.5,
-          }
+        const url =
+          `${OSRM_SERVER}/` +
+          `${userLongitude},${userLatitude};` +
+          `${destinationLongitude},${destinationLatitude}` +
+          `?overview=full` +
+          `&geometries=geojson` +
+          `&steps=true`;
+
+        const response = await fetch(url, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Routing server error: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        if (
+          data.code !== "Ok" ||
+          !data.routes ||
+          data.routes.length === 0
+        ) {
+          throw new Error(
+            "No route found."
+          );
+        }
+
+        const route = data.routes[0];
+
+        /*
+          OSRM:
+
+          [longitude, latitude]
+
+          Leaflet:
+
+          [latitude, longitude]
+        */
+
+        const coordinates =
+          route.geometry.coordinates.map(
+            ([longitude, latitude]) => [
+              latitude,
+              longitude,
+            ]
+          );
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setRouteCoordinates(
+          coordinates
         );
 
-        setLocationLoading(false);
-      },
+        setRouteInfo({
+          distance: route.distance,
+          duration: route.duration,
+        });
+      } catch (error) {
+        if (
+          error.name ===
+          "AbortError"
+        ) {
+          return;
+        }
 
-      (error) => {
         console.error(
-          "Location error:",
+          "Routing error:",
           error
         );
 
-        alert(
-          "Location permission দেওয়া হয়নি বা location পাওয়া যাচ্ছে না."
+        setRouteCoordinates([]);
+        setRouteInfo(null);
+
+        setRouteError(
+          "Unable to find a route. Please try again."
         );
-
-        setLocationLoading(false);
-      },
-
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+      } finally {
+        if (!controller.signal.aborted) {
+          setRouteLoading(false);
+        }
       }
-    );
-  };
+    },
+    [userLocation]
+  );
 
-  /* =====================================================
-     GET NEARBY PLACES FROM OPENSTREETMAP
-  ===================================================== */
+  /* ===================================================
+     CLEAR ROUTE
+  =================================================== */
 
-  const getNearbyPlaces = async (
-    latitude,
-    longitude
-  ) => {
-    setNearbyLoading(true);
+  const clearRoute = useCallback(() => {
+    routeAbortRef.current?.abort();
+
+    setRouteCoordinates([]);
+    setRouteInfo(null);
+    setRouteError("");
+    setRouteDestination(null);
+    setRouteLoading(false);
+  }, []);
+
+  /* ===================================================
+     COPY COORDINATES
+  =================================================== */
+
+  const copyCoordinates = async () => {
+    if (!clickedLocation) {
+      return;
+    }
+
+    const coordinates =
+      `${clickedLocation.latitude.toFixed(6)}, ` +
+      `${clickedLocation.longitude.toFixed(6)}`;
 
     try {
-      /*
-        Search radius:
+      if (
+        navigator.clipboard &&
+        window.isSecureContext
+      ) {
+        await navigator.clipboard.writeText(
+          coordinates
+        );
+      } else {
+        const textarea =
+          document.createElement(
+            "textarea"
+          );
 
-        2500 meters = 2.5 KM
-      */
+        textarea.value = coordinates;
 
-      const radius = 2500;
-
-      /*
-        OpenStreetMap Overpass query
-
-        We search:
-
-        shop
-        hospital
-        pharmacy
-        restaurant
-        school
-        bank
-        atm
-        cafe
-        clinic
-        supermarket
-        etc.
-      */
-
-      const overpassQuery = `
-        [out:json][timeout:25];
-
-        (
-          node
-            ["shop"]
-            (around:${radius},${latitude},${longitude});
-
-          way
-            ["shop"]
-            (around:${radius},${latitude},${longitude});
-
-          relation
-            ["shop"]
-            (around:${radius},${latitude},${longitude});
-
-          node
-            ["amenity"~"hospital|pharmacy|restaurant|school|bank|atm|cafe|clinic"]
-            (around:${radius},${latitude},${longitude});
-
-          way
-            ["amenity"~"hospital|pharmacy|restaurant|school|bank|atm|cafe|clinic"]
-            (around:${radius},${latitude},${longitude});
-
-          relation
-            ["amenity"~"hospital|pharmacy|restaurant|school|bank|atm|cafe|clinic"]
-            (around:${radius},${latitude},${longitude});
+        document.body.appendChild(
+          textarea
         );
 
-        out center tags;
-      `;
+        try {
+          textarea.select();
 
-      const response = await fetch(
-        "https://overpass-api.de/api/interpreter",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/x-www-form-urlencoded",
-          },
-
-          body:
-            "data=" +
-            encodeURIComponent(
-              overpassQuery
-            ),
+          document.execCommand(
+            "copy"
+          );
+        } finally {
+          document.body.removeChild(
+            textarea
+          );
         }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          "Nearby places request failed"
-        );
       }
 
-      const data =
-        await response.json();
+      setCopied(true);
 
-      console.log(
-        "Nearby OSM Places:",
-        data
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch {
+      alert(
+        "Failed to copy coordinates."
       );
-
-      /* =================================================
-         CONVERT OSM RESULTS
-      ================================================= */
-
-      const places = data.elements
-        .map((item) => {
-          let latitude;
-          let longitude;
-
-          /*
-            Node
-          */
-
-          if (
-            item.lat !== undefined &&
-            item.lon !== undefined
-          ) {
-            latitude = item.lat;
-            longitude = item.lon;
-          }
-
-          /*
-            Way / Relation
-          */
-
-          else if (item.center) {
-            latitude =
-              item.center.lat;
-
-            longitude =
-              item.center.lon;
-          }
-
-          if (
-            latitude === undefined ||
-            longitude === undefined
-          ) {
-            return null;
-          }
-
-          const tags =
-            item.tags || {};
-
-          /* =========================
-             NAME
-          ========================= */
-
-          const name =
-            tags.name ||
-            tags["name:en"] ||
-            "Unnamed Place";
-
-          /* =========================
-             CATEGORY
-          ========================= */
-
-          let category =
-            "other";
-
-          if (tags.shop) {
-            category = "shop";
-          }
-
-          if (tags.amenity) {
-            category =
-              tags.amenity;
-          }
-
-          return {
-            id: `${item.type}-${item.id}`,
-
-            latitude,
-
-            longitude,
-
-            name,
-
-            category,
-
-            address:
-              tags["addr:street"] ||
-              tags["addr:place"] ||
-              tags["addr:city"] ||
-              "",
-
-            phone:
-              tags.phone ||
-              tags["contact:phone"] ||
-              "",
-
-            website:
-              tags.website ||
-              tags["contact:website"] ||
-              "",
-          };
-        })
-        .filter(Boolean);
-
-      /* =================================================
-         REMOVE DUPLICATES
-      ================================================= */
-
-      const uniquePlaces = [];
-
-      const seen = new Set();
-
-      places.forEach((place) => {
-        const key =
-          `${place.name}-${place.latitude.toFixed(
-            5
-          )}-${place.longitude.toFixed(5)}`;
-
-        if (!seen.has(key)) {
-          seen.add(key);
-
-          uniquePlaces.push(place);
-        }
-      });
-
-      setNearbyPlaces(
-        uniquePlaces
-      );
-
-      console.log(
-        "Processed Nearby Places:",
-        uniquePlaces
-      );
-    } catch (error) {
-      console.error(
-        "Nearby places error:",
-        error
-      );
-
-      /*
-        Do not show scary error every time.
-        Just keep map working.
-      */
-
-      setNearbyPlaces([]);
-    } finally {
-      setNearbyLoading(false);
     }
   };
 
-  /* =====================================================
-     LOCATION SEARCH
-  ===================================================== */
+  /* ===================================================
+     BUILD OVERPASS QUERY
+  =================================================== */
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const buildCategoryQuery =
+    useCallback(
+      (
+        latitude,
+        longitude,
+        category
+      ) => {
+        let queryParts = "";
+
+        switch (category) {
+          case "shop":
+            queryParts = `
+              nwr["shop"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          case "hospital":
+            queryParts = `
+              nwr["amenity"="hospital"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["healthcare"="hospital"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          case "pharmacy":
+            queryParts = `
+              nwr["amenity"="pharmacy"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["healthcare"="pharmacy"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          case "bank":
+            queryParts = `
+              nwr["amenity"="bank"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["office"="financial"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          case "restaurant":
+            queryParts = `
+              nwr["amenity"="restaurant"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["amenity"="fast_food"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["amenity"="cafe"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          case "school":
+            queryParts = `
+              nwr["amenity"="school"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+
+              nwr["amenity"="college"](
+                around:${NEARBY_RADIUS},
+                ${latitude},
+                ${longitude}
+              );
+            `;
+            break;
+
+          default:
+            break;
+        }
+
+        return `
+          [out:json][timeout:10];
+          (
+            ${queryParts}
+          );
+          out center tags;
+        `;
+      },
+      []
+    );
+
+  /* ===================================================
+     CONVERT OSM ELEMENT
+  =================================================== */
+
+  const convertOSMElement =
+    useCallback((element) => {
+      const tags = element.tags || {};
+
+      const latitude =
+        typeof element.lat === "number"
+          ? element.lat
+          : element.center?.lat;
+
+      const longitude =
+        typeof element.lon === "number"
+          ? element.lon
+          : element.center?.lon;
+
+      if (
+        typeof latitude !== "number" ||
+        typeof longitude !== "number"
+      ) {
+        return null;
+      }
+
+      if (
+        !isInsideKolkata(
+          latitude,
+          longitude
+        )
+      ) {
+        return null;
+      }
+
+      let category = "other";
+
+      if (tags.shop) {
+        category = "shop";
+      }
+
+      if (
+        tags.amenity === "hospital" ||
+        tags.healthcare === "hospital"
+      ) {
+        category = "hospital";
+      }
+
+      if (
+        tags.amenity === "pharmacy" ||
+        tags.healthcare === "pharmacy"
+      ) {
+        category = "pharmacy";
+      }
+
+      if (
+        tags.amenity === "bank" ||
+        tags.office === "financial"
+      ) {
+        category = "bank";
+      }
+
+      if (
+        [
+          "restaurant",
+          "fast_food",
+          "cafe",
+        ].includes(tags.amenity)
+      ) {
+        category = "restaurant";
+      }
+
+      if (
+        ["school", "college"].includes(
+          tags.amenity
+        )
+      ) {
+        category = "school";
+      }
+
+      const name =
+        tags.name?.trim() ||
+        tags["name:en"]?.trim() ||
+        tags["name:bn"]?.trim() ||
+        tags.brand?.trim() ||
+        tags.operator?.trim();
+
+      if (!name) {
+        return null;
+      }
+
+      return {
+        id: `${element.type}-${element.id}`,
+        name,
+        category,
+        latitude,
+        longitude,
+
+        address:
+          tags["addr:full"] ||
+          [
+            tags["addr:housenumber"],
+            tags["addr:street"],
+            tags["addr:suburb"],
+            tags["addr:city"],
+          ]
+            .filter(Boolean)
+            .join(", "),
+
+        phone:
+          tags.phone ||
+          tags["contact:phone"] ||
+          "",
+
+        website:
+          tags.website ||
+          tags["contact:website"] ||
+          "",
+      };
+    }, []);
+
+  /* ===================================================
+     REMOVE DUPLICATES
+  =================================================== */
+
+  const removeDuplicates =
+    useCallback((places) => {
+      const unique = new Map();
+
+      places.forEach((place) => {
+        const key =
+          `${place.latitude.toFixed(5)}-` +
+          `${place.longitude.toFixed(5)}-` +
+          `${place.name.toLowerCase()}-` +
+          `${place.category}`;
+
+        if (!unique.has(key)) {
+          unique.set(key, place);
+        }
+      });
+
+      return Array.from(
+        unique.values()
+      );
+    }, []);
+
+  /* ===================================================
+     GET NEARBY PLACES
+  =================================================== */
+
+  const getNearbyPlaces =
+    useCallback(
+      async (
+        latitude,
+        longitude,
+        category
+      ) => {
+        if (!category) {
+          setNearbyPlaces([]);
+          setNearbyLoading(false);
+          return;
+        }
+
+        if (
+          !isInsideKolkata(
+            latitude,
+            longitude
+          )
+        ) {
+          setNearbyPlaces([]);
+          setNearbyError(
+            "Selected location is outside Kolkata region."
+          );
+          return;
+        }
+
+        const cacheKey =
+          `${latitude.toFixed(4)}_` +
+          `${longitude.toFixed(4)}_` +
+          `${category}`;
+
+        if (
+          nearbyCacheRef.current.has(
+            cacheKey
+          )
+        ) {
+          setNearbyPlaces(
+            nearbyCacheRef.current.get(
+              cacheKey
+            )
+          );
+
+          setNearbyError("");
+          setNearbyLoading(false);
+
+          return;
+        }
+
+        nearbyAbortRef.current?.abort();
+
+        const controller =
+          new AbortController();
+
+        nearbyAbortRef.current =
+          controller;
+
+        setNearbyLoading(true);
+        setNearbyError("");
+        setNearbyPlaces([]);
+
+        const overpassQuery =
+          buildCategoryQuery(
+            latitude,
+            longitude,
+            category
+          );
+
+        let successful = false;
+
+        for (const server of OVERPASS_SERVERS) {
+          try {
+            const response =
+              await fetch(server, {
+                method: "POST",
+                headers: {
+                  "Content-Type":
+                    "application/x-www-form-urlencoded",
+                },
+                body:
+                  `data=${encodeURIComponent(
+                    overpassQuery
+                  )}`,
+                signal:
+                  controller.signal,
+              });
+
+            if (!response.ok) {
+              throw new Error(
+                `Server status ${response.status}`
+              );
+            }
+
+            const data =
+              await response.json();
+
+            const places =
+              (data.elements || [])
+                .map(
+                  convertOSMElement
+                )
+                .filter(Boolean);
+
+            const uniquePlaces =
+              removeDuplicates(
+                places
+              );
+
+            if (
+              controller.signal.aborted
+            ) {
+              return;
+            }
+
+            nearbyCacheRef.current.set(
+              cacheKey,
+              uniquePlaces
+            );
+
+            setNearbyPlaces(
+              uniquePlaces
+            );
+
+            setNearbyError("");
+
+            successful = true;
+
+            break;
+          } catch (error) {
+            if (
+              error.name ===
+              "AbortError"
+            ) {
+              return;
+            }
+          }
+        }
+
+        if (
+          controller.signal.aborted
+        ) {
+          return;
+        }
+
+        if (!successful) {
+          setNearbyPlaces([]);
+
+          setNearbyError(
+            "Nearby services timeout. Try choosing a specific category."
+          );
+        }
+
+        setNearbyLoading(false);
+      },
+      [
+        buildCategoryQuery,
+        convertOSMElement,
+        removeDuplicates,
+      ]
+    );
+
+  /* ===================================================
+     SEARCH
+  =================================================== */
+
+  const handleSearch = async (event) => {
+    event.preventDefault();
 
     const searchText =
       query.trim();
@@ -431,255 +1070,195 @@ function SearchLocation() {
 
     if (!MAPTILER_KEY) {
       alert(
-        "MapTiler API key is missing"
+        "MapTiler API Key is missing. Check your .env file."
       );
-
       return;
     }
 
-    setLoading(true);
+    searchAbortRef.current?.abort();
 
+    const controller =
+      new AbortController();
+
+    searchAbortRef.current =
+      controller;
+
+    setLoading(true);
     setResults([]);
 
-    /*
-      Hide old nearby places
-      when a new search starts.
-    */
-
     setNearbyPlaces([]);
+    setNearbyError("");
+    setNearbyCategory(null);
 
     try {
-      /* =================================================
-         CURRENT MAP CENTER
-
-         IMPORTANT:
-
-         This is NOT GPS.
-
-         It only tells MapTiler which area
-         should get priority.
-      ================================================= */
-
-      const mapCenter =
-        map.getCenter();
-
-      const longitude =
-        mapCenter.lng;
-
-      const latitude =
-        mapCenter.lat;
-
-      /* =================================================
-         MAPTILER SEARCH
-
-         types:
-
-         place
-         locality
-         neighbourhood
-         address
-         poi
-      ================================================= */
+      const center =
+        mapTarget ||
+        defaultPosition;
 
       const url =
         `https://api.maptiler.com/geocoding/` +
-        `${encodeURIComponent(searchText)}.json` +
+        `${encodeURIComponent(
+          searchText
+        )}.json` +
         `?key=${MAPTILER_KEY}` +
         `&country=in` +
-        `&autocomplete=false` +
+        `&autocomplete=true` +
         `&fuzzyMatch=true` +
-        `&proximity=${longitude},${latitude}` +
-        `&types=place,locality,neighbourhood,address,poi` +
-        `&limit=10`;
-
-      console.log(
-        "Location Search:",
-        searchText
-      );
-
-      console.log(
-        "Search Proximity:",
-        longitude,
-        latitude
-      );
+        `&proximity=${center[1]},${center[0]}` +
+        `&limit=10` +
+        `&bbox=` +
+        `${KOLKATA_BOUNDS.west},` +
+        `${KOLKATA_BOUNDS.south},` +
+        `${KOLKATA_BOUNDS.east},` +
+        `${KOLKATA_BOUNDS.north}`;
 
       const response =
-        await fetch(url);
+        await fetch(url, {
+          signal:
+            controller.signal,
+        });
 
       if (!response.ok) {
         throw new Error(
-          "Search request failed"
+          `MapTiler error: ${response.status}`
         );
       }
 
       const data =
         await response.json();
 
-      console.log(
-        "MapTiler Search Result:",
-        data
-      );
+      const kolkataResults =
+        (data.features || []).filter(
+          (feature) => {
+            if (
+              !feature.center ||
+              feature.center.length < 2
+            ) {
+              return false;
+            }
 
-      if (
-        !data.features ||
-        data.features.length === 0
-      ) {
-        alert(
-          "Location not found"
+            return isInsideKolkata(
+              feature.center[1],
+              feature.center[0]
+            );
+          }
         );
 
+      if (
+        controller.signal.aborted
+      ) {
         return;
       }
 
-      /* =================================================
-         CUSTOM RANKING
-      ================================================= */
-
-      const searchLower =
-        searchText.toLowerCase();
-
-      const sortedResults = [
-        ...data.features,
-      ].sort((a, b) => {
-        const aText =
-          (
-            a.text || ""
-          ).toLowerCase();
-
-        const bText =
-          (
-            b.text || ""
-          ).toLowerCase();
-
-        const aPlace =
-          (
-            a.place_name || ""
-          ).toLowerCase();
-
-        const bPlace =
-          (
-            b.place_name || ""
-          ).toLowerCase();
-
-        let scoreA = 0;
-
-        let scoreB = 0;
-
-        /* =========================
-           EXACT NAME
-        ========================= */
-
-        if (
-          aText === searchLower
-        ) {
-          scoreA += 1000;
-        }
-
-        if (
-          bText === searchLower
-        ) {
-          scoreB += 1000;
-        }
-
-        /* =========================
-           STARTS WITH
-        ========================= */
-
-        if (
-          aText.startsWith(
-            searchLower
-          )
-        ) {
-          scoreA += 500;
-        }
-
-        if (
-          bText.startsWith(
-            searchLower
-          )
-        ) {
-          scoreB += 500;
-        }
-
-        /* =========================
-           CONTAINS
-        ========================= */
-
-        if (
-          aText.includes(
-            searchLower
-          )
-        ) {
-          scoreA += 250;
-        }
-
-        if (
-          bText.includes(
-            searchLower
-          )
-        ) {
-          scoreB += 250;
-        }
-
-        /* =========================
-           PLACE NAME
-        ========================= */
-
-        if (
-          aPlace.includes(
-            searchLower
-          )
-        ) {
-          scoreA += 150;
-        }
-
-        if (
-          bPlace.includes(
-            searchLower
-          )
-        ) {
-          scoreB += 150;
-        }
-
-        /* =========================
-           MAPTILER RELEVANCE
-        ========================= */
-
-        scoreA +=
-          (a.relevance || 0) *
-          100;
-
-        scoreB +=
-          (b.relevance || 0) *
-          100;
-
-        return (
-          scoreB - scoreA
+      if (
+        kolkataResults.length === 0
+      ) {
+        alert(
+          "No results found within Kolkata boundaries."
         );
-      });
-
-      setResults(
-        sortedResults
-      );
+      } else {
+        setResults(
+          kolkataResults
+        );
+      }
     } catch (error) {
-      console.error(
-        "Search error:",
-        error
-      );
-
-      alert(
-        "Unable to search location"
-      );
+      if (
+        error.name !==
+        "AbortError"
+      ) {
+        alert(
+          "Location search failed. Please try again."
+        );
+      }
     } finally {
-      setLoading(false);
+      if (
+        !controller.signal.aborted
+      ) {
+        setLoading(false);
+      }
     }
   };
 
-  /* =====================================================
-     SELECT LOCATION
-  ===================================================== */
+  /* ===================================================
+     GET USER LOCATION
+  =================================================== */
 
-  const selectLocation = async (
+  const getUserLocation = () => {
+    if (!navigator.geolocation) {
+      alert(
+        "Geolocation is not supported by your browser."
+      );
+      return;
+    }
+
+    setLocationLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const {
+          latitude,
+          longitude,
+          accuracy,
+        } = position.coords;
+
+        if (
+          !isInsideKolkata(
+            latitude,
+            longitude
+          )
+        ) {
+          setLocationLoading(false);
+
+          alert(
+            "Your location is outside the defined Kolkata region."
+          );
+
+          return;
+        }
+
+        const location = [
+          latitude,
+          longitude,
+        ];
+
+        setUserLocation(location);
+        setLocationAccuracy(
+          accuracy
+        );
+
+        setClickedLocation(null);
+        setSelectedLocation(null);
+
+        setNearbyPlaces([]);
+        setNearbyCategory(null);
+        setNearbyError("");
+
+        setMapTarget(location);
+
+        clearRoute();
+
+        setLocationLoading(false);
+      },
+      () => {
+        alert(
+          "Location access denied or timed out."
+        );
+
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      }
+    );
+  };
+
+  /* ===================================================
+     SELECT SEARCH RESULT
+  =================================================== */
+
+  const selectLocation = (
     feature
   ) => {
     if (!feature.center) {
@@ -691,246 +1270,627 @@ function SearchLocation() {
       latitude,
     ] = feature.center;
 
+    if (
+      !isInsideKolkata(
+        latitude,
+        longitude
+      )
+    ) {
+      alert(
+        "Selected location is outside the map region."
+      );
+
+      return;
+    }
+
     const location = [
       latitude,
       longitude,
     ];
 
-    /* =================================================
-       SAVE SELECTED LOCATION
-    ================================================= */
-
-    const selected = {
+    setSelectedLocation({
       position: location,
-
       latitude,
-
       longitude,
-
       name:
         feature.text ||
-        feature.place_name ||
         "Selected Location",
-
       address:
-        feature.place_name ||
-        "",
-    };
+        feature.place_name || "",
+    });
 
-    setSelectedLocation(
-      selected
-    );
+    setClickedLocation(null);
+    setCopied(false);
 
-    /* =================================================
-       MOVE MAP
-    ================================================= */
+    setNearbyPlaces([]);
+    setNearbyError("");
+    setNearbyCategory(null);
 
-    map.flyTo(
-      location,
-      16,
-      {
-        duration: 1.5,
-      }
-    );
-
-    /* =================================================
-       UPDATE SEARCH BOX
-    ================================================= */
+    setMapTarget(location);
 
     setQuery(
       feature.text ||
-      feature.place_name ||
-      ""
+        feature.place_name ||
+        ""
     );
-
-    /* =================================================
-       CLOSE LOCATION RESULTS
-    ================================================= */
 
     setResults([]);
-
-    /* =================================================
-       SEARCH NEARBY PLACES
-    ================================================= */
-
-    await getNearbyPlaces(
-      latitude,
-      longitude
-    );
   };
 
-  /* =====================================================
-     FILTER NEARBY PLACES
-  ===================================================== */
+  /* ===================================================
+     MAP CLICK
+  =================================================== */
+
+  const handleMapClick = (
+    location
+  ) => {
+    setClickedLocation(location);
+
+    setSelectedLocation(null);
+    setCopied(false);
+
+    setNearbyPlaces([]);
+    setNearbyError("");
+    setNearbyCategory(null);
+  };
+
+  /* ===================================================
+     CLEAR SEARCH
+  =================================================== */
+
+  const clearSearch = () => {
+    setQuery("");
+    setResults([]);
+
+    setSelectedLocation(null);
+    setClickedLocation(null);
+
+    setNearbyPlaces([]);
+    setNearbyCategory(null);
+    setNearbyError("");
+
+    setCopied(false);
+  };
+
+  /* ===================================================
+     CURRENT SELECTED POSITION
+  =================================================== */
+
+  const getCurrentSelectedPosition =
+    useCallback(() => {
+      if (selectedLocation) {
+        return {
+          latitude:
+            selectedLocation.latitude,
+          longitude:
+            selectedLocation.longitude,
+        };
+      }
+
+      if (clickedLocation) {
+        return {
+          latitude:
+            clickedLocation.latitude,
+          longitude:
+            clickedLocation.longitude,
+        };
+      }
+
+      if (userLocation) {
+        return {
+          latitude:
+            userLocation[0],
+          longitude:
+            userLocation[1],
+        };
+      }
+
+      return null;
+    }, [
+      selectedLocation,
+      clickedLocation,
+      userLocation,
+    ]);
+
+  /* ===================================================
+     CATEGORY CHANGE
+  =================================================== */
+
+  const handleCategoryChange =
+    (category) => {
+      const location =
+        getCurrentSelectedPosition();
+
+      if (!location) {
+        setNearbyError(
+          "Please select a location first."
+        );
+        return;
+      }
+
+      setNearbyCategory(category);
+
+      getNearbyPlaces(
+        location.latitude,
+        location.longitude,
+        category
+      );
+    };
+
+  /* ===================================================
+     FILTER NEARBY
+  =================================================== */
 
   const filteredNearbyPlaces =
-    nearbyPlaces.filter(
-      (place) => {
-        if (
-          nearbyCategory ===
-          "all"
-        ) {
-          return true;
-        }
+    useMemo(() => {
+      if (!nearbyCategory) {
+        return [];
+      }
 
-        if (
-          nearbyCategory ===
-          "shop"
-        ) {
-          return (
-            place.category ===
-            "shop"
-          );
-        }
-
-        return (
+      return nearbyPlaces.filter(
+        (place) =>
           place.category ===
           nearbyCategory
-        );
-      }
-    );
+      );
+    }, [
+      nearbyCategory,
+      nearbyPlaces,
+    ]);
 
-  /* =====================================================
-     RETURN UI
-  ===================================================== */
+  /* ===================================================
+     JSX
+  =================================================== */
 
   return (
-    <>
-      {/* =================================================
-          USER LOCATION MARKER
-      ================================================= */}
-
-      {userLocation && (
-        <Marker
-          position={userLocation}
-          icon={userIcon}
-        >
-          <Popup>
-            <strong>
-              📍 Your Location
-            </strong>
-
-            <br />
-
-            Current device location
-          </Popup>
-        </Marker>
-      )}
+    <div className="map-view-container">
 
       {/* =================================================
-          SELECTED LOCATION MARKER
+          MAP
       ================================================= */}
 
-      {selectedLocation && (
-        <Marker
-          position={
-            selectedLocation.position
+      <MapContainer
+        center={defaultPosition}
+        zoom={12}
+        minZoom={3}
+        maxZoom={18}
+        scrollWheelZoom={true}
+        className="leaflet-full-height"
+      >
+
+        <MapController
+          onMapClick={handleMapClick}
+          targetPosition={mapTarget}
+        />
+
+        {/* =================================================
+            ROUTE
+        ================================================= */}
+
+        <RouteLayer
+          routeCoordinates={
+            routeCoordinates
           }
-          icon={defaultIcon}
-        >
-          <Popup>
-            <strong>
-              📍{" "}
-              {selectedLocation.name}
-            </strong>
+        />
 
-            <br />
+        {/* =================================================
+            MAP LAYERS
+        ================================================= */}
 
-            {selectedLocation.address}
-          </Popup>
-        </Marker>
-      )}
+        <LayersControl position="topright">
 
-      {/* =================================================
-          NEARBY PLACE MARKERS
-      ================================================= */}
+          {/* STREETS */}
 
-      {filteredNearbyPlaces.map(
-        (place) => (
+          <LayersControl.BaseLayer
+            checked
+            name="Streets"
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              keepBuffer={4}
+            />
+          </LayersControl.BaseLayer>
+
+          {/* SATELLITE */}
+
+          <LayersControl.BaseLayer
+            name="Satellite"
+          >
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution="Tiles &copy; Esri"
+              keepBuffer={4}
+            />
+          </LayersControl.BaseLayer>
+
+          {/* CITY HUB */}
+
+          <LayersControl.Overlay
+            checked
+            name="City Hub"
+          >
+            <LayerGroup>
+
+              <Marker
+                position={[
+                  22.5726,
+                  88.3639,
+                ]}
+              >
+                <Popup>
+                  <strong>
+                    📍 Central Kolkata
+                    Command Hub
+                  </strong>
+
+                  <br />
+
+                  <small>
+                    Kolkata Smart City
+                  </small>
+                </Popup>
+              </Marker>
+
+            </LayerGroup>
+          </LayersControl.Overlay>
+
+        </LayersControl>
+
+        {/* =================================================
+            USER LOCATION
+        ================================================= */}
+
+        {userLocation && (
+          <>
+            <Circle
+              center={userLocation}
+              radius={
+                locationAccuracy || 40
+              }
+              pathOptions={{
+                color: "#2563eb",
+                fillColor: "#3b82f6",
+                fillOpacity: 0.12,
+                weight: 1.5,
+                dashArray: "4, 4",
+              }}
+            />
+
+            <CircleMarker
+              center={userLocation}
+              radius={12}
+              pathOptions={{
+                color: "#60a5fa",
+                weight: 2,
+                fillColor: "#3b82f6",
+                fillOpacity: 0.4,
+              }}
+            />
+
+            <CircleMarker
+              center={userLocation}
+              radius={6}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 2,
+                fillColor: "#2563eb",
+                fillOpacity: 1,
+              }}
+            >
+              <Popup>
+
+                <div className="text-center">
+
+                  <strong>
+                    📍 Current Position
+                  </strong>
+
+                  <br />
+
+                  <small className="text-muted">
+                    Accuracy:{" "}
+                    {Math.round(
+                      locationAccuracy
+                    )}{" "}
+                    m
+                  </small>
+
+                </div>
+
+              </Popup>
+            </CircleMarker>
+          </>
+        )}
+
+        {/* =================================================
+            SELECTED SEARCH LOCATION
+        ================================================= */}
+
+        {selectedLocation && (
           <Marker
-            key={place.id}
-            position={[
-              place.latitude,
-              place.longitude,
-            ]}
-            icon={defaultIcon}
+            position={
+              selectedLocation.position
+            }
           >
             <Popup>
+
               <strong>
-                📍 {place.name}
+                🎯{" "}
+                {selectedLocation.name}
               </strong>
 
               <br />
 
-              <span>
-                {place.category}
-              </span>
+              <small>
+                {selectedLocation.address}
+              </small>
 
-              {place.address && (
-                <>
-                  <br />
-                  <small>
-                    {place.address}
-                  </small>
-                </>
-              )}
+              <br />
 
-              {place.phone && (
-                <>
-                  <br />
-                  📞 {place.phone}
-                </>
-              )}
+              <small>
+                Lat:{" "}
+                {selectedLocation.latitude.toFixed(
+                  6
+                )}
+              </small>
 
-              {place.website && (
-                <>
-                  <br />
+              <br />
 
-                  <a
-                    href={
-                      place.website
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Website
-                  </a>
-                </>
-              )}
+              <small>
+                Lng:{" "}
+                {selectedLocation.longitude.toFixed(
+                  6
+                )}
+              </small>
+
+              <br />
+              <br />
+
+              <button
+                type="button"
+                className="route-btn"
+                onClick={() =>
+                  getRoute({
+                    latitude:
+                      selectedLocation.latitude,
+                    longitude:
+                      selectedLocation.longitude,
+                    name:
+                      selectedLocation.name,
+                  })
+                }
+              >
+                🚗 Get Route
+              </button>
+
             </Popup>
           </Marker>
-        )
-      )}
-
-      {/* =================================================
-          SEARCH UI
-      ================================================= */}
-
-      <div className="map-search-box">
+        )}
 
         {/* =================================================
-            LOCATION SEARCH
+            CLICKED LOCATION
         ================================================= */}
+
+        {clickedLocation && (
+          <Marker
+            position={
+              clickedLocation.position
+            }
+          >
+            <Popup>
+
+              <div className="clicked-popup-wrapper">
+
+                <strong>
+                  📍 Selected Coordinates
+                </strong>
+
+                <hr className="popup-divider" />
+
+                <div className="popup-coordinates">
+
+                  <div>
+                    <strong>
+                      Latitude:
+                    </strong>{" "}
+                    {clickedLocation.latitude.toFixed(
+                      6
+                    )}
+                  </div>
+
+                  <div>
+                    <strong>
+                      Longitude:
+                    </strong>{" "}
+                    {clickedLocation.longitude.toFixed(
+                      6
+                    )}
+                  </div>
+
+                </div>
+
+                <button
+                  type="button"
+                  className={`copy-btn ${
+                    copied
+                      ? "copied"
+                      : ""
+                  }`}
+                  onClick={
+                    copyCoordinates
+                  }
+                >
+                  {copied
+                    ? "✓ Copied!"
+                    : "📋 Copy Coordinates"}
+                </button>
+
+                <button
+                  type="button"
+                  className="route-btn"
+                  onClick={() =>
+                    getRoute({
+                      latitude:
+                        clickedLocation.latitude,
+                      longitude:
+                        clickedLocation.longitude,
+                      name:
+                        "Selected Location",
+                    })
+                  }
+                >
+                  🚗 Get Route
+                </button>
+
+              </div>
+
+            </Popup>
+          </Marker>
+        )}
+
+        {/* =================================================
+            NEARBY PLACES
+        ================================================= */}
+
+        {filteredNearbyPlaces.map(
+          (place) => (
+            <Marker
+              key={place.id}
+              position={[
+                place.latitude,
+                place.longitude,
+              ]}
+              icon={createCategoryLeafletIcon(
+                place.category
+              )}
+            >
+              <Popup>
+
+                <div className="nearby-place-popup">
+
+                  <strong>
+                    {getCategoryIcon(
+                      place.category
+                    )}{" "}
+                    {place.name}
+                  </strong>
+
+                  <br />
+
+                  <small className="category-tag">
+                    {place.category}
+                  </small>
+
+                  {place.address && (
+                    <>
+                      <br />
+
+                      <small>
+                        📍{" "}
+                        {place.address}
+                      </small>
+                    </>
+                  )}
+
+                  {place.phone && (
+                    <>
+                      <br />
+
+                      <small>
+                        📞{" "}
+                        {place.phone}
+                      </small>
+                    </>
+                  )}
+
+                  {place.website && (
+                    <>
+                      <br />
+
+                      <a
+                        href={
+                          place.website.startsWith(
+                            "http"
+                          )
+                            ? place.website
+                            : `https://${place.website}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        🌐 Website
+                      </a>
+                    </>
+                  )}
+
+                  <br />
+                  <br />
+
+                  <button
+                    type="button"
+                    className="route-btn"
+                    onClick={() =>
+                      getRoute({
+                        latitude:
+                          place.latitude,
+                        longitude:
+                          place.longitude,
+                        name:
+                          place.name,
+                      })
+                    }
+                  >
+                    🚗 Get Route
+                  </button>
+
+                </div>
+
+              </Popup>
+            </Marker>
+          )
+        )}
+
+      </MapContainer>
+
+      {/* ===================================================
+          SEARCH BOX
+      =================================================== */}
+
+      <div className="map-search-box">
 
         <form
           onSubmit={handleSearch}
         >
+
           <input
             type="text"
-            placeholder="Search location..."
+            placeholder="Search location in Kolkata..."
             value={query}
-            onChange={(e) => {
+            onChange={(event) =>
               setQuery(
-                e.target.value
-              );
-            }}
+                event.target.value
+              )
+            }
           />
+
+          {query && (
+            <button
+              type="button"
+              className="clear-btn"
+              onClick={
+                clearSearch
+              }
+            >
+              ❌
+            </button>
+          )}
 
           <button type="submit">
             {loading
               ? "..."
               : "🔍"}
           </button>
+
         </form>
 
         {/* =================================================
@@ -942,6 +1902,9 @@ function SearchLocation() {
           className="my-location-btn"
           onClick={
             getUserLocation
+          }
+          disabled={
+            locationLoading
           }
         >
           📍{" "}
@@ -975,11 +1938,13 @@ function SearchLocation() {
                     )
                   }
                 >
+
                   <span className="result-icon">
                     📍
                   </span>
 
                   <span className="result-info">
+
                     <strong>
                       {feature.text ||
                         "Unknown Location"}
@@ -989,7 +1954,9 @@ function SearchLocation() {
                       {feature.place_name ||
                         ""}
                     </small>
+
                   </span>
+
                 </button>
               )
             )}
@@ -998,278 +1965,265 @@ function SearchLocation() {
         )}
 
         {/* =================================================
-            NEARBY PLACES PANEL
+            ROUTE INFORMATION
         ================================================= */}
 
-        {selectedLocation && (
+        {(routeLoading ||
+          routeInfo ||
+          routeError) && (
+          <div className="route-panel">
+
+            <div className="route-header">
+
+              <span>
+                🛣️ Route
+              </span>
+
+              {routeLoading && (
+                <span>
+                  Calculating...
+                </span>
+              )}
+
+            </div>
+
+            {routeLoading && (
+              <div className="route-loading">
+                Finding the best driving route...
+              </div>
+            )}
+
+            {!routeLoading &&
+              routeInfo && (
+                <>
+                  <div className="route-destination">
+
+                    📍{" "}
+                    {routeDestination?.name ||
+                      "Destination"}
+
+                  </div>
+
+                  <div className="route-details">
+
+                    <span>
+                      📏{" "}
+                      {formatDistance(
+                        routeInfo.distance
+                      )}
+                    </span>
+
+                    <span>
+                      ⏱️{" "}
+                      {formatDuration(
+                        routeInfo.duration
+                      )}
+                    </span>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    className="clear-route-btn"
+                    onClick={
+                      clearRoute
+                    }
+                  >
+                    ✕ Clear Route
+                  </button>
+                </>
+              )}
+
+            {!routeLoading &&
+              routeError && (
+                <div className="route-error">
+
+                  <span>
+                    {routeError}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="retry-route-btn"
+                    onClick={() => {
+                      if (
+                        routeDestination
+                      ) {
+                        getRoute(
+                          routeDestination
+                        );
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+
+                </div>
+              )}
+
+          </div>
+        )}
+
+        {/* =================================================
+            NEARBY PANEL
+        ================================================= */}
+
+        {(selectedLocation ||
+          userLocation ||
+          clickedLocation) && (
           <div className="nearby-panel">
 
             <div className="nearby-header">
-              <strong>
-                Nearby Places
-              </strong>
+
+              <span>
+                Nearby Services{" "}
+                <small>
+                  (
+                  {NEARBY_RADIUS /
+                    1000}
+                  km)
+                </small>
+              </span>
 
               {nearbyLoading && (
                 <span>
                   Loading...
                 </span>
               )}
+
             </div>
 
-            {/* =================================================
-                CATEGORY FILTER
-            ================================================= */}
+            {!nearbyLoading &&
+              nearbyPlaces.length ===
+                0 &&
+              !nearbyError && (
+                <small className="nearby-hint">
+                  Select a category to
+                  search nearby.
+                </small>
+              )}
+
+            {/* CATEGORY BUTTONS */}
 
             <div className="nearby-filters">
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "all"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "all"
-                  )
-                }
-              >
-                All
-              </button>
+              {[
+                "shop",
+                "hospital",
+                "pharmacy",
+                "restaurant",
+                "school",
+                "bank",
+              ].map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={
+                    nearbyCategory ===
+                    category
+                      ? "active"
+                      : ""
+                  }
+                  onClick={() =>
+                    handleCategoryChange(
+                      category
+                    )
+                  }
+                >
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "shop"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "shop"
-                  )
-                }
-              >
-                🛍️ Shops
-              </button>
+                  {category ===
+                    "shop" &&
+                    "🛍️ Shops"}
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "hospital"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "hospital"
-                  )
-                }
-              >
-                🏥 Hospital
-              </button>
+                  {category ===
+                    "hospital" &&
+                    "🏥 Hospital"}
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "pharmacy"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "pharmacy"
-                  )
-                }
-              >
-                💊 Pharmacy
-              </button>
+                  {category ===
+                    "pharmacy" &&
+                    "💊 Pharmacy"}
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "restaurant"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "restaurant"
-                  )
-                }
-              >
-                🍴 Restaurant
-              </button>
+                  {category ===
+                    "restaurant" &&
+                    "🍴 Food"}
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "school"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "school"
-                  )
-                }
-              >
-                🏫 School
-              </button>
+                  {category ===
+                    "school" &&
+                    "🏫 School"}
 
-              <button
-                type="button"
-                className={
-                  nearbyCategory ===
-                  "bank"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setNearbyCategory(
-                    "bank"
-                  )
-                }
-              >
-                🏦 Bank
-              </button>
+                  {category ===
+                    "bank" &&
+                    "🏦 Bank"}
+
+                </button>
+              ))}
 
             </div>
 
-            {/* =================================================
-                RESULT COUNT
-            ================================================= */}
+            {/* LOADING */}
 
-            {!nearbyLoading && (
+            {nearbyLoading && (
               <small className="nearby-count">
-                {filteredNearbyPlaces.length}{" "}
-                places found within
-                2.5 km
+                Searching{" "}
+                {nearbyCategory}{" "}
+                nearby...
               </small>
             )}
+
+            {/* ERROR */}
+
+            {!nearbyLoading &&
+              nearbyError && (
+                <div className="nearby-error-wrapper">
+
+                  <span>
+                    {nearbyError}
+                  </span>
+
+                  <button
+                    type="button"
+                    className="retry-btn"
+                    onClick={() => {
+                      const location =
+                        getCurrentSelectedPosition();
+
+                      if (
+                        location &&
+                        nearbyCategory
+                      ) {
+                        getNearbyPlaces(
+                          location.latitude,
+                          location.longitude,
+                          nearbyCategory
+                        );
+                      }
+                    }}
+                  >
+                    Retry
+                  </button>
+
+                </div>
+              )}
+
+            {/* RESULT COUNT */}
+
+            {!nearbyLoading &&
+              !nearbyError &&
+              nearbyPlaces.length >
+                0 && (
+                <small className="nearby-count">
+                  Found{" "}
+                  {
+                    filteredNearbyPlaces.length
+                  }{" "}
+                  places
+                </small>
+              )}
 
           </div>
         )}
 
       </div>
-    </>
-  );
-}
-
-/* =====================================================
-   MAP VIEW
-===================================================== */
-
-function MapView() {
-  const defaultPosition = [
-    22.5726,
-    88.3639,
-  ];
-
-  return (
-    <div className="map-view">
-
-      <MapContainer
-        center={defaultPosition}
-        zoom={12}
-        scrollWheelZoom={true}
-        style={{
-          width: "100%",
-          height: "100%",
-        }}
-      >
-
-        {/* =================================================
-            SEARCH / MARKERS
-        ================================================= */}
-
-        <SearchLocation />
-
-        {/* =================================================
-            MAP LAYERS
-        ================================================= */}
-
-        <LayersControl
-          position="topright"
-        >
-
-          {/* =================================================
-              STREETS
-          ================================================= */}
-
-          <LayersControl.BaseLayer
-            checked
-            name="Streets"
-          >
-            <TileLayer
-              url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${
-                import.meta.env
-                  .VITE_MAPTILER_KEY
-              }`}
-              attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
-            />
-          </LayersControl.BaseLayer>
-
-          {/* =================================================
-              SATELLITE
-          ================================================= */}
-
-          <LayersControl.BaseLayer
-            name="Satellite"
-          >
-            <TileLayer
-              url={`https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=${
-                import.meta.env
-                  .VITE_MAPTILER_KEY
-              }`}
-              attribution="&copy; MapTiler &copy; OpenStreetMap contributors"
-            />
-          </LayersControl.BaseLayer>
-
-          {/* =================================================
-              CITY ISSUES
-          ================================================= */}
-
-          <LayersControl.Overlay
-            checked
-            name="City Issues"
-          >
-            <LayerGroup>
-
-              <Marker
-                position={[
-                  22.5726,
-                  88.3639,
-                ]}
-                icon={defaultIcon}
-              >
-                <Popup>
-                  <strong>
-                    📍 Kolkata City Center
-                  </strong>
-
-                  <br />
-
-                  Example city location.
-                </Popup>
-              </Marker>
-
-            </LayerGroup>
-          </LayersControl.Overlay>
-
-        </LayersControl>
-
-      </MapContainer>
-
     </div>
   );
 }
-
-export default MapView;
