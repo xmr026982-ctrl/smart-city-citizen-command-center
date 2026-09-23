@@ -53,12 +53,15 @@ export default function Contact() {
             +91 33 1234 5678
           </a>
 
-          <a
-            href="mailto:info@smartkolkata.com"
-            className="contact-link"
-          >
-            Send us an email
-          </a>
+        <a
+  href="https://mail.google.com/mail/?view=cm&fs=1&to=supportsmartkolkata@gmail.com"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="contact-link"
+>
+  Send us an email
+</a>
+
 
         </div>
 
@@ -110,7 +113,7 @@ export default function Contact() {
 
           <div>
             <strong>✉ Email</strong>
-            <span>support@smartkolkata.com</span>
+            <span>supportsmartkolkata@gmail.com</span>
           </div>
 
           <div>
