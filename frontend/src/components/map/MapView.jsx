@@ -13,12 +13,13 @@ import {
   Popup,
   LayersControl,
   LayerGroup,
-  useMap,
-  useMapEvents,
-  Circle,
-  CircleMarker,
   Polyline,
 } from "react-leaflet";
+
+import {
+  KOLKATA_BOUNDS,
+  isInsideKolkata,
+} from "./MapUtils";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -28,6 +29,16 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import markerRetina from "leaflet/dist/images/marker-icon-2x.png";
 
 import "./MapView.css";
+
+import MapSearch from "./MapSearch";
+import MapControls from "./MapControls";
+import RouteLayer from "./RouteLayer";
+import MyLocation from "./MyLocation";
+import NearbyPlaces from "./NearbyPlaces";
+import TrafficLayer from "./TrafficLayer";
+import LocationPlaylist from "./LocationPlaylist";
+
+
 
 /* =====================================================
    LEAFLET DEFAULT ICON FIX
@@ -40,17 +51,6 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
-
-/* =====================================================
-   KOLKATA BOUNDS
-===================================================== */
-
-export const KOLKATA_BOUNDS = {
-  south: 22.35,
-  north: 22.8,
-  west: 88.15,
-  east: 88.6,
-};
 
 /* =====================================================
    CONSTANTS
@@ -87,19 +87,6 @@ const getCategoryIcon = (category) =>
   CATEGORY_ICONS[category] || CATEGORY_ICONS.other;
 
 /* =====================================================
-   KOLKATA CHECK
-===================================================== */
-
-const isInsideKolkata = (latitude, longitude) => {
-  return (
-    latitude >= KOLKATA_BOUNDS.south &&
-    latitude <= KOLKATA_BOUNDS.north &&
-    longitude >= KOLKATA_BOUNDS.west &&
-    longitude <= KOLKATA_BOUNDS.east
-  );
-};
-
-/* =====================================================
    CATEGORY ICON CACHE
 ===================================================== */
 
@@ -127,105 +114,6 @@ const createCategoryLeafletIcon = (category) => {
 };
 
 /* =====================================================
-   ROUTE LAYER
-===================================================== */
-
-function RouteLayer({ routeCoordinates }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!routeCoordinates || routeCoordinates.length < 2) {
-      return;
-    }
-
-    const bounds = L.latLngBounds(routeCoordinates);
-
-    map.fitBounds(bounds, {
-      padding: [60, 60],
-      maxZoom: 16,
-      animate: true,
-      duration: 1,
-    });
-  }, [routeCoordinates, map]);
-
-  if (!routeCoordinates || routeCoordinates.length < 2) {
-    return null;
-  }
-
-  return (
-    <Polyline
-      positions={routeCoordinates}
-      pathOptions={{
-        color: "#2563eb",
-        weight: 6,
-        opacity: 0.85,
-        lineCap: "round",
-        lineJoin: "round",
-      }}
-    />
-  );
-}
-
-/* =====================================================
-   MAP CONTROLLER
-===================================================== */
-
-function MapController({
-  onMapClick,
-  targetPosition,
-}) {
-  const map = useMap();
-
-  const previousPositionRef = useRef(null);
-
-  useMapEvents({
-    click(event) {
-      const { lat, lng } = event.latlng;
-
-      if (!isInsideKolkata(lat, lng)) {
-        alert(
-          "Please select a location inside Kolkata boundaries."
-        );
-        return;
-      }
-
-      onMapClick({
-        position: [lat, lng],
-        latitude: lat,
-        longitude: lng,
-      });
-    },
-  });
-
-  useEffect(() => {
-    if (!targetPosition) {
-      return;
-    }
-
-    const [latitude, longitude] =
-      targetPosition;
-
-    const previous =
-      previousPositionRef.current;
-
-    if (
-      !previous ||
-      previous[0] !== latitude ||
-      previous[1] !== longitude
-    ) {
-      map.flyTo(targetPosition, 16, {
-        duration: 1.5,
-      });
-
-      previousPositionRef.current =
-        targetPosition;
-    }
-  }, [targetPosition, map]);
-
-  return null;
-}
-
-/* =====================================================
    MAIN MAP COMPONENT
 ===================================================== */
 
@@ -249,6 +137,7 @@ export default function MapView() {
   const nearbyAbortRef = useRef(null);
   const searchAbortRef = useRef(null);
   const routeAbortRef = useRef(null);
+  const trackingWatchRef = useRef(null);
 
   /* ===================================================
      CACHE
@@ -282,6 +171,19 @@ export default function MapView() {
     useState(false);
 
   /* ===================================================
+     LIVE TRACKING
+  =================================================== */
+
+  const [isTracking, setIsTracking] =
+    useState(false);
+
+  const [trackingPath, setTrackingPath] =
+    useState([]);
+
+  const [trackingError, setTrackingError] =
+    useState("");
+
+  /* ===================================================
      SELECTED LOCATION
   =================================================== */
 
@@ -308,6 +210,14 @@ export default function MapView() {
 
   const [nearbyCategory, setNearbyCategory] =
     useState(null);
+  
+  /* ===================================================
+     TRAFFIC
+  =================================================== */
+
+  const [showTraffic, setShowTraffic] =
+    useState(false);
+
 
   /* ===================================================
      ROUTING
@@ -337,6 +247,13 @@ export default function MapView() {
       nearbyAbortRef.current?.abort();
       searchAbortRef.current?.abort();
       routeAbortRef.current?.abort();
+
+      if (trackingWatchRef.current !== null) {
+        navigator.geolocation?.clearWatch(
+          trackingWatchRef.current
+        );
+        trackingWatchRef.current = null;
+      }
     };
   }, []);
 
@@ -1184,74 +1101,146 @@ export default function MapView() {
   =================================================== */
 
   const getUserLocation = () => {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+
+  setLocationLoading(true);
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const {
+        latitude,
+        longitude,
+        accuracy,
+      } = position.coords;
+
+      // My Location-এর জন্য কোনো Kolkata boundary check নেই
+      const location = [latitude, longitude];
+
+      setUserLocation(location);
+      setLocationAccuracy(accuracy);
+
+      // আগের selected/clicked location clear
+      setClickedLocation(null);
+      setSelectedLocation(null);
+
+      // Nearby data clear
+      setNearbyPlaces([]);
+      setNearbyCategory(null);
+      setNearbyError("");
+
+      // Map current location-এ যাবে
+      setMapTarget(location);
+
+      // পুরনো route clear
+      clearRoute();
+
+      setLocationLoading(false);
+    },
+    () => {
+      alert("Location access denied or timed out.");
+      setLocationLoading(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 60000,
+    }
+  );
+};
+  /* ===================================================
+     START LIVE TRACKING
+  =================================================== */
+
+  const startLiveTracking = () => {
     if (!navigator.geolocation) {
-      alert(
+      setTrackingError(
         "Geolocation is not supported by your browser."
       );
       return;
     }
 
-    setLocationLoading(true);
+    if (trackingWatchRef.current !== null) {
+      return;
+    }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const {
-          latitude,
-          longitude,
-          accuracy,
-        } = position.coords;
+    setTrackingError("");
+    setIsTracking(true);
+    setTrackingPath([]);
 
-        if (
-          !isInsideKolkata(
+    trackingWatchRef.current =
+      navigator.geolocation.watchPosition(
+        (position) => {
+          const {
             latitude,
-            longitude
-          )
-        ) {
-          setLocationLoading(false);
+            longitude,
+            accuracy,
+          } = position.coords;
 
-          alert(
-            "Your location is outside the defined Kolkata region."
-          );
+          const location = [latitude, longitude];
 
-          return;
+          setUserLocation(location);
+          setLocationAccuracy(accuracy);
+          setMapTarget(location);
+          setTrackingError("");
+
+          setTrackingPath((previousPath) => {
+            const lastPoint =
+              previousPath[previousPath.length - 1];
+
+            if (
+              lastPoint &&
+              lastPoint[0] === latitude &&
+              lastPoint[1] === longitude
+            ) {
+              return previousPath;
+            }
+
+            return [...previousPath, location];
+          });
+        },
+        (error) => {
+          let message =
+            "Unable to track your live location.";
+
+          if (error.code === 1) {
+            message =
+              "Location permission was denied.";
+          } else if (error.code === 2) {
+            message =
+              "Your current location is unavailable.";
+          } else if (error.code === 3) {
+            message =
+              "Live location request timed out.";
+          }
+
+          setTrackingError(message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 5000,
         }
+      );
+  };
 
-        const location = [
-          latitude,
-          longitude,
-        ];
+  /* ===================================================
+     STOP LIVE TRACKING
+  =================================================== */
 
-        setUserLocation(location);
-        setLocationAccuracy(
-          accuracy
-        );
+  const stopLiveTracking = () => {
+    if (trackingWatchRef.current !== null) {
+      navigator.geolocation.clearWatch(
+        trackingWatchRef.current
+      );
 
-        setClickedLocation(null);
-        setSelectedLocation(null);
+      trackingWatchRef.current = null;
+    }
 
-        setNearbyPlaces([]);
-        setNearbyCategory(null);
-        setNearbyError("");
-
-        setMapTarget(location);
-
-        clearRoute();
-
-        setLocationLoading(false);
-      },
-      () => {
-        alert(
-          "Location access denied or timed out."
-        );
-
-        setLocationLoading(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000,
-      }
-    );
+    setIsTracking(false);
+    setTrackingError("");
   };
 
   /* ===================================================
@@ -1449,28 +1438,54 @@ export default function MapView() {
       ================================================= */}
 
       <MapContainer
-        center={defaultPosition}
-        zoom={12}
-        minZoom={3}
-        maxZoom={18}
-        scrollWheelZoom={true}
-        className="leaflet-full-height"
-      >
+         center={defaultPosition}
+         zoom={12}
+         zoomControl={false}
+         minZoom={3}
+         maxZoom={18}
+         scrollWheelZoom={true}
+           className="leaflet-full-height"
+          >
 
-        <MapController
+        <MapControls
           onMapClick={handleMapClick}
-          targetPosition={mapTarget}
+          getUserLocation={getUserLocation}
+          locationLoading={locationLoading}
         />
 
+        <LocationPlaylist userLocation={userLocation} />
+
+        {showTraffic && <TrafficLayer />}
+        
         {/* =================================================
             ROUTE
         ================================================= */}
 
         <RouteLayer
-          routeCoordinates={
-            routeCoordinates
-          }
+          routeCoordinates={routeCoordinates}
+          routeDestination={routeDestination}
+          routeInfo={routeInfo}
+          formatDistance={formatDistance}
+          formatDuration={formatDuration}
         />
+
+        {/* =================================================
+            LIVE TRACKING PATH
+        ================================================= */}
+
+        {trackingPath.length > 1 && (
+          <Polyline
+            positions={trackingPath}
+            pathOptions={{
+              color: "#2563eb",
+              weight: 5,
+              opacity: 0.75,
+              lineCap: "round",
+              lineJoin: "round",
+              dashArray: "8, 8",
+            }}
+          />
+        )}
 
         {/* =================================================
             MAP LAYERS
@@ -1502,6 +1517,18 @@ export default function MapView() {
               keepBuffer={4}
             />
           </LayersControl.BaseLayer>
+
+           {/* TERRAIN */}
+
+          <LayersControl.BaseLayer
+            name="Terrain"
+          >
+         <TileLayer
+            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+            attribution='Map data &copy; OpenStreetMap contributors, SRTM | Map style &copy; OpenTopoMap'
+            keepBuffer={4}
+          />
+         </LayersControl.BaseLayer>
 
           {/* CITY HUB */}
 
@@ -1540,67 +1567,10 @@ export default function MapView() {
             USER LOCATION
         ================================================= */}
 
-        {userLocation && (
-          <>
-            <Circle
-              center={userLocation}
-              radius={
-                locationAccuracy || 40
-              }
-              pathOptions={{
-                color: "#2563eb",
-                fillColor: "#3b82f6",
-                fillOpacity: 0.12,
-                weight: 1.5,
-                dashArray: "4, 4",
-              }}
-            />
-
-            <CircleMarker
-              center={userLocation}
-              radius={12}
-              pathOptions={{
-                color: "#60a5fa",
-                weight: 2,
-                fillColor: "#3b82f6",
-                fillOpacity: 0.4,
-              }}
-            />
-
-            <CircleMarker
-              center={userLocation}
-              radius={6}
-              pathOptions={{
-                color: "#ffffff",
-                weight: 2,
-                fillColor: "#2563eb",
-                fillOpacity: 1,
-              }}
-            >
-              <Popup>
-
-                <div className="text-center">
-
-                  <strong>
-                    📍 Current Position
-                  </strong>
-
-                  <br />
-
-                  <small className="text-muted">
-                    Accuracy:{" "}
-                    {Math.round(
-                      locationAccuracy
-                    )}{" "}
-                    m
-                  </small>
-
-                </div>
-
-              </Popup>
-            </CircleMarker>
-          </>
-        )}
+        <MyLocation
+          userLocation={userLocation}
+          locationAccuracy={locationAccuracy}
+        />
 
         {/* =================================================
             SELECTED SEARCH LOCATION
@@ -1752,478 +1722,55 @@ export default function MapView() {
             NEARBY PLACES
         ================================================= */}
 
-        {filteredNearbyPlaces.map(
-          (place) => (
-            <Marker
-              key={place.id}
-              position={[
-                place.latitude,
-                place.longitude,
-              ]}
-              icon={createCategoryLeafletIcon(
-                place.category
-              )}
-            >
-              <Popup>
-
-                <div className="nearby-place-popup">
-
-                  <strong>
-                    {getCategoryIcon(
-                      place.category
-                    )}{" "}
-                    {place.name}
-                  </strong>
-
-                  <br />
-
-                  <small className="category-tag">
-                    {place.category}
-                  </small>
-
-                  {place.address && (
-                    <>
-                      <br />
-
-                      <small>
-                        📍{" "}
-                        {place.address}
-                      </small>
-                    </>
-                  )}
-
-                  {place.phone && (
-                    <>
-                      <br />
-
-                      <small>
-                        📞{" "}
-                        {place.phone}
-                      </small>
-                    </>
-                  )}
-
-                  {place.website && (
-                    <>
-                      <br />
-
-                      <a
-                        href={
-                          place.website.startsWith(
-                            "http"
-                          )
-                            ? place.website
-                            : `https://${place.website}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        🌐 Website
-                      </a>
-                    </>
-                  )}
-
-                  <br />
-                  <br />
-
-                  <button
-                    type="button"
-                    className="route-btn"
-                    onClick={() =>
-                      getRoute({
-                        latitude:
-                          place.latitude,
-                        longitude:
-                          place.longitude,
-                        name:
-                          place.name,
-                      })
-                    }
-                  >
-                    🚗 Get Route
-                  </button>
-
-                </div>
-
-              </Popup>
-            </Marker>
-          )
-        )}
+        <NearbyPlaces
+            places={filteredNearbyPlaces}
+            createCategoryLeafletIcon={createCategoryLeafletIcon}
+            getRoute={getRoute}
+        />
 
       </MapContainer>
 
-      {/* ===================================================
-          SEARCH BOX
-      =================================================== */}
-
-      <div className="map-search-box">
-
-        <form
-          onSubmit={handleSearch}
-        >
-
-          <input
-            type="text"
-            placeholder="Search location in Kolkata..."
-            value={query}
-            onChange={(event) =>
-              setQuery(
-                event.target.value
-              )
-            }
-          />
-
-          {query && (
-            <button
-              type="button"
-              className="clear-btn"
-              onClick={
-                clearSearch
-              }
-            >
-              ❌
-            </button>
-          )}
-
-          <button type="submit">
-            {loading
-              ? "..."
-              : "🔍"}
-          </button>
-
-        </form>
-
-        {/* =================================================
-            MY LOCATION
-        ================================================= */}
-
-        <button
-          type="button"
-          className="my-location-btn"
-          onClick={
-            getUserLocation
-          }
-          disabled={
-            locationLoading
-          }
-        >
-          📍{" "}
-          {locationLoading
-            ? "Locating..."
-            : "My Location"}
-        </button>
-
-        {/* =================================================
-            SEARCH RESULTS
-        ================================================= */}
-
-        {results.length > 0 && (
-          <div className="search-results">
-
-            {results.map(
-              (
-                feature,
-                index
-              ) => (
-                <button
-                  key={
-                    feature.id ||
-                    index
-                  }
-                  type="button"
-                  className="search-result-item"
-                  onClick={() =>
-                    selectLocation(
-                      feature
-                    )
-                  }
-                >
-
-                  <span className="result-icon">
-                    📍
-                  </span>
-
-                  <span className="result-info">
-
-                    <strong>
-                      {feature.text ||
-                        "Unknown Location"}
-                    </strong>
-
-                    <small>
-                      {feature.place_name ||
-                        ""}
-                    </small>
-
-                  </span>
-
-                </button>
-              )
-            )}
-
-          </div>
-        )}
-
-        {/* =================================================
-            ROUTE INFORMATION
-        ================================================= */}
-
-        {(routeLoading ||
-          routeInfo ||
-          routeError) && (
-          <div className="route-panel">
-
-            <div className="route-header">
-
-              <span>
-                🛣️ Route
-              </span>
-
-              {routeLoading && (
-                <span>
-                  Calculating...
-                </span>
-              )}
-
-            </div>
-
-            {routeLoading && (
-              <div className="route-loading">
-                Finding the best driving route...
-              </div>
-            )}
-
-            {!routeLoading &&
-              routeInfo && (
-                <>
-                  <div className="route-destination">
-
-                    📍{" "}
-                    {routeDestination?.name ||
-                      "Destination"}
-
-                  </div>
-
-                  <div className="route-details">
-
-                    <span>
-                      📏{" "}
-                      {formatDistance(
-                        routeInfo.distance
-                      )}
-                    </span>
-
-                    <span>
-                      ⏱️{" "}
-                      {formatDuration(
-                        routeInfo.duration
-                      )}
-                    </span>
-
-                  </div>
-
-                  <button
-                    type="button"
-                    className="clear-route-btn"
-                    onClick={
-                      clearRoute
-                    }
-                  >
-                    ✕ Clear Route
-                  </button>
-                </>
-              )}
-
-            {!routeLoading &&
-              routeError && (
-                <div className="route-error">
-
-                  <span>
-                    {routeError}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="retry-route-btn"
-                    onClick={() => {
-                      if (
-                        routeDestination
-                      ) {
-                        getRoute(
-                          routeDestination
-                        );
-                      }
-                    }}
-                  >
-                    Retry
-                  </button>
-
-                </div>
-              )}
-
-          </div>
-        )}
-
-        {/* =================================================
-            NEARBY PANEL
-        ================================================= */}
-
-        {(selectedLocation ||
-          userLocation ||
-          clickedLocation) && (
-          <div className="nearby-panel">
-
-            <div className="nearby-header">
-
-              <span>
-                Nearby Services{" "}
-                <small>
-                  (
-                  {NEARBY_RADIUS /
-                    1000}
-                  km)
-                </small>
-              </span>
-
-              {nearbyLoading && (
-                <span>
-                  Loading...
-                </span>
-              )}
-
-            </div>
-
-            {!nearbyLoading &&
-              nearbyPlaces.length ===
-                0 &&
-              !nearbyError && (
-                <small className="nearby-hint">
-                  Select a category to
-                  search nearby.
-                </small>
-              )}
-
-            {/* CATEGORY BUTTONS */}
-
-            <div className="nearby-filters">
-
-              {[
-                "shop",
-                "hospital",
-                "pharmacy",
-                "restaurant",
-                "school",
-                "bank",
-              ].map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  className={
-                    nearbyCategory ===
-                    category
-                      ? "active"
-                      : ""
-                  }
-                  onClick={() =>
-                    handleCategoryChange(
-                      category
-                    )
-                  }
-                >
-
-                  {category ===
-                    "shop" &&
-                    "🛍️ Shops"}
-
-                  {category ===
-                    "hospital" &&
-                    "🏥 Hospital"}
-
-                  {category ===
-                    "pharmacy" &&
-                    "💊 Pharmacy"}
-
-                  {category ===
-                    "restaurant" &&
-                    "🍴 Food"}
-
-                  {category ===
-                    "school" &&
-                    "🏫 School"}
-
-                  {category ===
-                    "bank" &&
-                    "🏦 Bank"}
-
-                </button>
-              ))}
-
-            </div>
-
-            {/* LOADING */}
-
-            {nearbyLoading && (
-              <small className="nearby-count">
-                Searching{" "}
-                {nearbyCategory}{" "}
-                nearby...
-              </small>
-            )}
-
-            {/* ERROR */}
-
-            {!nearbyLoading &&
-              nearbyError && (
-                <div className="nearby-error-wrapper">
-
-                  <span>
-                    {nearbyError}
-                  </span>
-
-                  <button
-                    type="button"
-                    className="retry-btn"
-                    onClick={() => {
-                      const location =
-                        getCurrentSelectedPosition();
-
-                      if (
-                        location &&
-                        nearbyCategory
-                      ) {
-                        getNearbyPlaces(
-                          location.latitude,
-                          location.longitude,
-                          nearbyCategory
-                        );
-                      }
-                    }}
-                  >
-                    Retry
-                  </button>
-
-                </div>
-              )}
-
-            {/* RESULT COUNT */}
-
-            {!nearbyLoading &&
-              !nearbyError &&
-              nearbyPlaces.length >
-                0 && (
-                <small className="nearby-count">
-                  Found{" "}
-                  {
-                    filteredNearbyPlaces.length
-                  }{" "}
-                  places
-                </small>
-              )}
-
-          </div>
-        )}
-
-      </div>
+   
+     
+      <MapSearch 
+  query={query} 
+  setQuery={setQuery} 
+  handleSearch={handleSearch} 
+  clearSearch={clearSearch} 
+  loading={loading} 
+  getUserLocation={getUserLocation} 
+  locationLoading={locationLoading} 
+  isTracking={isTracking} 
+  startLiveTracking={startLiveTracking} 
+  stopLiveTracking={stopLiveTracking} 
+  trackingError={trackingError} 
+  results={results} 
+  selectLocation={selectLocation} 
+  routeLoading={routeLoading} 
+  routeInfo={routeInfo} 
+  routeDestination={routeDestination} 
+  routeError={routeError} 
+  getRoute={getRoute} 
+  clearRoute={clearRoute} 
+  formatDistance={formatDistance} 
+  formatDuration={formatDuration} 
+  selectedLocation={selectedLocation} 
+  userLocation={userLocation} 
+  clickedLocation={clickedLocation} 
+  nearbyCategory={nearbyCategory} 
+  nearbyLoading={nearbyLoading} 
+  nearbyPlaces={nearbyPlaces} 
+  nearbyError={nearbyError} 
+  filteredNearbyPlaces={filteredNearbyPlaces} 
+  handleCategoryChange={handleCategoryChange} 
+  getCurrentSelectedPosition={getCurrentSelectedPosition} 
+  getNearbyPlaces={getNearbyPlaces} 
+  NEARBY_RADIUS={NEARBY_RADIUS}
+
+  // Traffic
+  showTraffic={showTraffic}
+  setShowTraffic={setShowTraffic}
+/>
     </div>
   );
 }

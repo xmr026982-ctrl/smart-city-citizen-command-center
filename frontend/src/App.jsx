@@ -1,10 +1,19 @@
-import MapView from "./components/map/mapview";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+
+import UserMap from "./pages/User/UserMap";
+import StaffMap from "./pages/Staff/StaffMap";
+import AdminMap from "./pages/Admin/AdminMap";
 
 function App() {
   return (
-    <div>
-      <MapView />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<UserMap />} />
+        <Route path="/user/map" element={<UserMap />} />
+        <Route path="/staff/map" element={<StaffMap />} />
+        <Route path="/admin/map" element={<AdminMap />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
