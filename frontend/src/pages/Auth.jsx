@@ -111,13 +111,23 @@ function AuthPage({ initialMode }) {
 
   const [role, setRole] = useState(null)
 
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const [showPassword, setShowPassword] = useState(false)
 
+  /*
+    SIGNUP FLOW
+
+    role
+      ↓
+    email
+      ↓
+    password
+  */
   const [signupStep, setSignupStep] =
-    useState('email')
+    useState('role')
 
   const [userPasswordStep, setUserPasswordStep] =
     useState(false)
@@ -139,22 +149,27 @@ function AuthPage({ initialMode }) {
     )
 
     setRole(null)
+    setName('')
     setEmail('')
     setPassword('')
     setShowPassword(false)
-    setSignupStep('email')
+    setSignupStep('role')
     setUserPasswordStep(false)
     setMessage('')
+    setLoading(false)
   }
 
   const submit = async (event) => {
     event.preventDefault()
 
     /*
+      =====================================
       USER LOGIN
       First step: email
       Second step: password
+      =====================================
     */
+
     if (
       mode === 'login' &&
       role === 'user' &&
@@ -165,20 +180,28 @@ function AuthPage({ initialMode }) {
     }
 
     /*
+      =====================================
       SIGNUP
-      Keep the existing signup flow for now.
+      First step: name + email
+      Second step: password
+      =====================================
     */
+
     if (
       mode === 'signup' &&
       signupStep === 'email'
     ) {
       setSignupStep('password')
+      setMessage('')
       return
     }
 
     /*
+      =====================================
       LOGIN
+      =====================================
     */
+
     if (mode === 'login') {
       try {
         setLoading(true)
@@ -246,12 +269,90 @@ function AuthPage({ initialMode }) {
     }
 
     /*
-      SIGNUP
+      =====================================
+      SIGNUP / REGISTER
+      =====================================
     */
-    setMessage(
-      'Your account has been created successfully.'
-    )
+
+    if (mode === 'signup') {
+      try {
+        setLoading(true)
+        setMessage('')
+
+        const response = await fetch(
+          'http://localhost:5000/api/auth/register',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              name,
+              email,
+              password,
+              role
+            })
+          }
+        )
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          setMessage(
+            data.message || 'Registration failed.'
+          )
+          return
+        }
+
+        /*
+          Save the token and user information
+          returned by the backend.
+        */
+
+        if (data.token) {
+          localStorage.setItem(
+            'token',
+            data.token
+          )
+        }
+
+        if (data.user) {
+          localStorage.setItem(
+            'user',
+            JSON.stringify(data.user)
+          )
+        }
+
+        setMessage(
+          data.message ||
+          `${selectedRole?.name} account created successfully.`
+        )
+
+        console.log(
+          'Registered:',
+          data.user
+        )
+
+      } catch (error) {
+        console.error(
+          'Registration error:',
+          error
+        )
+
+        setMessage(
+          'Unable to connect to the backend server.'
+        )
+      } finally {
+        setLoading(false)
+      }
+    }
   }
+
+  /*
+    =====================================
+    PASSWORD FIELD VISIBILITY
+    =====================================
+  */
 
   const showPasswordField =
     (mode === 'signup' &&
@@ -259,6 +360,105 @@ function AuthPage({ initialMode }) {
     (mode === 'login' &&
       (role !== 'user' ||
         userPasswordStep))
+
+  /*
+    =====================================
+    SIGNUP ROLE PAGE
+    =====================================
+  */
+
+  if (
+    mode === 'signup' &&
+    signupStep === 'role'
+  ) {
+    return (
+      <main className="auth-page">
+
+        <section className="auth-card">
+
+          <BrandMark />
+
+          <p className="intro">
+            Create your account to access smart city services.
+          </p>
+
+          <GoogleButton
+            label="Continue with Google"
+            onClick={() =>
+              setMessage(
+                'Google sign-up selected.'
+              )
+            }
+          />
+
+          <div className="divider">
+            <span>or</span>
+          </div>
+
+          <p className="intro">
+            Choose your account type to continue.
+          </p>
+
+          <div className="role-page-options">
+
+            {roles.map((item) => (
+              <button
+                className="role-card"
+                type="button"
+                key={item.id}
+                onClick={() => {
+                  setRole(item.id)
+                  setSignupStep('email')
+                  setMessage('')
+                }}
+              >
+                <span className="role-card-icon">
+                  {item.icon}
+                </span>
+
+                <span className="role-card-copy">
+                  <strong>
+                    {item.name} Account
+                  </strong>
+
+                  <small>
+                    {item.description}
+                  </small>
+                </span>
+
+                <span className="role-arrow">
+                  →
+                </span>
+              </button>
+            ))}
+
+          </div>
+
+          <p className="switch-copy role-switch">
+            Already have an account?{' '}
+
+            <button
+              type="button"
+              className="text-button switch-button"
+              onClick={() =>
+                switchMode('login')
+              }
+            >
+              Log in
+            </button>
+          </p>
+
+        </section>
+
+      </main>
+    )
+  }
+
+  /*
+    =====================================
+    NORMAL LOGIN / SIGNUP UI
+    =====================================
+  */
 
   return (
     <main className="auth-page">
@@ -280,8 +480,6 @@ function AuthPage({ initialMode }) {
         {mode === 'login' &&
         step === 'role' ? (
           <>
-            {/* <h1>Login to Smart City</h1> */}
-
             <p className="intro">
               Choose your login type to continue.
             </p>
@@ -335,9 +533,33 @@ function AuthPage({ initialMode }) {
                   setStep('role')
                   setRole(null)
                   setMessage('')
+                  setEmail('')
+                  setPassword('')
+                  setUserPasswordStep(false)
                 }}
               >
                 ← Back to login options
+              </button>
+            )}
+
+            {/* ========================= */}
+            {/* BACK TO ROLE FOR SIGNUP    */}
+            {/* ========================= */}
+
+            {mode === 'signup' && (
+              <button
+                className="back-button"
+                type="button"
+                onClick={() => {
+                  setSignupStep('role')
+                  setRole(null)
+                  setName('')
+                  setEmail('')
+                  setPassword('')
+                  setMessage('')
+                }}
+              >
+                ← Back to account types
               </button>
             )}
 
@@ -367,6 +589,31 @@ function AuthPage({ initialMode }) {
               )}
 
             {/* ========================= */}
+            {/* SELECTED SIGNUP ROLE        */}
+            {/* ========================= */}
+
+            {mode === 'signup' &&
+              selectedRole && (
+                <div
+                  className={`login-identity ${role}-identity`}
+                >
+                  <span className="login-identity-icon">
+                    {selectedRole.icon}
+                  </span>
+
+                  <div>
+                    <strong>
+                      {selectedRole.name} Account
+                    </strong>
+
+                    <small>
+                      {selectedRole.description}
+                    </small>
+                  </div>
+                </div>
+              )}
+
+            {/* ========================= */}
             {/* TITLE                       */}
             {/* ========================= */}
 
@@ -380,17 +627,14 @@ function AuthPage({ initialMode }) {
             {/* GOOGLE LOGIN                */}
             {/* ========================= */}
 
-            {(mode === 'signup' ||
-              (mode === 'login' &&
-                role === 'user')) && (
+            {mode === 'login' &&
+              role === 'user' && (
               <>
                 <GoogleButton
                   label="Continue with Google"
                   onClick={() =>
                     setMessage(
-                      mode === 'signup'
-                        ? 'Google sign-up selected.'
-                        : 'Google sign-in selected.'
+                      'Google sign-in selected.'
                     )
                   }
                 />
@@ -407,6 +651,37 @@ function AuthPage({ initialMode }) {
 
             <form onSubmit={submit}>
 
+              {/* ========================= */}
+              {/* NAME - SIGNUP ONLY         */}
+              {/* ========================= */}
+
+              {mode === 'signup' &&
+                signupStep === 'email' && (
+                <>
+                  <label htmlFor="name">
+                    Full name
+                  </label>
+
+                  <input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(event) =>
+                      setName(
+                        event.target.value
+                      )
+                    }
+                    autoComplete="name"
+                    required
+                  />
+                </>
+              )}
+
+              {/* ========================= */}
+              {/* EMAIL                       */}
+              {/* ========================= */}
+
               <label htmlFor="identity">
                 Email address
               </label>
@@ -419,6 +694,7 @@ function AuthPage({ initialMode }) {
                 onChange={(event) =>
                   setEmail(event.target.value)
                 }
+                autoComplete="email"
                 required
               />
 
@@ -504,15 +780,20 @@ function AuthPage({ initialMode }) {
               <button
                 className="submit-button"
                 type="submit"
+                disabled={loading}
               >
-                {mode === 'login'
-                  ? role === 'user' &&
-                    !userPasswordStep
-                    ? 'CONTINUE'
-                    : 'LOGIN'
-                  : signupStep === 'email'
-                    ? 'CONTINUE'
-                    : 'CREATE ACCOUNT'}
+                {loading
+                  ? mode === 'login'
+                    ? 'LOGGING IN...'
+                    : 'CREATING ACCOUNT...'
+                  : mode === 'login'
+                    ? role === 'user' &&
+                      !userPasswordStep
+                      ? 'CONTINUE'
+                      : 'LOGIN'
+                    : signupStep === 'email'
+                      ? 'CONTINUE'
+                      : 'CREATE ACCOUNT'}
               </button>
 
             </form>

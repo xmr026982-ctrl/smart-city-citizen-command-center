@@ -13,11 +13,19 @@ const generateToken = (userId) => {
 // Register citizen
 const register = async (req, res) => {
   try {
-    const { name, email, password, ward } = req.body;
+    const { name, email, password, ward, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
         message: "Name, email and password are required."
+      });
+    }
+
+    const allowedRoles = ["admin", "staff", "user"];
+
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({
+        message: "A valid role is required."
       });
     }
 
@@ -36,7 +44,7 @@ const register = async (req, res) => {
       email,
       password: hashedPassword,
       ward,
-      role: "citizen"
+      role
     });
 
     const token = generateToken(user._id);
