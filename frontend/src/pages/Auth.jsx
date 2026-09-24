@@ -1,6 +1,5 @@
 import { useState } from 'react'
 
-
 const roles = [
   {
     id: 'admin',
@@ -124,6 +123,7 @@ function AuthPage({ initialMode }) {
     useState(false)
 
   const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const selectedRole = roles.find(
     (item) => item.id === role
@@ -147,17 +147,13 @@ function AuthPage({ initialMode }) {
     setMessage('')
   }
 
-  const submit = (event) => {
+  const submit = async (event) => {
     event.preventDefault()
 
     /*
       USER LOGIN
-
-      First step:
-      User enters email.
-
-      Second step:
-      User enters password.
+      First step: email
+      Second step: password
     */
     if (
       mode === 'login' &&
@@ -169,13 +165,8 @@ function AuthPage({ initialMode }) {
     }
 
     /*
-      SIGN UP
-
-      First step:
-      User enters email.
-
-      Second step:
-      User creates password.
+      SIGNUP
+      Keep the existing signup flow for now.
     */
     if (
       mode === 'signup' &&
@@ -186,17 +177,79 @@ function AuthPage({ initialMode }) {
     }
 
     /*
-      Temporary frontend message.
+      LOGIN
+    */
+    if (mode === 'login') {
+      try {
+        setLoading(true)
+        setMessage('')
 
-      Later this section can be connected
-      to your backend API.
+        const response = await fetch(
+          'http://localhost:5000/api/auth/login',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email,
+              password,
+              role
+            })
+          }
+        )
 
-      Person 6 can connect Admin login here.
+        const data = await response.json()
+
+        if (!response.ok) {
+          setMessage(
+            data.message || 'Login failed.'
+          )
+          return
+        }
+
+        /*
+          Backend has verified:
+          1. Email exists
+          2. Password is correct
+          3. Account is active
+          4. Selected role matches database role
+        */
+
+        localStorage.setItem(
+          'token',
+          data.token
+        )
+
+        localStorage.setItem(
+          'user',
+          JSON.stringify(data.user)
+        )
+
+        setMessage(
+          `${selectedRole?.name} login successful.`
+        )
+
+        console.log('Logged in:', data.user)
+
+      } catch (error) {
+        console.error('Login error:', error)
+
+        setMessage(
+          'Unable to connect to the backend server.'
+        )
+      } finally {
+        setLoading(false)
+      }
+
+      return
+    }
+
+    /*
+      SIGNUP
     */
     setMessage(
-      mode === 'login'
-        ? `${selectedRole?.name} login submitted successfully.`
-        : 'Your account has been created successfully.'
+      'Your account has been created successfully.'
     )
   }
 
@@ -227,7 +280,7 @@ function AuthPage({ initialMode }) {
         {mode === 'login' &&
         step === 'role' ? (
           <>
-            <h1>Login to Smart City</h1>
+            {/* <h1>Login to Smart City</h1> */}
 
             <p className="intro">
               Choose your login type to continue.
@@ -317,12 +370,6 @@ function AuthPage({ initialMode }) {
             {/* TITLE                       */}
             {/* ========================= */}
 
-            <h1>
-              {mode === 'login'
-                ? `${selectedRole?.name} Login`
-                : 'Create your account'}
-            </h1>
-
             <p className="intro">
               {mode === 'login'
                 ? `Log in as ${selectedRole?.name} to continue.`
@@ -361,26 +408,13 @@ function AuthPage({ initialMode }) {
             <form onSubmit={submit}>
 
               <label htmlFor="identity">
-                {mode === 'login' &&
-                role === 'staff'
-                  ? 'Staff ID'
-                  : 'Email address'}
+                Email address
               </label>
 
               <input
                 id="identity"
-                type={
-                  mode === 'login' &&
-                  role === 'staff'
-                    ? 'text'
-                    : 'email'
-                }
-                placeholder={
-                  mode === 'login' &&
-                  role === 'staff'
-                    ? 'Enter your staff ID'
-                    : 'Enter your email address'
-                }
+                type="email"
+                placeholder="Enter your email address"
                 value={email}
                 onChange={(event) =>
                   setEmail(event.target.value)

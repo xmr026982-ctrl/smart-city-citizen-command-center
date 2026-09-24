@@ -64,40 +64,50 @@ const register = async (req, res) => {
 // Login
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body
 
     if (!email || !password) {
       return res.status(400).json({
         message: "Email and password are required."
-      });
+      })
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email })
 
     if (!user) {
       return res.status(401).json({
         message: "Invalid email or password."
-      });
+      })
     }
 
     const passwordMatch = await bcrypt.compare(
       password,
       user.password
-    );
+    )
 
     if (!passwordMatch) {
       return res.status(401).json({
         message: "Invalid email or password."
-      });
+      })
+    }
+
+    /*
+      Verify that the selected portal
+      matches the user's actual database role.
+    */
+    if (role && user.role !== role) {
+      return res.status(403).json({
+        message: `This account does not have ${role} access.`
+      })
     }
 
     if (!user.isActive) {
       return res.status(403).json({
         message: "Your account has been disabled."
-      });
+      })
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user._id)
 
     res.json({
       message: "Login successful.",
@@ -109,15 +119,16 @@ const login = async (req, res) => {
         role: user.role,
         ward: user.ward
       }
-    });
+    })
+
   } catch (error) {
-    console.error(error);
+    console.error(error)
 
     res.status(500).json({
       message: "Login failed."
-    });
+    })
   }
-};
+}
 
 module.exports = {
   register,
