@@ -14,6 +14,7 @@ import { useAuth } from "../../../store/authStore";
 import Button from "../../ui/Button";
 import { Select } from "../../ui/Input";
 import IssueComments from "./IssueComments";
+import IssueLocationPreview from "./IssueLocationPreview";
 import IssuePriorityBadge from "./IssuePriorityBadge";
 import IssueSLAIndicator from "./IssueSLAIndicator";
 import IssueStatusBadge from "./IssueStatusBadge";
@@ -24,6 +25,7 @@ function IssueDetails({ issue }) {
   const canStatus = canUpdateStatus(user.role);
   const canAssign = canAssignIssues(user.role);
   const canPriority = canSetPriority(user.role);
+  const isCitizen = user.role === "citizen";
 
   return (
     <div className="page-stack">
@@ -36,9 +38,9 @@ function IssueDetails({ issue }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <IssuePriorityBadge priority={issue.priority} />
+          {!isCitizen ? <IssuePriorityBadge priority={issue.priority} /> : null}
           <IssueStatusBadge status={issue.status} />
-          {user.role === "citizen" ? (
+          {isCitizen ? (
             <Button type="button" variant="secondary" onClick={() => toggleSaved(issue.id)}>
               <Bookmark size={14} />
               {issue.saved ? "Saved" : "Save"}
@@ -52,22 +54,42 @@ function IssueDetails({ issue }) {
         <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>{issue.description}</p>
       </section>
 
+      <IssueLocationPreview issue={issue} />
+
       <section className="panel" style={{ padding: 16 }}>
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">Dispatch</p>
+        {isCitizen ? (
+          <>
+            <p className="eyebrow">Update</p>
             <p style={{ marginTop: 8, fontSize: 14 }}>
-              Assigned to <strong>{issue.assignedTo || "Unassigned"}</strong>
+              {issue.status === "resolved"
+                ? "City operations marked this report resolved."
+                : issue.assignedTo
+                  ? "City operations is handling this report."
+                  : "Your report is with the command desk."}
             </p>
-          </div>
-          <IssuePriorityBadge priority={issue.priority} />
-        </div>
-        <p style={{ marginTop: 10, color: "var(--muted)", fontSize: 13 }}>
-          Priority set by command: <strong>{PRIORITY_LABEL[issue.priority]}</strong>
-          {canPriority
-            ? ". You can update assignment and priority."
-            : ". Visible to staff, locked from field changes."}
-        </p>
+            <p style={{ marginTop: 6, color: "var(--muted)", fontSize: 13 }}>
+              Current status: <strong>{STATUS_LABEL[issue.status]}</strong>. Staff names stay internal.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">Dispatch</p>
+                <p style={{ marginTop: 8, fontSize: 14 }}>
+                  Assigned to <strong>{issue.assignedTo || "Unassigned"}</strong>
+                </p>
+              </div>
+              <IssuePriorityBadge priority={issue.priority} />
+            </div>
+            <p style={{ marginTop: 10, color: "var(--muted)", fontSize: 13 }}>
+              Priority set by command: <strong>{PRIORITY_LABEL[issue.priority]}</strong>
+              {canPriority
+                ? ". You can update assignment and priority."
+                : ". Visible to staff, locked from field changes."}
+            </p>
+          </>
+        )}
       </section>
 
       {issue.photos?.length ? (
@@ -160,12 +182,14 @@ function IssueDetails({ issue }) {
           <p className="eyebrow">Last updated</p>
           <p style={{ marginTop: 6 }}>{formatDateTime(issue.updatedAt)}</p>
         </div>
-        <div>
-          <p className="eyebrow">Service window</p>
-          <p style={{ marginTop: 6 }}>
-            <IssueSLAIndicator issue={issue} />
-          </p>
-        </div>
+        {!isCitizen ? (
+          <div>
+            <p className="eyebrow">Service window</p>
+            <p style={{ marginTop: 6 }}>
+              <IssueSLAIndicator issue={issue} />
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
