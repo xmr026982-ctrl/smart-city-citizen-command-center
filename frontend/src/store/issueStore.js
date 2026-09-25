@@ -16,12 +16,12 @@ const seed = [
     reporterId: "citizen-1",
     status: "in_progress",
     priority: "high",
-    assignedTo: "Rohan Desai",
+    assignedTo: "Koushik Bhowmik",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-12T08:10:00.000Z", by: "Aanya Mehra" },
-      { status: "acknowledged", at: "2026-09-12T14:40:00.000Z", by: "Priya Shah" },
-      { status: "in_progress", at: "2026-09-15T09:10:00.000Z", by: "Rohan Desai" },
+      { status: "acknowledged", at: "2026-09-12T14:40:00.000Z", by: "Priti Sarkar" },
+      { status: "in_progress", at: "2026-09-15T09:10:00.000Z", by: "Koushik Bhowmik" },
     ],
     createdAt: "2026-09-12T08:10:00.000Z",
     updatedAt: "2026-09-15T09:20:00.000Z",
@@ -42,11 +42,11 @@ const seed = [
     reporterId: "citizen-1",
     status: "acknowledged",
     priority: "critical",
-    assignedTo: "Meera Kulkarni",
+    assignedTo: "Koushik Bhowmik",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-10T11:00:00.000Z", by: "Aanya Mehra" },
-      { status: "acknowledged", at: "2026-09-11T08:15:00.000Z", by: "Priya Shah" },
+      { status: "acknowledged", at: "2026-09-11T08:15:00.000Z", by: "Priti Sarkar" },
     ],
     createdAt: "2026-09-10T11:00:00.000Z",
     updatedAt: "2026-09-11T08:15:00.000Z",
@@ -67,13 +67,13 @@ const seed = [
     reporterId: "citizen-1",
     status: "resolved",
     priority: "medium",
-    assignedTo: "Sana Qureshi",
+    assignedTo: "Sayan Majumder",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-05T07:30:00.000Z", by: "Aanya Mehra" },
-      { status: "acknowledged", at: "2026-09-05T12:00:00.000Z", by: "Priya Shah" },
-      { status: "in_progress", at: "2026-09-08T09:00:00.000Z", by: "Sana Qureshi" },
-      { status: "resolved", at: "2026-09-14T16:00:00.000Z", by: "Sana Qureshi" },
+      { status: "acknowledged", at: "2026-09-05T12:00:00.000Z", by: "Priti Sarkar" },
+      { status: "in_progress", at: "2026-09-08T09:00:00.000Z", by: "Sayan Majumder" },
+      { status: "resolved", at: "2026-09-14T16:00:00.000Z", by: "Sayan Majumder" },
     ],
     createdAt: "2026-09-05T07:30:00.000Z",
     updatedAt: "2026-09-14T16:00:00.000Z",
@@ -111,7 +111,7 @@ let audit = [
   {
     id: "a1",
     at: "2026-09-15T09:10:00.000Z",
-    actor: "Rohan Desai",
+    actor: "Koushik Bhowmik",
     role: "staff",
     action: "Moved ISS-2401 to In Progress",
     issueId: "ISS-2401",
@@ -172,13 +172,22 @@ export function updateStatus(id, status, by) {
         }
   );
   audit = [
-    { id: uid("a"), at: now(), actor: by, role: "staff", action: `Moved ${id} to ${status}`, issueId: id },
+    {
+      id: uid("a"),
+      at: now(),
+      actor: by,
+      role: "staff",
+      action: `Moved ${id} to ${status}`,
+      issueId: id,
+    },
     ...audit,
   ];
   emit();
 }
 
-export function assignIssue(id, staffName, by) {
+export function assignIssue(id, staffName, by, role = "admin") {
+  if (role !== "admin") return;
+
   issues = issues.map((issue) =>
     issue.id !== id
       ? issue
@@ -189,7 +198,15 @@ export function assignIssue(id, staffName, by) {
           status: issue.status === "submitted" && staffName ? "acknowledged" : issue.status,
           timeline:
             issue.status === "submitted" && staffName
-              ? [...issue.timeline, { status: "acknowledged", at: now(), by, note: `Assigned to ${staffName}` }]
+              ? [
+                  ...issue.timeline,
+                  {
+                    status: "acknowledged",
+                    at: now(),
+                    by,
+                    note: `Assigned to ${staffName}`,
+                  },
+                ]
               : issue.timeline,
         }
   );
@@ -207,12 +224,21 @@ export function assignIssue(id, staffName, by) {
   emit();
 }
 
-export function setPriority(id, priority, by) {
+export function setPriority(id, priority, by, role = "admin") {
+  if (role !== "admin") return;
+
   issues = issues.map((issue) =>
     issue.id !== id ? issue : { ...issue, priority, updatedAt: now() }
   );
   audit = [
-    { id: uid("a"), at: now(), actor: by, role: "admin", action: `Set ${id} priority to ${priority}`, issueId: id },
+    {
+      id: uid("a"),
+      at: now(),
+      actor: by,
+      role: "admin",
+      action: `Set ${id} priority to ${priority}`,
+      issueId: id,
+    },
     ...audit,
   ];
   emit();

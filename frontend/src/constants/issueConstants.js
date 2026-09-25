@@ -17,9 +17,12 @@ export const WARDS = [
   { name: "Hadapsar", lat: 18.5089, lng: 73.926 },
 ];
 
+export const ADMIN_ROSTER = ["Priti Sarkar"];
+
 export const STAFF_ROSTER = [
-  "Rohan Desai",
-  "Meera Kulkarni",
-  "Arjun Nair",
-  "Sana Qureshi",
+  "Koushik Bhowmik",
+  "Subhomoy Ghosh",
+  "Taras Hembram",
+  "Sayan Majumder",
+  "Swarup Sutradhar",
 ];

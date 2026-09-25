@@ -45,7 +45,11 @@
   text-transform: uppercase;
 }
 
-.sidebar-nav { display: flex; flex-direction: column; gap: 6px; }
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .sidebar-link {
   height: 44px;
@@ -59,7 +63,10 @@
   transition: background 180ms var(--ease), color 180ms var(--ease);
 }
 
-.sidebar-link:hover { background: rgba(30, 58, 95, 0.05); color: var(--fg); }
+.sidebar-link:hover {
+  background: rgba(30, 58, 95, 0.05);
+  color: var(--fg);
+}
 
 .sidebar-link.active {
   background: var(--primary);
@@ -75,7 +82,11 @@
   line-height: 1.5;
 }
 
-.shell-main { min-width: 0; display: flex; flex-direction: column; }
+.shell-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .topbar {
   position: sticky;
@@ -91,28 +102,35 @@
   backdrop-filter: blur(16px);
 }
 
-.role-switch {
+.session-plate {
   display: flex;
-  padding: 4px;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 8px 0 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--card);
+  box-shadow: 0 8px 20px rgba(15, 23, 32, 0.04);
 }
 
-.role-switch button {
-  height: 32px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 0 14px;
-  font-size: 12px;
+.identity-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  text-align: left;
+  margin-right: 6px;
+}
+
+.identity-copy small {
+  display: block;
+  margin-top: 2px;
+  color: var(--subtle);
+  font-size: 11px;
   font-weight: 600;
-}
-
-.role-switch button.active {
-  background: var(--primary);
-  color: var(--primary-fg);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .page-wrap {
@@ -129,4 +147,42 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
+}
+
+.signin-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(30, 58, 95, 0.1), transparent 55%),
+    linear-gradient(180deg, #f7f9fb 0%, #eef2f6 100%);
+}
+
+.signin-panel {
+  width: min(520px, 100%);
+  padding: 40px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 60px rgba(30, 58, 95, 0.08);
+}
+
+.signin-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.signin-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.signin-note {
+  margin-top: 22px;
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.5;
 }

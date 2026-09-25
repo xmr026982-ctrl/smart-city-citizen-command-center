@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { STAFF_ROSTER } from "../../../constants/issueConstants";
-import { assignIssue } from "../../../store/issueStore";
 import { useAuth } from "../../../store/authStore";
+import { assignIssue } from "../../../store/issueStore";
 import Button from "../../ui/Button";
 import { Select } from "../../ui/Input";
 
@@ -10,6 +10,24 @@ function AssignIssueModal({ issue, onClose }) {
   const [staff, setStaff] = useState(issue?.assignedTo || "");
 
   if (!issue) return null;
+
+  if (user.role !== "admin") {
+    return (
+      <div className="drawer-overlay" style={{ display: "grid", placeItems: "center" }}>
+        <div className="panel" style={{ width: "min(420px, calc(100% - 32px))", padding: 24 }}>
+          <h3>Assignment locked</h3>
+          <p style={{ marginTop: 8, color: "var(--muted)", fontSize: 14 }}>
+            Only command admin can assign issues.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="drawer-overlay" style={{ display: "grid", placeItems: "center" }}>
@@ -32,7 +50,7 @@ function AssignIssueModal({ issue, onClose }) {
           <Button
             type="button"
             onClick={() => {
-              assignIssue(issue.id, staff, user.name);
+              assignIssue(issue.id, staff, user.name, user.role);
               onClose();
             }}
           >

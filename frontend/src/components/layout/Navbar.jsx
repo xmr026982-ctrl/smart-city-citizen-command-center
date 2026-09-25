@@ -1,17 +1,13 @@
-import { Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ROLE_LABEL } from "../../constants/userRoles";
-import { setRole, useAuth } from "../../store/authStore";
-
-const HOME = {
-  citizen: "/citizen/report",
-  staff: "/staff/queue",
-  admin: "/admin/command",
-};
+import { logout, useAuth } from "../../store/authStore";
 
 function Navbar({ onMenu }) {
   const user = useAuth();
   const navigate = useNavigate();
+
+  if (!user) return null;
 
   return (
     <header className="topbar">
@@ -26,20 +22,25 @@ function Navbar({ onMenu }) {
           </div>
         </div>
       </div>
-      <div className="role-switch">
-        {["citizen", "staff", "admin"].map((role) => (
-          <button
-            key={role}
-            type="button"
-            className={user.role === role ? "active" : ""}
-            onClick={() => {
-              setRole(role);
-              navigate(HOME[role]);
-            }}
-          >
-            {ROLE_LABEL[role]}
-          </button>
-        ))}
+
+      <div className="session-plate">
+        <span className="live-dot" />
+        <span className="identity-copy">
+          <strong>{user.name}</strong>
+          <small>Secure session · {ROLE_LABEL[user.role]}</small>
+        </span>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ height: 36, padding: "0 12px" }}
+          onClick={() => {
+            logout();
+            navigate("/sign-in", { replace: true });
+          }}
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
       </div>
     </header>
   );
