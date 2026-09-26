@@ -9,12 +9,12 @@ export const PHOTO_HINTS = [
 ];
 
 export const WARDS = [
-  { name: "Kothrud", lat: 18.5074, lng: 73.8077 },
-  { name: "Aundh", lat: 18.559, lng: 73.807 },
-  { name: "Baner", lat: 18.5596, lng: 73.7794 },
-  { name: "Shivajinagar", lat: 18.5308, lng: 73.847 },
-  { name: "Koregaon Park", lat: 18.5362, lng: 73.8938 },
-  { name: "Hadapsar", lat: 18.5089, lng: 73.926 },
+  { name: "Shyambazar", lat: 22.6015, lng: 88.3736 },
+  { name: "B.B.D. Bagh", lat: 22.5726, lng: 88.349 },
+  { name: "Ballygunge", lat: 22.527, lng: 88.363 },
+  { name: "College Street", lat: 22.576, lng: 88.3635 },
+  { name: "B.P. Township", lat: 22.5035, lng: 88.398 },
+  { name: "Dharmatala", lat: 22.5604, lng: 88.3519 },
 ];
 
 export const ADMIN_ROSTER = ["Priti Sarkar"];

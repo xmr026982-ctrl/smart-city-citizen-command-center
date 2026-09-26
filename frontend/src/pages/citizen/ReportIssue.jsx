@@ -11,10 +11,9 @@ function ReportIssue() {
   const [photos, setPhotos] = useState([]);
 
   const handleSubmit = (draft) => {
-    const id = nextIssueId();
     const createdAt = new Date().toISOString();
     addIssue({
-      id,
+      id: nextIssueId(),
       title: draft.title.trim(),
       description: draft.description.trim(),
       category: draft.category,
@@ -36,13 +35,25 @@ function ReportIssue() {
       slaHours: 48,
     });
     setPhotos([]);
-    toast(`${id} is now on the command board.`);
+    toast("Report submitted successfully");
   };
 
   const steps = [
-    { n: "01", title: "Describe the issue", body: "Tell us what happened with a clear and simple description." },
-    { n: "02", title: "Add the location", body: "Provide the affected area so the right department can respond." },
-    { n: "03", title: "Attach evidence", body: "Upload photos to help the team understand the problem faster." },
+    {
+      n: "01",
+      title: "Describe the issue",
+      body: "Tell us what happened with a clear and simple description.",
+    },
+    {
+      n: "02",
+      title: "Add the location",
+      body: "Provide the affected area so the right department can respond.",
+    },
+    {
+      n: "03",
+      title: "Attach evidence",
+      body: "Upload photos to help the team understand the problem faster.",
+    },
   ];
 
   return (
@@ -53,7 +64,8 @@ function ReportIssue() {
           <h1>Report a city issue</h1>
           <p>
             Help improve your city by reporting problems around you. Share the
-            details, add the location, and track the progress of your report from one place.
+            details, add the location, and track the progress of your report from
+            one place.
           </p>
           <div className="hero-live">
             <span className="live-dot" />
@@ -92,7 +104,7 @@ function ReportIssue() {
           </span>
         </div>
         <div className="report-layout">
-          <CitizenReportForm photos={photos} onSubmit={handleSubmit} />
+          <CitizenReportForm onSubmit={handleSubmit} />
           <aside className="photo-panel">
             <IssuePhotoUpload files={photos} onChange={setPhotos} />
           </aside>

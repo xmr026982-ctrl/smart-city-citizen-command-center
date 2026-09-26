@@ -57,7 +57,7 @@ export const ACCOUNTS = [
     password: "Wardline@2026",
     name: "Aanya Mehra",
     role: "citizen",
-    ward: "Kothrud",
+    ward: "Ballygunge",
   },
 ];
 
