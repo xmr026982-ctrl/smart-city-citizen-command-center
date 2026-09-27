@@ -26,7 +26,7 @@ function StaffResolutionForm({ issue }) {
           disabled={issue.status === "resolved"}
           onClick={() => {
             if (note.trim()) addComment(issue.id, note.trim(), user.name, user.role, true);
-            updateStatus(issue.id, "resolved", user.name);
+            updateStatus(issue.id, "resolved", user.name, user.role);
             setNote("");
           }}
         >

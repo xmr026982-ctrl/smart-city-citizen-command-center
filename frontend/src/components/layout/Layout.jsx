@@ -19,7 +19,7 @@ function Layout() {
       ) : null}
       <div className="shell-main">
         <Navbar onMenu={() => setOpen(true)} />
-        <div className="page-wrap">
+        <div className="page-canvas">
           <Outlet />
         </div>
       </div>

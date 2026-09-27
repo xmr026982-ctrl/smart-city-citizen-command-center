@@ -1,148 +1,23 @@
 .app-shell {
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 268px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   background:
-    radial-gradient(1000px 420px at 85% -8%, rgba(14, 165, 233, 0.07), transparent 55%),
-    radial-gradient(800px 380px at 10% 100%, rgba(34, 211, 238, 0.04), transparent 50%),
-    linear-gradient(180deg, #f7fafc 0%, var(--bg) 30%);
+    radial-gradient(1200px 480px at 80% -10%, rgba(14, 165, 233, 0.07), transparent 55%),
+    linear-gradient(180deg, #f5f9fc 0%, var(--bg) 32%);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
   height: 100dvh;
-  background: color-mix(in oklab, var(--card) 82%, white);
-  border-right: 1px solid var(--line);
-  padding: 22px 14px;
-  backdrop-filter: blur(22px) saturate(1.3);
-  display: flex;
-  flex-direction: column;
-  z-index: 30;
-}
-
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 10px 28px;
-}
-
-.sidebar-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #0ea5e9, #0284c7);
-  color: white;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  position: relative;
-}
-
-.sidebar-mark::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: 16px;
-  border: 1px solid rgba(34, 211, 238, 0.4);
-  animation: neural-pulse 3s ease-in-out infinite;
-}
-
-.sidebar-brand small {
-  display: block;
-  color: var(--subtle);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  margin-top: 2px;
-}
-
-.sidebar-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-.sidebar-link {
-  height: 46px;
-  border-radius: 14px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: all 220ms var(--ease);
-  position: relative;
-}
-
-.sidebar-link svg {
-  width: 18px;
-  height: 18px;
-  opacity: 0.7;
-  transition: opacity 200ms;
-}
-
-.sidebar-link:hover {
-  background: rgba(14, 165, 233, 0.06);
-  color: var(--fg);
-}
-
-.sidebar-link:hover svg {
-  opacity: 1;
-}
-
-.sidebar-link.active {
-  background: linear-gradient(135deg, #0ea5e9, #0284c7);
-  color: white;
-  box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
-}
-
-.sidebar-link.active svg {
-  opacity: 1;
-  color: white;
-}
-
-.sidebar-link.active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 22px;
-  border-radius: 0 4px 4px 0;
-  background: var(--neon);
-  box-shadow: 0 0 12px var(--neon);
-}
-
-.sidebar-section {
-  margin-top: 18px;
-  padding: 0 12px 6px;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--subtle);
-  font-weight: 600;
-}
-
-.sidebar-note {
-  margin-top: auto;
-  padding: 16px 12px 8px;
-  font-size: 11px;
-  color: var(--subtle);
-  line-height: 1.5;
-  border-top: 1px solid var(--line);
+  width: 100%;
+  overflow: hidden;
 }
 
 .shell-main {
   min-width: 0;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -156,9 +31,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 28px;
-  background: color-mix(in oklab, var(--surface) 70%, white);
+  background: color-mix(in oklab, var(--surface) 72%, white);
   border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(16px);
 }
 
 .session-plate {
@@ -192,11 +67,19 @@
   text-transform: uppercase;
 }
 
-.page-wrap {
-  padding: 32px;
-  max-width: 1180px;
-  margin: 0 auto;
+.page-canvas {
+  flex: 1;
+  min-width: 0;
   width: 100%;
+}
+
+.page-wrap,
+.page-stack {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 28px 32px 48px;
+  box-sizing: border-box;
 }
 
 .menu-btn {
@@ -215,7 +98,7 @@
   padding: 24px;
   background:
     radial-gradient(900px 420px at 80% -10%, rgba(14, 165, 233, 0.1), transparent 55%),
-    linear-gradient(180deg, #f7fafc 0%, #eef2f6 100%);
+    linear-gradient(180deg, #f7f9fb 0%, #eef2f6 100%);
 }
 
 .signin-panel {
@@ -244,4 +127,20 @@
   color: var(--subtle);
   font-size: 12px;
   line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-btn {
+    display: grid;
+    place-items: center;
+  }
+
+  .page-wrap,
+  .page-stack {
+    padding: 20px 16px 36px;
+  }
 }

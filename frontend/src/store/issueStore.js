@@ -160,7 +160,7 @@ export function addIssue(issue) {
   emit();
 }
 
-export function updateStatus(id, status, by) {
+export function updateStatus(id, status, by, role = "staff") {
   issues = issues.map((issue) =>
     issue.id !== id
       ? issue
@@ -176,7 +176,7 @@ export function updateStatus(id, status, by) {
       id: uid("a"),
       at: now(),
       actor: by,
-      role: "staff",
+      role,
       action: `Moved ${id} to ${status}`,
       issueId: id,
     },

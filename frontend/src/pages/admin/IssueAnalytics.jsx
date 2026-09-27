@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import {
   Activity, Layers, AlertTriangle, CheckCircle2,
-  TrendingUp, Zap, MapPin, BarChart3
+  MapPin, Car, Lightbulb, Droplets, Trash2, Zap,
+  ShieldAlert, MoreHorizontal
 } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
@@ -12,6 +13,16 @@ function pct(part, total) {
   if (!total) return 0;
   return Math.round((part / total) * 100);
 }
+
+const CATEGORY_META = {
+  roads: { icon: Car, color: "#0ea5e9" },
+  lighting: { icon: Lightbulb, color: "#f59e0b" },
+  water: { icon: Droplets, color: "#06b6d4" },
+  waste: { icon: Trash2, color: "#10b981" },
+  electricity: { icon: Zap, color: "#8b5cf6" },
+  safety: { icon: ShieldAlert, color: "#ef4444" },
+  other: { icon: MoreHorizontal, color: "#64748b" },
+};
 
 function IssueAnalytics() {
   const issues = useIssues();
@@ -75,56 +86,33 @@ function IssueAnalytics() {
         </div>
       </div>
 
-      {/* ========== TOP STAT CARDS (3D glass) ========== */}
+      {/* Top stats */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
         gap: 14,
         margin: "28px 0 24px",
       }}>
-        <StatCard
-          label="Open Board"
-          value={stats.open}
-          sub={`${stats.openPct}% of all reports`}
-          icon={Layers}
-          color="#0ea5e9"
-        />
-        <StatCard
-          label="In Progress"
-          value={stats.inProgress}
-          sub="Active field work"
-          icon={Activity}
-          color="#f59e0b"
-        />
-        <StatCard
-          label="Unassigned"
-          value={stats.unassigned}
-          sub="Waiting for dispatch"
-          icon={MapPin}
-          color="#ef4444"
-        />
-        <StatCard
-          label="Resolved"
-          value={stats.resolved}
-          sub={`${stats.resolveRate}% close rate`}
-          icon={CheckCircle2}
-          color="#10b981"
-        />
+        <StatCard label="Open Board" value={stats.open} sub={`${stats.openPct}% of all reports`} icon={Layers} color="#0ea5e9" />
+        <StatCard label="In Progress" value={stats.inProgress} sub="Active field work" icon={Activity} color="#f59e0b" />
+        <StatCard label="Unassigned" value={stats.unassigned} sub="Waiting for dispatch" icon={MapPin} color="#ef4444" />
+        <StatCard label="Resolved" value={stats.resolved} sub={`${stats.resolveRate}% close rate`} icon={CheckCircle2} color="#10b981" />
       </div>
 
-      {/* ========== MIDDLE ROW ========== */}
+      {/* Middle row */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1.2fr 1fr",
+        gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 1fr)",
         gap: 16,
         marginBottom: 20,
       }}>
-        {/* Status Mix */}
-        <div className="holo-surface holo-border" style={{
+        <div style={{
           borderRadius: 20,
           padding: 22,
-          background: "rgba(255,255,255,0.7)",
-          backdropFilter: "blur(16px)",
+          background: "rgba(255,255,255,0.72)",
+          backdropFilter: "blur(18px)",
+          border: "1px solid rgba(14,165,233,0.14)",
+          boxShadow: "0 10px 36px rgba(14,165,233,0.07)",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
             <div>
@@ -149,12 +137,9 @@ function IssueAnalytics() {
                       {item.value} · {p}%
                     </span>
                   </div>
-                  <div style={{
-                    height: 8, borderRadius: 999, background: "rgba(14,165,233,0.08)", overflow: "hidden",
-                  }}>
+                  <div style={{ height: 8, borderRadius: 999, background: "rgba(14,165,233,0.08)", overflow: "hidden" }}>
                     <div style={{
-                      height: "100%", borderRadius: 999,
-                      width: `${p}%`,
+                      height: "100%", borderRadius: 999, width: `${p}%`,
                       background: "linear-gradient(90deg, #0ea5e9, #22d3ee)",
                       boxShadow: "0 0 12px rgba(14,165,233,0.4)",
                       transition: "width 0.8s cubic-bezier(0.22,1,0.36,1)",
@@ -166,12 +151,13 @@ function IssueAnalytics() {
           </div>
         </div>
 
-        {/* Resolution Gauge */}
-        <div className="holo-surface holo-border" style={{
+        <div style={{
           borderRadius: 20,
           padding: 22,
-          background: "rgba(255,255,255,0.7)",
-          backdropFilter: "blur(16px)",
+          background: "rgba(255,255,255,0.72)",
+          backdropFilter: "blur(18px)",
+          border: "1px solid rgba(14,165,233,0.14)",
+          boxShadow: "0 10px 36px rgba(14,165,233,0.07)",
           display: "flex",
           flexDirection: "column",
         }}>
@@ -183,11 +169,7 @@ function IssueAnalytics() {
           </h3>
 
           <div style={{ display: "flex", alignItems: "center", gap: 24, flex: 1 }}>
-            {/* Circular gauge */}
-            <div style={{
-              position: "relative",
-              width: 120, height: 120, flexShrink: 0,
-            }}>
+            <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
               <svg width="120" height="120" viewBox="0 0 120 120">
                 <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(14,165,233,0.1)" strokeWidth="10" />
                 <circle
@@ -197,7 +179,6 @@ function IssueAnalytics() {
                   strokeLinecap="round"
                   strokeDasharray={`${(stats.resolveRate / 100) * 327} 327`}
                   transform="rotate(-90 60 60)"
-                  style={{ transition: "stroke-dasharray 1s cubic-bezier(0.22,1,0.36,1)" }}
                 />
                 <defs>
                   <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -207,8 +188,7 @@ function IssueAnalytics() {
                 </defs>
               </svg>
               <div style={{
-                position: "absolute", inset: 0,
-                display: "grid", placeItems: "center",
+                position: "absolute", inset: 0, display: "grid", placeItems: "center",
                 fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700,
               }}>
                 {stats.resolveRate}%
@@ -226,7 +206,6 @@ function IssueAnalytics() {
             </div>
           </div>
 
-          {/* Coverage bar */}
           <div style={{ marginTop: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
               <span>Assignment Coverage</span>
@@ -237,19 +216,20 @@ function IssueAnalytics() {
                 height: "100%", borderRadius: 999, width: `${stats.coverage}%`,
                 background: "linear-gradient(90deg, #0ea5e9, #22d3ee)",
                 boxShadow: "0 0 12px rgba(14,165,233,0.35)",
-                transition: "width 0.8s cubic-bezier(0.22,1,0.36,1)",
               }} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ========== CATEGORY PRESSURE ========== */}
-      <div className="holo-surface holo-border" style={{
+      {/* Category pressure with icons */}
+      <div style={{
         borderRadius: 20,
         padding: 22,
-        background: "rgba(255,255,255,0.7)",
-        backdropFilter: "blur(16px)",
+        background: "rgba(255,255,255,0.72)",
+        backdropFilter: "blur(18px)",
+        border: "1px solid rgba(14,165,233,0.14)",
+        boxShadow: "0 10px 36px rgba(14,165,233,0.07)",
       }}>
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>
           Category Pressure
@@ -264,45 +244,62 @@ function IssueAnalytics() {
           gap: 14,
         }}>
           {byCategory.map((item) => {
+            const meta = CATEGORY_META[item.key] || CATEGORY_META.other;
+            const Icon = meta.icon;
+            const color = meta.color;
             const p = pct(item.value, stats.total);
-            const heightPct = Math.max(12, (item.value / maxCat) * 100);
+            const heightPct = Math.max(8, (item.value / maxCat) * 100);
+
             return (
               <div
                 key={item.key}
                 style={{
-                  background: "rgba(255,255,255,0.6)",
+                  background: "rgba(255,255,255,0.62)",
                   border: "1px solid rgba(14,165,233,0.12)",
                   borderRadius: 16,
                   padding: 16,
                   display: "flex",
                   flexDirection: "column",
+                  position: "relative",
+                  overflow: "hidden",
+                  transform: "perspective(900px) rotateX(1.5deg)",
                   transition: "transform 200ms, box-shadow 200ms",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                  e.currentTarget.style.boxShadow = "0 12px 32px rgba(14,165,233,0.12)";
+                  e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+                  e.currentTarget.style.boxShadow = `0 16px 36px ${color}22`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.transform = "perspective(900px) rotateX(1.5deg)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, height: 2,
+                  background: `linear-gradient(90deg, transparent, ${color}70, transparent)`,
+                }} />
+
+                <div style={{
+                  width: 38, height: 38, borderRadius: 12, marginBottom: 12,
+                  background: `${color}16`,
+                  display: "grid", placeItems: "center",
+                  boxShadow: `0 0 0 1px ${color}22`,
+                }}>
+                  <Icon size={18} color={color} strokeWidth={1.8} />
+                </div>
+
                 <p style={{ fontSize: 11, color: "var(--subtle)", marginBottom: 6 }}>{item.label}</p>
                 <p style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, marginBottom: 12 }}>
                   {item.value}
                 </p>
 
-                {/* Vertical bar */}
-                <div style={{
-                  flex: 1, minHeight: 48,
-                  display: "flex", alignItems: "flex-end",
-                }}>
+                <div style={{ flex: 1, minHeight: 48, display: "flex", alignItems: "flex-end" }}>
                   <div style={{
-                    width: "100%", height: `${heightPct}%`,
+                    width: "100%",
+                    height: `${heightPct}%`,
                     borderRadius: "8px 8px 4px 4px",
-                    background: "linear-gradient(180deg, #22d3ee, #0ea5e9)",
-                    boxShadow: "0 0 16px rgba(14,165,233,0.3)",
-                    transition: "height 0.7s cubic-bezier(0.22,1,0.36,1)",
+                    background: `linear-gradient(180deg, ${color}cc, ${color})`,
+                    boxShadow: `0 0 16px ${color}40`,
                   }} />
                 </div>
 
@@ -328,24 +325,31 @@ function IssueAnalytics() {
 function StatCard({ label, value, sub, icon: Icon, color }) {
   return (
     <div
-      className="holo-surface holo-border"
       style={{
         borderRadius: 18,
         padding: "18px 18px 16px",
         background: "rgba(255,255,255,0.72)",
-        backdropFilter: "blur(14px)",
+        backdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.75)",
+        boxShadow: "0 8px 28px rgba(14,165,233,0.07)",
         transform: "perspective(900px) rotateX(1.5deg)",
         transition: "transform 200ms, box-shadow 200ms",
+        position: "relative",
+        overflow: "hidden",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-2px)";
+        e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-3px)";
         e.currentTarget.style.boxShadow = `0 16px 40px ${color}22`;
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "perspective(900px) rotateX(1.5deg)";
-        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07)";
       }}
     >
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: `linear-gradient(90deg, transparent, ${color}55, transparent)`,
+      }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
         <div style={{
           width: 40, height: 40, borderRadius: 12,
@@ -360,10 +364,7 @@ function StatCard({ label, value, sub, icon: Icon, color }) {
           {label}
         </p>
       </div>
-      <p style={{
-        fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700,
-        lineHeight: 1, marginBottom: 6,
-      }}>
+      <p style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, lineHeight: 1, marginBottom: 6 }}>
         {value}
       </p>
       <p style={{ fontSize: 12.5, color: "var(--muted)" }}>{sub}</p>

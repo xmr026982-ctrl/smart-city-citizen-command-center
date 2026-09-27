@@ -12,7 +12,7 @@ function StaffStatusUpdate({ issue }) {
       <Select
         id="staff-status"
         value={issue.status}
-        onChange={(e) => updateStatus(issue.id, e.target.value, user.name)}
+        onChange={(e) => updateStatus(issue.id, e.target.value, user.name, user.role)}
       >
         {ISSUE_STATUSES.map((status) => (
           <option key={status} value={status}>

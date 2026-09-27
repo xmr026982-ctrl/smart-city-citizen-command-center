@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import {
   UserPlus, MapPin, UserMinus, RefreshCw, Search,
-  ArrowUpDown, ChevronLeft, ChevronRight, Calendar,
-  Tag, ArrowUp, ArrowDown
+  ArrowUpDown, ChevronLeft, ChevronRight, Calendar, Tag, ArrowUp, ArrowDown
 } from "lucide-react";
 import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
 import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
@@ -113,7 +112,6 @@ function ManageAssignments() {
           cursor: "pointer",
           fontSize: 13,
           fontWeight: active ? 600 : 500,
-          transition: "all 180ms var(--ease)",
         }}
       >
         {Icon && <Icon size={14} />}
@@ -131,14 +129,12 @@ function ManageAssignments() {
         description="Assign, re-assign or remove specialists. Full neural routing with category, date & priority control."
       />
 
-      {/* Filters + Sort bar */}
       <div style={{ display: "flex", gap: 10, margin: "24px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
-        {/* Search */}
         <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
           <input
             type="text"
-            placeholder="Search ID, title, ward, category or assignee…"
+            placeholder="Search ID, title, zone, category or assignee…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             style={{
@@ -149,7 +145,6 @@ function ManageAssignments() {
           />
         </div>
 
-        {/* Status filter */}
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -161,7 +156,6 @@ function ManageAssignments() {
           <option value="in_progress">In Progress</option>
         </select>
 
-        {/* Category filter */}
         <select
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
@@ -174,7 +168,6 @@ function ManageAssignments() {
         </select>
       </div>
 
-      {/* Sort buttons */}
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
         <SortButton label="Date" sortKeyName="createdAt" icon={Calendar} />
         <SortButton label="Priority" sortKeyName="priority" icon={ArrowUpDown} />
@@ -183,7 +176,6 @@ function ManageAssignments() {
         <SortButton label="Status" sortKeyName="status" />
       </div>
 
-      {/* Issue cards */}
       <div style={{ display: "grid", gap: 12 }}>
         {paginated.length === 0 && (
           <div className="holo-surface holo-border" style={{ borderRadius: 18, padding: 48, textAlign: "center", color: "var(--subtle)" }}>
@@ -206,7 +198,6 @@ function ManageAssignments() {
             }}
           >
             <div style={{ flex: 1, minWidth: 260 }}>
-              {/* ID + Date */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
                   {issue.id}
@@ -217,18 +208,15 @@ function ManageAssignments() {
                 </span>
               </div>
 
-              {/* Title */}
               <h3 style={{ fontSize: 15, fontFamily: "var(--font-display)", fontWeight: 600 }}>
                 {issue.title}
               </h3>
 
-              {/* Location */}
               <p style={{ marginTop: 4, color: "var(--muted)", fontSize: 12.5, display: "flex", alignItems: "center", gap: 5 }}>
                 <MapPin size={12} />
                 {issue.ward} · {issue.location}
               </p>
 
-              {/* Badges: Status + Priority + Category */}
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <IssueStatusBadge status={issue.status} />
                 <IssuePriorityBadge priority={issue.priority} />
@@ -252,7 +240,6 @@ function ManageAssignments() {
               </div>
             </div>
 
-            {/* Actions */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {issue.assignedTo ? (
                 <span style={{
@@ -299,12 +286,11 @@ function ManageAssignments() {
         ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 24 }}>
           <button
             disabled={page === 1}
-            onClick={() => setPage(p => p - 1)}
+            onClick={() => setPage((p) => p - 1)}
             style={{
               width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
               background: "white", display: "grid", placeItems: "center",
@@ -318,7 +304,7 @@ function ManageAssignments() {
           </span>
           <button
             disabled={page === totalPages}
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => setPage((p) => p + 1)}
             style={{
               width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
               background: "white", display: "grid", placeItems: "center",

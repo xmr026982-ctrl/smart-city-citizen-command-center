@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
 import {
   Search, Shield, User, Clock, FileText, Activity,
-  ChevronLeft, ChevronRight, Filter
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
 import { ROLE_LABEL } from "../../constants/userRoles";
+import { ADMIN_ROSTER, STAFF_ROSTER } from "../../constants/issueConstants";
 import { formatDateTime } from "../../utils/formatDate";
 import { useAudit } from "../../store/issueStore";
+
+function resolveRole(event) {
+  if (ADMIN_ROSTER.includes(event.actor)) return "admin";
+  if (STAFF_ROSTER.includes(event.actor)) return "staff";
+  return event.role || "staff";
+}
 
 function IssueAuditLogs() {
   const audit = useAudit() || [];
@@ -15,22 +22,27 @@ function IssueAuditLogs() {
   const [page, setPage] = useState(1);
   const perPage = 8;
 
+  const normalized = useMemo(
+    () => audit.map((event) => ({ ...event, role: resolveRole(event) })),
+    [audit]
+  );
+
   const filtered = useMemo(() => {
-    return audit.filter((event) => {
+    return normalized.filter((event) => {
       const haystack = `${event.action} ${event.actor} ${event.issueId || ""} ${ROLE_LABEL[event.role] || ""}`.toLowerCase();
       if (query && !haystack.includes(query.toLowerCase())) return false;
       if (roleFilter !== "all" && event.role !== roleFilter) return false;
       return true;
     });
-  }, [audit, query, roleFilter]);
+  }, [normalized, query, roleFilter]);
 
   const totalPages = Math.ceil(filtered.length / perPage) || 1;
   const paginated = filtered.slice((page - 1) * perPage, page * perPage);
 
   const stats = {
-    total: audit.length,
-    admin: audit.filter((e) => e.role === "admin").length,
-    staff: audit.filter((e) => e.role === "staff").length,
+    total: normalized.length,
+    admin: normalized.filter((e) => e.role === "admin").length,
+    staff: normalized.filter((e) => e.role === "staff").length,
   };
 
   return (
@@ -39,7 +51,7 @@ function IssueAuditLogs() {
         <PageHeader
           eyebrow="Audit Log · Neural Trace"
           title="Command History"
-          description="Status moves, assignments and system actions. Ready for Person 6 real-time feed."
+          description="Admin and staff actions. Official city command trace."
         />
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
@@ -47,15 +59,10 @@ function IssueAuditLogs() {
           background: "rgba(14,165,233,0.1)", border: "1px solid rgba(14,165,233,0.25)",
           fontSize: 12.5, fontWeight: 600, color: "var(--primary-deep)",
         }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: "50%", background: "#0ea5e9",
-            boxShadow: "0 0 0 3px rgba(14,165,233,0.25)", animation: "livePulse 1.8s ease infinite",
-          }} />
           Live Trace
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
@@ -68,7 +75,6 @@ function IssueAuditLogs() {
         <MiniStat icon={Activity} label="Showing" value={filtered.length} color="#f59e0b" />
       </div>
 
-      {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
@@ -79,8 +85,8 @@ function IssueAuditLogs() {
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             style={{
               width: "100%", height: 42, paddingLeft: 38, paddingRight: 14,
-              borderRadius: 12, border: "1px solid var(--line)", background: "rgba(255,255,255,0.9)",
-              fontSize: 13.5, outline: "none",
+              borderRadius: 12, border: "1px solid var(--line)",
+              background: "rgba(255,255,255,0.9)", fontSize: 13.5, outline: "none",
             }}
           />
         </div>
@@ -97,12 +103,9 @@ function IssueAuditLogs() {
         </select>
       </div>
 
-      {/* Timeline / Event list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {paginated.length === 0 && (
-          <div className="holo-surface holo-border" style={{
-            borderRadius: 16, padding: 48, textAlign: "center", color: "var(--subtle)",
-          }}>
+          <div style={{ borderRadius: 16, padding: 48, textAlign: "center", color: "var(--subtle)" }}>
             No audit events match your filters
           </div>
         )}
@@ -110,7 +113,6 @@ function IssueAuditLogs() {
         {paginated.map((event, idx) => (
           <div
             key={event.id || idx}
-            className="holo-surface holo-border"
             style={{
               borderRadius: 16,
               padding: "16px 18px",
@@ -119,18 +121,9 @@ function IssueAuditLogs() {
               alignItems: "flex-start",
               background: "rgba(255,255,255,0.7)",
               backdropFilter: "blur(12px)",
-              transition: "transform 180ms, box-shadow 180ms",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 12px 32px rgba(14,165,233,0.1)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
+              border: "1px solid rgba(14,165,233,0.12)",
             }}
           >
-            {/* Timeline dot */}
             <div style={{
               width: 36, height: 36, borderRadius: 11, flexShrink: 0,
               background: event.role === "admin"
@@ -149,15 +142,11 @@ function IssueAuditLogs() {
               )}
             </div>
 
-            {/* Content */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4 }}>
                 {event.action}
               </p>
-              <div style={{
-                display: "flex", flexWrap: "wrap", gap: "6px 14px",
-                fontSize: 12.5, color: "var(--muted)",
-              }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", fontSize: 12.5, color: "var(--muted)" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <Clock size={12} />
                   {formatDateTime(event.at)}
@@ -182,10 +171,7 @@ function IssueAuditLogs() {
                   {ROLE_LABEL[event.role] || event.role}
                 </span>
                 {event.issueId && (
-                  <span style={{
-                    fontFamily: "var(--font-mono)", fontSize: 12,
-                    color: "var(--primary-deep)",
-                  }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--primary-deep)" }}>
                     {event.issueId}
                   </span>
                 )}
@@ -195,7 +181,6 @@ function IssueAuditLogs() {
         ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 22 }}>
           <button
@@ -225,22 +210,16 @@ function IssueAuditLogs() {
           </button>
         </div>
       )}
-
-      <style>{`
-        @keyframes livePulse {
-          0%, 100% { box-shadow: 0 0 0 3px rgba(14,165,233,0.25); }
-          50% { box-shadow: 0 0 0 6px rgba(14,165,233,0.1); }
-        }
-      `}</style>
     </main>
   );
 }
 
 function MiniStat({ icon: Icon, label, value, color }) {
   return (
-    <div className="holo-surface holo-border" style={{
+    <div style={{
       borderRadius: 14, padding: "14px 16px",
       background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)",
+      border: "1px solid rgba(14,165,233,0.1)",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{

@@ -7,7 +7,10 @@ function ManageIssueStatus({ issue }) {
   const user = useAuth();
 
   return (
-    <Select value={issue.status} onChange={(e) => updateStatus(issue.id, e.target.value, user.name)}>
+    <Select
+      value={issue.status}
+      onChange={(e) => updateStatus(issue.id, e.target.value, user.name, user.role)}
+    >
       {ISSUE_STATUSES.map((status) => (
         <option key={status} value={status}>
           {STATUS_LABEL[status]}

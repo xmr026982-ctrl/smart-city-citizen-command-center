@@ -6,7 +6,6 @@ import {
 import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
 import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
 import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
-import IssueSLAIndicator from "../../components/issues/shared/IssueSLAIndicator";
 import PageHeader from "../../components/layout/PageHeader";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { STATUS_LABEL } from "../../constants/issueStatuses";
@@ -19,7 +18,7 @@ function AllIssues() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [wardFilter, setWardFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sortKey, setSortKey] = useState("updatedAt");
+  const [sortKey, setSortKey] = useState("createdAt");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
@@ -94,11 +93,11 @@ function AllIssues() {
           padding: "0 12px",
           borderRadius: 10,
           border: active ? "1.5px solid var(--primary)" : "1px solid var(--line)",
-          background: active ? "rgba(14,165,233,0.1)" : "white",
+          background: active ? "rgba(14,165,233,0.12)" : "rgba(255,255,255,0.88)",
           color: active ? "var(--primary-deep)" : "var(--fg)",
           display: "flex",
           alignItems: "center",
-          gap: 5,
+          gap: 6,
           cursor: "pointer",
           fontSize: 12.5,
           fontWeight: active ? 600 : 500,
@@ -106,7 +105,9 @@ function AllIssues() {
       >
         {Icon && <Icon size={13} />}
         {label}
-        {active && (sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+        {active ? (sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : (
+          <ArrowUpDown size={12} style={{ opacity: 0.4 }} />
+        )}
       </button>
     );
   };
@@ -119,17 +120,34 @@ function AllIssues() {
         description="Every civic issue currently on the board. Real-time command view."
       />
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "24px 0 20px" }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+        gap: 12,
+        margin: "24px 0 20px",
+      }}>
         {[
           { label: "Total Issues", value: stats.total, icon: Layers, color: "#0ea5e9" },
           { label: "Open", value: stats.open, icon: Activity, color: "#f59e0b" },
           { label: "Unassigned", value: stats.unassigned, icon: MapPin, color: "#ef4444" },
           { label: "Critical", value: stats.critical, icon: AlertTriangle, color: "#dc2626" },
         ].map((s) => (
-          <div key={s.label} className="holo-surface holo-border" style={{ borderRadius: 14, padding: "14px 16px" }}>
+          <div
+            key={s.label}
+            style={{
+              borderRadius: 16,
+              padding: "14px 16px",
+              background: "rgba(255,255,255,0.75)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,255,255,0.8)",
+              boxShadow: "0 8px 28px rgba(14,165,233,0.07)",
+            }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${s.color}18`, display: "grid", placeItems: "center" }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: `${s.color}18`, display: "grid", placeItems: "center",
+              }}>
                 <s.icon size={16} color={s.color} />
               </div>
               <div>
@@ -141,32 +159,29 @@ function AllIssues() {
         ))}
       </div>
 
-      {/* Search + Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
           <input
             type="text"
-            placeholder="Search ID, title, location, ward, category…"
+            placeholder="Search ID, title, location, zone, category…"
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             style={{
               width: "100%", height: 42, paddingLeft: 38, paddingRight: 14,
-              borderRadius: 12, border: "1px solid var(--line)", background: "rgba(255,255,255,0.9)",
-              fontSize: 13.5, outline: "none",
+              borderRadius: 12, border: "1px solid var(--line)",
+              background: "rgba(255,255,255,0.92)", fontSize: 13.5, outline: "none",
             }}
           />
         </div>
-
         <select
           value={wardFilter}
           onChange={(e) => { setWardFilter(e.target.value); setPage(1); }}
           style={{ height: 42, padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)", background: "white", fontSize: 13 }}
         >
-          <option value="all">All wards</option>
+          <option value="all">All zones</option>
           {wards.map((w) => <option key={w} value={w}>{w}</option>)}
         </select>
-
         <select
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
@@ -179,23 +194,18 @@ function AllIssues() {
         </select>
       </div>
 
-      {/* Status pills */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
         {["all", "submitted", "acknowledged", "in_progress", "resolved"].map((s) => (
           <button
             key={s}
             onClick={() => { setStatusFilter(s); setPage(1); }}
             style={{
-              height: 34,
-              padding: "0 14px",
-              borderRadius: 999,
+              height: 34, padding: "0 14px", borderRadius: 999,
               border: statusFilter === s ? "none" : "1px solid var(--line)",
-              background: statusFilter === s ? "linear-gradient(135deg, #0ea5e9, #0284c7)" : "white",
+              background: statusFilter === s ? "linear-gradient(135deg, #0ea5e9, #0284c7)" : "rgba(255,255,255,0.9)",
               color: statusFilter === s ? "white" : "var(--muted)",
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: statusFilter === s ? "0 6px 14px rgba(14,165,233,0.3)" : "none",
+              fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+              boxShadow: statusFilter === s ? "0 6px 14px rgba(14,165,233,0.28)" : "none",
             }}
           >
             {s === "all" ? "All" : STATUS_LABEL[s]}
@@ -203,122 +213,119 @@ function AllIssues() {
         ))}
       </div>
 
-      {/* Sort bar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <SortBtn label="Updated" k="updatedAt" icon={Calendar} />
         <SortBtn label="Reported" k="createdAt" icon={Calendar} />
+        <SortBtn label="Updated" k="updatedAt" icon={Calendar} />
         <SortBtn label="Priority" k="priority" icon={ArrowUpDown} />
         <SortBtn label="Category" k="category" icon={Tag} />
         <SortBtn label="Title" k="title" />
         <SortBtn label="Status" k="status" />
       </div>
 
-      {/* Ultra-clean futuristic table */}
-      <div className="holo-surface holo-border" style={{ borderRadius: 18, overflow: "hidden" }}>
-        {/* Header – properly spaced */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "100px minmax(180px, 1.8fr) 110px 130px 120px 100px 130px 100px 110px",
-            gap: 12,
-            padding: "13px 20px",
-            background: "linear-gradient(90deg, rgba(14,165,233,0.06), rgba(14,165,233,0.02))",
-            borderBottom: "1px solid var(--line)",
-            fontSize: 11,
-            fontWeight: 600,
-            color: "var(--subtle)",
-            textTransform: "uppercase",
-            letterSpacing: "0.07em",
-            alignItems: "center",
-          }}
-        >
-          <div>ID</div>
-          <div>Title</div>
-          <div>Ward</div>
-          <div>Category</div>
-          <div>Status</div>
-          <div>Priority</div>
-          <div>Assignee</div>
-          <div>SLA</div>
-          <div>Updated</div>
-        </div>
-
-        {/* Rows */}
-        {paginated.length === 0 ? (
-          <div style={{ padding: 48, textAlign: "center", color: "var(--subtle)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {paginated.length === 0 && (
+          <div style={{
+            borderRadius: 18, padding: 48, textAlign: "center", color: "var(--subtle)",
+            background: "rgba(255,255,255,0.7)", border: "1px solid rgba(14,165,233,0.12)",
+          }}>
             No issues match your filters
           </div>
-        ) : (
-          paginated.map((issue, idx) => (
-            <div
-              key={issue.id}
-              onClick={() => setSelectedId(issue.id)}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "100px minmax(180px, 1.8fr) 110px 130px 120px 100px 130px 100px 110px",
-                gap: 12,
-                padding: "15px 20px",
-                borderBottom: idx === paginated.length - 1 ? "none" : "1px solid var(--line)",
-                cursor: "pointer",
-                transition: "background 150ms ease",
-                alignItems: "center",
-                fontSize: 13,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(14,165,233,0.045)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              {/* ID */}
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--subtle)" }}>
-                {issue.id}
+        )}
+
+        {paginated.map((issue) => (
+          <article
+            key={issue.id}
+            onClick={() => setSelectedId(issue.id)}
+            style={{
+              borderRadius: 16,
+              padding: "16px 18px",
+              background: "rgba(255,255,255,0.78)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(14,165,233,0.12)",
+              boxShadow: "0 8px 28px rgba(14,165,233,0.06)",
+              cursor: "pointer",
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 16,
+              alignItems: "center",
+              transition: "transform 160ms, box-shadow 160ms",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 14px 36px rgba(14,165,233,0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.06)";
+            }}
+          >
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
+                  {issue.id}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--subtle)" }}>
+                  {issue.ward}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--primary-deep)", fontWeight: 500 }}>
+                  {CATEGORY_LABEL[issue.category] || issue.category}
+                </span>
               </div>
 
-              {/* Title */}
-              <div style={{ fontWeight: 500, lineHeight: 1.35 }}>
+              <h3 style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 16,
+                fontWeight: 650,
+                margin: 0,
+                lineHeight: 1.3,
+              }}>
                 {issue.title}
-              </div>
+              </h3>
 
-              {/* Ward */}
-              <div style={{ color: "var(--muted)", fontSize: 12.5 }}>
-                {issue.ward}
-              </div>
-
-              {/* Category */}
-              <div style={{ fontSize: 12.5, color: "var(--primary-deep)", fontWeight: 500 }}>
-                {CATEGORY_LABEL[issue.category] || issue.category}
-              </div>
-
-              {/* Status */}
-              <div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <IssueStatusBadge status={issue.status} />
-              </div>
-
-              {/* Priority */}
-              <div>
                 <IssuePriorityBadge priority={issue.priority} />
-              </div>
-
-              {/* Assignee */}
-              <div style={{ fontSize: 12.5, color: issue.assignedTo ? "var(--fg)" : "var(--subtle)" }}>
-                {issue.assignedTo || "—"}
-              </div>
-
-              {/* SLA */}
-              <div>
-                <IssueSLAIndicator issue={issue} />
-              </div>
-
-              {/* Updated */}
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
-                {formatDate(issue.updatedAt)}
+                <span style={{ fontSize: 12.5, color: issue.assignedTo ? "var(--fg)" : "var(--subtle)" }}>
+                  {issue.assignedTo || "Unassigned"}
+                </span>
               </div>
             </div>
-          ))
-        )}
+
+            <div style={{ textAlign: "right", minWidth: 132 }}>
+              <p style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--subtle)",
+                marginBottom: 4,
+              }}>
+                Reported
+              </p>
+              <p style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--fg)",
+                whiteSpace: "nowrap",
+              }}>
+                {formatDate(issue.createdAt)}
+              </p>
+              <p style={{
+                fontSize: 11,
+                color: "var(--subtle)",
+                marginTop: 6,
+                whiteSpace: "nowrap",
+              }}>
+                Updated {formatDate(issue.updatedAt)}
+              </p>
+            </div>
+          </article>
+        ))}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 20 }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 22 }}>
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
