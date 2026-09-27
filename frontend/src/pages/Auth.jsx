@@ -401,36 +401,33 @@ function AuthPage({ initialMode }) {
 
           <div className="role-page-options">
 
-            {roles.map((item) => (
-              <button
-                className="role-card"
-                type="button"
-                key={item.id}
-                onClick={() => {
-                  setRole(item.id)
-                  setSignupStep('email')
-                  setMessage('')
-                }}
-              >
-                <span className="role-card-icon">
-                  {item.icon}
-                </span>
+            <button
+              className="role-card"
+              type="button"
+              onClick={() => {
+                setRole('user')
+                setSignupStep('email')
+                setMessage('')
+              }}
+            >
+              <span className="role-card-icon">
+                👤
+              </span>
 
-                <span className="role-card-copy">
-                  <strong>
-                    {item.name} Account
-                  </strong>
+              <span className="role-card-copy">
+                <strong>
+                  User Account
+                </strong>
 
-                  <small>
-                    {item.description}
-                  </small>
-                </span>
+                <small>
+                  Access smart city services
+                </small>
+              </span>
 
-                <span className="role-arrow">
-                  →
-                </span>
-              </button>
-            ))}
+              <span className="role-arrow">
+                →
+              </span>
+            </button>
 
           </div>
 
