@@ -1,31 +1,41 @@
 :root {
-  --bg: #f4f6f8;
+  /* Premium white + soft holographic cyan (Year 3000) */
+  --bg: #f4f7fb;
   --surface: #f8fafc;
   --card: #ffffff;
-  --fg: #0f1720;
+  --fg: #0b1220;
   --muted: #5b6573;
   --subtle: #8a94a3;
-  --primary: #1e3a5f;
-  --primary-fg: #f7f8fa;
-  --accent: #2c4a6e;
-  --line: #dce3ec;
+  --primary: #0ea5e9;
+  --primary-deep: #0284c7;
+  --primary-fg: #f0f9ff;
+  --accent: #38bdf8;
+  --neon: #22d3ee;
+  --neon-soft: rgba(34, 211, 238, 0.12);
+  --line: #e2e8f0;
   --border: #e6ebf1;
-  --live: #12b76a;
-  --danger: #b42318;
-  --danger-soft: #fef3f2;
-  --success: #067647;
-  --success-soft: #ecfdf3;
-  --warning: #b54708;
-  --warning-soft: #fffaeb;
-  --info: #175cd3;
-  --info-soft: #eff8ff;
+  --live: #10b981;
+  --danger: #ef4444;
+  --danger-soft: #fef2f2;
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-soft: #fffbeb;
+  --info: #0ea5e9;
+  --info-soft: #f0f9ff;
+
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
   --radius-xl: 28px;
-  --shadow: 0 1px 1px rgba(15, 23, 32, 0.03), 0 18px 40px rgba(30, 58, 95, 0.06);
-  --shadow-hover: 0 18px 50px rgba(30, 58, 95, 0.1);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --shadow: 0 1px 1px rgba(15, 23, 32, 0.03), 0 18px 40px rgba(14, 165, 233, 0.06);
+  --shadow-hover: 0 20px 50px rgba(14, 165, 233, 0.12);
+  --shadow-glow: 0 0 0 1px rgba(34, 211, 238, 0.25), 0 0 24px rgba(34, 211, 238, 0.15);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --glass: color-mix(in oklab, white 78%, transparent);
 }
 
 h1, h2, h3, h4 {
@@ -36,4 +46,6 @@ h1, h2, h3, h4 {
   margin: 0;
 }
 
-p { margin: 0; }
+p {
+  margin: 0;
+}

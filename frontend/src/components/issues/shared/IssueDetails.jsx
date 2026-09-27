@@ -1,15 +1,13 @@
 import { Bookmark } from "lucide-react";
 import { CATEGORY_LABEL } from "../../../constants/issueCategories";
-import { STAFF_ROSTER } from "../../../constants/issueConstants";
 import { ISSUE_PRIORITIES, PRIORITY_LABEL } from "../../../constants/issuePriorities";
 import { ISSUE_STATUSES, STATUS_LABEL } from "../../../constants/issueStatuses";
 import { formatDateTime } from "../../../utils/formatDate";
 import {
-  canAssignIssues,
   canSetPriority,
   canUpdateStatus,
 } from "../../../utils/permissionHelper";
-import { assignIssue, setPriority, toggleSaved, updateStatus } from "../../../store/issueStore";
+import { setPriority, toggleSaved, updateStatus } from "../../../store/issueStore";
 import { useAuth } from "../../../store/authStore";
 import Button from "../../ui/Button";
 import { Select } from "../../ui/Input";
@@ -23,12 +21,12 @@ import IssueStatusTimeline from "./IssueStatusTimeline";
 function IssueDetails({ issue }) {
   const user = useAuth();
   const canStatus = canUpdateStatus(user.role);
-  const canAssign = canAssignIssues(user.role);
   const canPriority = canSetPriority(user.role);
   const isCitizen = user.role === "citizen";
 
   return (
     <div className="page-stack">
+      {/* Header */}
       <header style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
           <p className="mono">{issue.id}</p>
@@ -49,13 +47,18 @@ function IssueDetails({ issue }) {
         </div>
       </header>
 
+      {/* Description */}
       <section>
         <h3 style={{ fontSize: 15, marginBottom: 8 }}>Description</h3>
-        <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>{issue.description}</p>
+        <p style={{ color: "var(--muted)", fontSize: 14, lineHeight: 1.6 }}>
+          {issue.description}
+        </p>
       </section>
 
+      {/* Location */}
       <IssueLocationPreview issue={issue} />
 
+      {/* Dispatch / Status info – FIXED assignee (no dropdown) */}
       <section className="panel" style={{ padding: 16 }}>
         {isCitizen ? (
           <>
@@ -73,41 +76,25 @@ function IssueDetails({ issue }) {
           </>
         ) : (
           <>
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">Dispatch</p>
-                <p style={{ marginTop: 8, fontSize: 14 }}>
-                  Assigned to <strong>{issue.assignedTo || "Unassigned"}</strong>
-                </p>
-              </div>
-              <IssuePriorityBadge priority={issue.priority} />
-            </div>
-            <p style={{ marginTop: 10, color: "var(--muted)", fontSize: 13 }}>
-              Priority set by command: <strong>{PRIORITY_LABEL[issue.priority]}</strong>
-              {canPriority
-                ? ". You can update assignment and priority."
-                : ". Visible to staff, locked from field changes."}
+            <p className="eyebrow">Dispatch</p>
+            <p style={{ marginTop: 8, fontSize: 14 }}>
+              Assigned to{" "}
+              <strong style={{ color: issue.assignedTo ? "var(--primary-deep)" : "var(--subtle)" }}>
+                {issue.assignedTo || "Unassigned"}
+              </strong>
+            </p>
+            <p style={{ marginTop: 6, color: "var(--muted)", fontSize: 13 }}>
+              Priority set by command: <strong>{PRIORITY_LABEL[issue.priority]}</strong>.
+              Assignment can only be changed from the Dispatch Board.
             </p>
           </>
         )}
       </section>
 
-      {issue.photos?.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-          {issue.photos.map((photo) => (
-            <img
-              key={photo.id}
-              src={photo.url}
-              alt={photo.name}
-              style={{ width: "100%", aspectRatio: "3 / 2", objectFit: "cover", borderRadius: 12 }}
-            />
-          ))}
-        </div>
-      ) : null}
-
-      {canStatus || canAssign || canPriority ? (
+      {/* Status + Priority controls (no Assignee) */}
+      {(canStatus || canPriority) && (
         <div className="form-grid panel" style={{ padding: 16 }}>
-          {canStatus ? (
+          {canStatus && (
             <label className="field">
               <span className="field-label">Status</span>
               <Select
@@ -121,26 +108,9 @@ function IssueDetails({ issue }) {
                 ))}
               </Select>
             </label>
-          ) : null}
+          )}
 
-          {canAssign ? (
-            <label className="field">
-              <span className="field-label">Assignee</span>
-              <Select
-                value={issue.assignedTo || ""}
-                onChange={(e) => assignIssue(issue.id, e.target.value, user.name, user.role)}
-              >
-                <option value="">Unassigned</option>
-                {STAFF_ROSTER.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-          ) : null}
-
-          {canPriority ? (
+          {canPriority && (
             <label className="field">
               <span className="field-label">Priority</span>
               <Select
@@ -154,17 +124,20 @@ function IssueDetails({ issue }) {
                 ))}
               </Select>
             </label>
-          ) : null}
+          )}
         </div>
-      ) : null}
+      )}
 
+      {/* Timeline */}
       <section>
         <h3 style={{ fontSize: 15, marginBottom: 12 }}>Status timeline</h3>
         <IssueStatusTimeline current={issue.status} events={issue.timeline} />
       </section>
 
+      {/* Comments */}
       <IssueComments issue={issue} />
 
+      {/* Reported / Updated / SLA dates – restored */}
       <div
         style={{
           display: "flex",
@@ -182,14 +155,14 @@ function IssueDetails({ issue }) {
           <p className="eyebrow">Last updated</p>
           <p style={{ marginTop: 6 }}>{formatDateTime(issue.updatedAt)}</p>
         </div>
-        {!isCitizen ? (
+        {!isCitizen && (
           <div>
             <p className="eyebrow">Service window</p>
             <p style={{ marginTop: 6 }}>
               <IssueSLAIndicator issue={issue} />
             </p>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );

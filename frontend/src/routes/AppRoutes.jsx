@@ -17,6 +17,7 @@ import ManageAssignments from "../pages/admin/ManageAssignments";
 import IssueAnalytics from "../pages/admin/IssueAnalytics";
 import IssueAuditLogs from "../pages/admin/IssueAuditLogs";
 import AdminIssueDetails from "../pages/admin/AdminIssueDetails";
+import StaffManagement from "../pages/admin/StaffManagement";
 import NotFound from "../pages/common/NotFound";
 import { useAuth } from "../store/authStore";
 
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/" element={<HomeRedirect />} />
 
+          {/* Citizen routes */}
           <Route element={<RoleRoute allow={["citizen"]} />}>
             <Route path="/citizen/report" element={<ReportIssue />} />
             <Route path="/citizen/my-reports" element={<MyReports />} />
@@ -44,6 +46,7 @@ function AppRoutes() {
             <Route path="/citizen/issues/:id" element={<CitizenIssueDetails />} />
           </Route>
 
+          {/* Staff routes */}
           <Route element={<RoleRoute allow={["staff"]} />}>
             <Route path="/staff" element={<StaffDashboard />} />
             <Route path="/staff/queue" element={<StaffWorkQueue />} />
@@ -51,10 +54,12 @@ function AppRoutes() {
             <Route path="/staff/issues/:id" element={<StaffIssueDetails />} />
           </Route>
 
+          {/* Admin routes */}
           <Route element={<RoleRoute allow={["admin"]} />}>
             <Route path="/admin/command" element={<AdminDashboard />} />
             <Route path="/admin/queue" element={<AllIssues />} />
             <Route path="/admin/assignments" element={<ManageAssignments />} />
+            <Route path="/admin/staff" element={<StaffManagement />} />
             <Route path="/admin/analytics" element={<IssueAnalytics />} />
             <Route path="/admin/audit" element={<IssueAuditLogs />} />
             <Route path="/admin/issues/:id" element={<AdminIssueDetails />} />

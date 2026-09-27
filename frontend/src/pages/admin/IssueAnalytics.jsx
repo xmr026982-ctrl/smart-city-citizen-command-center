@@ -1,3 +1,8 @@
+import { useMemo } from "react";
+import {
+  Activity, Layers, AlertTriangle, CheckCircle2,
+  TrendingUp, Zap, MapPin, BarChart3
+} from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { ISSUE_STATUSES, STATUS_LABEL } from "../../constants/issueStatuses";
@@ -10,137 +15,359 @@ function pct(part, total) {
 
 function IssueAnalytics() {
   const issues = useIssues();
-  const total = issues.length;
-  const open = issues.filter((i) => i.status !== "resolved").length;
-  const inProgress = issues.filter((i) => i.status === "in_progress").length;
-  const unassigned = issues.filter((i) => !i.assignedTo).length;
-  const resolved = issues.filter((i) => i.status === "resolved").length;
-  const assigned = issues.filter((i) => i.assignedTo).length;
-  const critical = issues.filter((i) => i.priority === "critical" || i.priority === "high").length;
-  const resolveRate = pct(resolved, total);
-  const coverage = pct(assigned, total);
+
+  const stats = useMemo(() => {
+    const total = issues.length;
+    const open = issues.filter((i) => i.status !== "resolved").length;
+    const inProgress = issues.filter((i) => i.status === "in_progress").length;
+    const unassigned = issues.filter((i) => !i.assignedTo && i.status !== "resolved").length;
+    const resolved = issues.filter((i) => i.status === "resolved").length;
+    const assigned = issues.filter((i) => i.assignedTo).length;
+    const critical = issues.filter((i) => i.priority === "critical" || i.priority === "high").length;
+
+    return {
+      total,
+      open,
+      inProgress,
+      unassigned,
+      resolved,
+      assigned,
+      critical,
+      resolveRate: pct(resolved, total),
+      coverage: pct(assigned, total),
+      openPct: pct(open, total),
+    };
+  }, [issues]);
 
   const byStatus = ISSUE_STATUSES.map((status) => ({
+    key: status,
     label: STATUS_LABEL[status],
-    value: issues.filter((issue) => issue.status === status).length,
+    value: issues.filter((i) => i.status === status).length,
   }));
 
   const byCategory = Object.entries(CATEGORY_LABEL).map(([key, label]) => ({
+    key,
     label,
-    value: issues.filter((issue) => issue.category === key).length,
+    value: issues.filter((i) => i.category === key).length,
   }));
 
+  const maxCat = Math.max(...byCategory.map((c) => c.value), 1);
+
   return (
-    <main className="page-stack">
-      <div className="section-head">
+    <main className="page-wrap">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <PageHeader
-          eyebrow="Analytics"
-          title="Issue intelligence"
+          eyebrow="Analytics · Neural Intel"
+          title="Issue Intelligence"
           description="Live load, coverage, and category pressure across the city board."
         />
-        <span className="citizen-chip">
-          <span className="live-dot" />
-          Command intel
-        </span>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          padding: "7px 14px", borderRadius: 999,
+          background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)",
+          fontSize: 12.5, fontWeight: 600, color: "#059669",
+        }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", background: "#10b981",
+            boxShadow: "0 0 0 3px rgba(16,185,129,0.25)", animation: "livePulse 1.8s ease infinite",
+          }} />
+          Command Intel · Live
+        </div>
       </div>
 
-      <section className="stats-grid">
-        <article className="stat-card">
-          <p className="eyebrow">Open board</p>
-          <strong>{open}</strong>
-          <p>{pct(open, total)}% of all reports</p>
-        </article>
-        <article className="stat-card">
-          <p className="eyebrow">In progress</p>
-          <strong>{inProgress}</strong>
-          <p>Active field work</p>
-        </article>
-        <article className="stat-card">
-          <p className="eyebrow">Unassigned</p>
-          <strong>{unassigned}</strong>
-          <p>Waiting for dispatch</p>
-        </article>
-        <article className="stat-card">
-          <p className="eyebrow">Resolved</p>
-          <strong>{resolved}</strong>
-          <p>{resolveRate}% close rate</p>
-        </article>
-      </section>
+      {/* ========== TOP STAT CARDS (3D glass) ========== */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: 14,
+        margin: "28px 0 24px",
+      }}>
+        <StatCard
+          label="Open Board"
+          value={stats.open}
+          sub={`${stats.openPct}% of all reports`}
+          icon={Layers}
+          color="#0ea5e9"
+        />
+        <StatCard
+          label="In Progress"
+          value={stats.inProgress}
+          sub="Active field work"
+          icon={Activity}
+          color="#f59e0b"
+        />
+        <StatCard
+          label="Unassigned"
+          value={stats.unassigned}
+          sub="Waiting for dispatch"
+          icon={MapPin}
+          color="#ef4444"
+        />
+        <StatCard
+          label="Resolved"
+          value={stats.resolved}
+          sub={`${stats.resolveRate}% close rate`}
+          icon={CheckCircle2}
+          color="#10b981"
+        />
+      </div>
 
-      <section className="intel-grid">
-        <article className="panel intel-panel">
-          <div className="section-head">
+      {/* ========== MIDDLE ROW ========== */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1fr",
+        gap: 16,
+        marginBottom: 20,
+      }}>
+        {/* Status Mix */}
+        <div className="holo-surface holo-border" style={{
+          borderRadius: 20,
+          padding: 22,
+          background: "rgba(255,255,255,0.7)",
+          backdropFilter: "blur(16px)",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
             <div>
-              <p className="eyebrow">Status mix</p>
-              <h3 style={{ marginTop: 8 }}>Pipeline share</h3>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>
+                Status Mix
+              </p>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, marginTop: 4 }}>
+                Pipeline Share
+              </h3>
             </div>
-            <span className="mono">{total} records</span>
+            <span style={{ fontSize: 12, color: "var(--subtle)" }}>{stats.total} records</span>
           </div>
-          <div className="intel-row" style={{ marginTop: 24 }}>
-            {byStatus.map((item) => (
-              <div key={item.label}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-                  <span>{item.label}</span>
-                  <span className="mono">
-                    {item.value} · {pct(item.value, total)}%
-                  </span>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{ width: `${pct(item.value, total)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
 
-        <article className="panel intel-panel">
-          <p className="eyebrow">Resolution</p>
-          <h3 style={{ marginTop: 8 }}>Operational health</h3>
-          <div className="gauge-wrap" style={{ marginTop: 28 }}>
-            <div className="gauge" style={{ ["--p"]: resolveRate }}>
-              <span>{resolveRate}%</span>
-            </div>
-            <div>
-              <p style={{ fontWeight: 600 }}>Close rate</p>
-              <p style={{ marginTop: 8, color: "var(--muted)", fontSize: 14 }}>
-                {assigned} assigned · {coverage}% coverage
-              </p>
-              <p style={{ marginTop: 8, color: "var(--muted)", fontSize: 14 }}>
-                {critical} high / critical still on the board
-              </p>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {byStatus.map((item) => {
+              const p = pct(item.value, stats.total);
+              return (
+                <div key={item.key}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ fontWeight: 500 }}>{item.label}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
+                      {item.value} · {p}%
+                    </span>
+                  </div>
+                  <div style={{
+                    height: 8, borderRadius: 999, background: "rgba(14,165,233,0.08)", overflow: "hidden",
+                  }}>
+                    <div style={{
+                      height: "100%", borderRadius: 999,
+                      width: `${p}%`,
+                      background: "linear-gradient(90deg, #0ea5e9, #22d3ee)",
+                      boxShadow: "0 0 12px rgba(14,165,233,0.4)",
+                      transition: "width 0.8s cubic-bezier(0.22,1,0.36,1)",
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div style={{ marginTop: 28 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span>Assignment coverage</span>
-              <span className="mono">{coverage}%</span>
-            </div>
-            <div className="bar-track">
-              <div className="bar-fill" style={{ width: `${coverage}%` }} />
-            </div>
-          </div>
-        </article>
-      </section>
-
-      <section className="panel intel-panel">
-        <p className="eyebrow">Category pressure</p>
-        <h3 style={{ margin: "8px 0 20px" }}>Where the city is reporting</h3>
-        <div className="category-grid">
-          {byCategory.map((item) => (
-            <div key={item.label} className="cat-tile">
-              <p className="eyebrow">{item.label}</p>
-              <strong>{item.value}</strong>
-              <div className="bar-track" style={{ marginTop: 12 }}>
-                <div className="bar-fill" style={{ width: `${pct(item.value, total)}%` }} />
-              </div>
-              <p className="mono" style={{ marginTop: 8 }}>
-                {pct(item.value, total)}% of board
-              </p>
-            </div>
-          ))}
         </div>
-      </section>
+
+        {/* Resolution Gauge */}
+        <div className="holo-surface holo-border" style={{
+          borderRadius: 20,
+          padding: 22,
+          background: "rgba(255,255,255,0.7)",
+          backdropFilter: "blur(16px)",
+          display: "flex",
+          flexDirection: "column",
+        }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>
+            Resolution
+          </p>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>
+            Operational Health
+          </h3>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 24, flex: 1 }}>
+            {/* Circular gauge */}
+            <div style={{
+              position: "relative",
+              width: 120, height: 120, flexShrink: 0,
+            }}>
+              <svg width="120" height="120" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(14,165,233,0.1)" strokeWidth="10" />
+                <circle
+                  cx="60" cy="60" r="52" fill="none"
+                  stroke="url(#gaugeGrad)"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(stats.resolveRate / 100) * 327} 327`}
+                  transform="rotate(-90 60 60)"
+                  style={{ transition: "stroke-dasharray 1s cubic-bezier(0.22,1,0.36,1)" }}
+                />
+                <defs>
+                  <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#0ea5e9" />
+                    <stop offset="100%" stopColor="#22d3ee" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div style={{
+                position: "absolute", inset: 0,
+                display: "grid", placeItems: "center",
+                fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700,
+              }}>
+                {stats.resolveRate}%
+              </div>
+            </div>
+
+            <div>
+              <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>Close Rate</p>
+              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>
+                {stats.assigned} assigned · {stats.coverage}% coverage
+              </p>
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>
+                {stats.critical} high / critical still on board
+              </p>
+            </div>
+          </div>
+
+          {/* Coverage bar */}
+          <div style={{ marginTop: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
+              <span>Assignment Coverage</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>{stats.coverage}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: "rgba(14,165,233,0.08)", overflow: "hidden" }}>
+              <div style={{
+                height: "100%", borderRadius: 999, width: `${stats.coverage}%`,
+                background: "linear-gradient(90deg, #0ea5e9, #22d3ee)",
+                boxShadow: "0 0 12px rgba(14,165,233,0.35)",
+                transition: "width 0.8s cubic-bezier(0.22,1,0.36,1)",
+              }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ========== CATEGORY PRESSURE ========== */}
+      <div className="holo-surface holo-border" style={{
+        borderRadius: 20,
+        padding: 22,
+        background: "rgba(255,255,255,0.7)",
+        backdropFilter: "blur(16px)",
+      }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>
+          Category Pressure
+        </p>
+        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, marginTop: 4, marginBottom: 20 }}>
+          Where the city is reporting
+        </h3>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 14,
+        }}>
+          {byCategory.map((item) => {
+            const p = pct(item.value, stats.total);
+            const heightPct = Math.max(12, (item.value / maxCat) * 100);
+            return (
+              <div
+                key={item.key}
+                style={{
+                  background: "rgba(255,255,255,0.6)",
+                  border: "1px solid rgba(14,165,233,0.12)",
+                  borderRadius: 16,
+                  padding: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "transform 200ms, box-shadow 200ms",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.boxShadow = "0 12px 32px rgba(14,165,233,0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <p style={{ fontSize: 11, color: "var(--subtle)", marginBottom: 6 }}>{item.label}</p>
+                <p style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, marginBottom: 12 }}>
+                  {item.value}
+                </p>
+
+                {/* Vertical bar */}
+                <div style={{
+                  flex: 1, minHeight: 48,
+                  display: "flex", alignItems: "flex-end",
+                }}>
+                  <div style={{
+                    width: "100%", height: `${heightPct}%`,
+                    borderRadius: "8px 8px 4px 4px",
+                    background: "linear-gradient(180deg, #22d3ee, #0ea5e9)",
+                    boxShadow: "0 0 16px rgba(14,165,233,0.3)",
+                    transition: "height 0.7s cubic-bezier(0.22,1,0.36,1)",
+                  }} />
+                </div>
+
+                <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10, fontFamily: "var(--font-mono)" }}>
+                  {p}% of board
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes livePulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.25); }
+          50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.1); }
+        }
+      `}</style>
     </main>
+  );
+}
+
+function StatCard({ label, value, sub, icon: Icon, color }) {
+  return (
+    <div
+      className="holo-surface holo-border"
+      style={{
+        borderRadius: 18,
+        padding: "18px 18px 16px",
+        background: "rgba(255,255,255,0.72)",
+        backdropFilter: "blur(14px)",
+        transform: "perspective(900px) rotateX(1.5deg)",
+        transition: "transform 200ms, box-shadow 200ms",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-2px)";
+        e.currentTarget.style.boxShadow = `0 16px 40px ${color}22`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "perspective(900px) rotateX(1.5deg)";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 12,
+          background: `${color}18`, display: "grid", placeItems: "center",
+        }}>
+          <Icon size={18} color={color} />
+        </div>
+        <p style={{
+          fontSize: 11, fontWeight: 600, letterSpacing: "0.08em",
+          textTransform: "uppercase", color: "var(--subtle)",
+        }}>
+          {label}
+        </p>
+      </div>
+      <p style={{
+        fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700,
+        lineHeight: 1, marginBottom: 6,
+      }}>
+        {value}
+      </p>
+      <p style={{ fontSize: 12.5, color: "var(--muted)" }}>{sub}</p>
+    </div>
   );
 }
 

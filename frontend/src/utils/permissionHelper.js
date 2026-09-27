@@ -6,8 +6,9 @@ export function canUpdateStatus(role) {
   return role === "staff" || role === "admin";
 }
 
+// Assignment is ONLY allowed from the Dispatch Board page
 export function canAssignIssues(role) {
-  return role === "admin";
+  return false;
 }
 
 export function canSetPriority(role) {
