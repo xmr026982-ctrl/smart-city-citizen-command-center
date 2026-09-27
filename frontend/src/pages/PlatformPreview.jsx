@@ -1,93 +1,97 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from 'react'
+
 
 const issues = [
   {
-    type: "Pothole",
-    location: "Main Street",
-    status: "In Progress",
-    color: "#ef4444",
-    icon: "🚧",
+    type: 'Pothole',
+    location: 'Main Street',
+    status: 'In Progress',
+    color: '#ef4444',
+    icon: '🚧'
   },
   {
-    type: "Garbage",
-    location: "Riverside Park",
-    status: "Pending",
-    color: "#f59e0b",
-    icon: "🗑️",
+    type: 'Garbage',
+    location: 'Riverside Park',
+    status: 'Pending',
+    color: '#f59e0b',
+    icon: '🗑️'
   },
   {
-    type: "Streetlight",
-    location: "Oak Avenue",
-    status: "Solved",
-    color: "#3b82f6",
-    icon: "💡",
-  },
-];
+    type: 'Streetlight',
+    location: 'Oak Avenue',
+    status: 'Solved',
+    color: '#3b82f6',
+    icon: '💡'
+  }
+]
 
 const featureCards = [
   {
-    icon: "🚨",
-    title: "Issue Solving",
-    text: "Report civic problems and follow them from the first report to the final fix.",
+    icon: '🚨',
+    title: 'Issue Solving',
+    text: 'Report civic problems and follow them from the first report to the final fix.'
   },
   {
-    icon: "🗳️",
-    title: "Community Voting",
-    text: "Give residents a voice and help your community prioritize what matters most.",
+    icon: '🗳️',
+    title: 'Community Voting',
+    text: 'Give residents a voice and help your community prioritize what matters most.'
   },
   {
-    icon: "📍",
-    title: "Live Locations",
-    text: "See reported problems on an easy-to-understand city map.",
+    icon: '📍',
+    title: 'Live Locations',
+    text: 'See reported problems on an easy-to-understand city map.'
   },
   {
-    icon: "📊",
-    title: "Problem Status",
-    text: "Track every issue as it moves from pending to in progress and solved.",
-  },
-];
+    icon: '📊',
+    title: 'Problem Status',
+    text: 'Track every issue as it moves from pending to in progress and solved.'
+  }
+]
 
-function PlatformPreview() {
-  const navigate = useNavigate();
+function PlatformPreview({ onNavigate }) {
+  const [activeIssue, setActiveIssue] =
+    useState(0)
 
-  const [activeIssue, setActiveIssue] = useState(0);
-  const [resolvedIssues, setResolvedIssues] = useState(0);
+  const [resolvedIssues, setResolvedIssues] =
+    useState(0)
 
-  const issue = issues[activeIssue];
+  const issue = issues[activeIssue]
 
   useEffect(() => {
-    const target = 2847;
-    const duration = 1200;
-    const startedAt = performance.now();
+    const target = 2847
+    const duration = 1200
+    const startedAt = performance.now()
 
     const updateCount = (now) => {
       const progress = Math.min(
         (now - startedAt) / duration,
         1
-      );
+      )
 
       setResolvedIssues(
         Math.floor(progress * target)
-      );
+      )
 
       if (progress < 1) {
-        requestAnimationFrame(updateCount);
+        requestAnimationFrame(updateCount)
       }
-    };
+    }
 
-    requestAnimationFrame(updateCount);
-  }, []);
+    requestAnimationFrame(updateCount)
+  }, [])
 
   return (
     <main className="app preview-page">
 
-      {/* Preview Navigation */}
+    
+
       <nav className="nav preview-nav">
 
         <button
           className="brand brand-button"
-          onClick={() => navigate("/home")}
+          onClick={() =>
+            onNavigate('home')
+          }
         >
           <span className="brand-mark">
             ✦
@@ -104,9 +108,9 @@ function PlatformPreview() {
             className="text-button"
             onClick={() =>
               document
-                .getElementById("features")
+                .getElementById('features')
                 ?.scrollIntoView({
-                  behavior: "smooth",
+                  behavior: 'smooth'
                 })
             }
           >
@@ -115,9 +119,21 @@ function PlatformPreview() {
 
           <button
             className="text-button"
-            onClick={() => navigate("/home")}
+            onClick={() =>
+              onNavigate('home')
+            }
           >
             Home
+          </button>
+
+          <button
+            className="login-button"
+            onClick={() =>
+              onNavigate('auth')
+            }
+          >
+            <span aria-hidden="true">👤</span>
+            Log in
           </button>
 
         </div>
@@ -125,7 +141,7 @@ function PlatformPreview() {
       </nav>
 
 
-      {/* Hero Section */}
+
       <section className="preview-hero">
 
         <div>
@@ -166,7 +182,6 @@ function PlatformPreview() {
       </section>
 
 
-      {/* Dashboard */}
       <section className="dashboard-grid">
 
         <div className="map-card card">
@@ -238,19 +253,19 @@ function PlatformPreview() {
 
             </div>
 
-
-            {/* Map Pins */}
             {issues.map((item, index) => (
 
               <button
                 key={item.type}
-                className={`map-pin pin-${index + 1} ${
+                className={`map-pin pin-${
+                  index + 1
+                } ${
                   activeIssue === index
-                    ? "selected"
-                    : ""
+                    ? 'selected'
+                    : ''
                 }`}
                 style={{
-                  "--pin-color": item.color,
+                  '--pin-color': item.color
                 }}
                 onClick={() =>
                   setActiveIssue(index)
@@ -262,12 +277,10 @@ function PlatformPreview() {
 
             ))}
 
-
-            {/* Selected Issue */}
             <div
               className="selected-issue"
               style={{
-                "--issue-color": issue.color,
+                '--issue-color': issue.color
               }}
             >
 
@@ -282,7 +295,7 @@ function PlatformPreview() {
                 </strong>
 
                 <small>
-                  {issue.location} ·{" "}
+                  {issue.location} ·{' '}
                   <b>
                     {issue.status}
                   </b>
@@ -296,14 +309,12 @@ function PlatformPreview() {
 
             </div>
 
-
-            {/* Map Legend */}
             <div className="map-legend">
 
               <span>
                 <i
                   style={{
-                    background: "#ef4444",
+                    background: '#ef4444'
                   }}
                 />
                 Pothole
@@ -312,7 +323,7 @@ function PlatformPreview() {
               <span>
                 <i
                   style={{
-                    background: "#f59e0b",
+                    background: '#f59e0b'
                   }}
                 />
                 Garbage
@@ -321,7 +332,7 @@ function PlatformPreview() {
               <span>
                 <i
                   style={{
-                    background: "#3b82f6",
+                    background: '#3b82f6'
                   }}
                 />
                 Streetlight
@@ -335,8 +346,7 @@ function PlatformPreview() {
 
       </section>
 
-
-      {/* Features Heading */}
+    
       <section
         id="features"
         className="section-heading"
@@ -358,8 +368,6 @@ function PlatformPreview() {
 
       </section>
 
-
-      {/* Feature Cards */}
       <section className="feature-grid feature-grid-large">
 
         {featureCards.map((feature) => (
@@ -381,14 +389,16 @@ function PlatformPreview() {
               {feature.text}
             </p>
 
+           
+
           </article>
 
         ))}
 
       </section>
 
+      
 
-      {/* Extra Section */}
       <section className="extra-grid">
 
         <div>
@@ -440,8 +450,8 @@ function PlatformPreview() {
 
       </section>
 
+     
 
-      {/* Final CTA */}
       <section className="final-cta">
 
         <p className="eyebrow">
@@ -457,28 +467,10 @@ function PlatformPreview() {
           shape the place you call home.
         </p>
 
-        <div>
-
-          <button
-            className="create-account-btn"
-            onClick={() => navigate("/signup")}
-          >
-            Create an account
-          </button>
-
-          <button
-            className="outline-button light"
-            onClick={() => navigate("/login")}
-          >
-            Log in
-          </button>
-
-        </div>
-
       </section>
 
     </main>
-  );
+  )
 }
 
-export default PlatformPreview;
+export default PlatformPreview
