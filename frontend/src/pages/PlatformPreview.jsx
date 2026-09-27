@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+
 const issues = [
   {
     type: 'Pothole',
@@ -123,6 +124,16 @@ function PlatformPreview({ onNavigate }) {
             }
           >
             Home
+          </button>
+
+          <button
+            className="login-button"
+            onClick={() =>
+              onNavigate('auth')
+            }
+          >
+            <span aria-hidden="true">👤</span>
+            Log in
           </button>
 
         </div>
@@ -455,26 +466,6 @@ function PlatformPreview({ onNavigate }) {
           Join your neighbors and help
           shape the place you call home.
         </p>
-
-        <div>
-
-          <button
-  className="create-account-btn"
-  onClick={() => onNavigate('signup')}
->
-  Create an account
-</button>
-
-          <button
-            className="outline-button light"
-            onClick={() =>
-              onNavigate('auth')
-            }
-          >
-            Log in
-          </button>
-
-        </div>
 
       </section>
 
