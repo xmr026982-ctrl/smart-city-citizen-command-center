@@ -34,17 +34,14 @@ function ManageAssignments() {
         (issue.assignedTo || "").toLowerCase().includes(search.toLowerCase()) ||
         issue.ward.toLowerCase().includes(search.toLowerCase()) ||
         (CATEGORY_LABEL[issue.category] || "").toLowerCase().includes(search.toLowerCase());
-
       const matchStatus = statusFilter === "all" || issue.status === statusFilter;
       const matchCategory = categoryFilter === "all" || issue.category === categoryFilter;
-
       return matchSearch && matchStatus && matchCategory;
     });
 
     list.sort((a, b) => {
       let valA = a[sortKey];
       let valB = b[sortKey];
-
       if (sortKey === "createdAt" || sortKey === "updatedAt") {
         valA = new Date(valA).getTime();
         valB = new Date(valB).getTime();
@@ -58,7 +55,6 @@ function ManageAssignments() {
         valA = order[a.priority] || 0;
         valB = order[b.priority] || 0;
       }
-
       if (typeof valA === "string") {
         return sortDir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
       }
@@ -85,9 +81,8 @@ function ManageAssignments() {
   };
 
   const toggleSort = (key) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
       setSortKey(key);
       setSortDir("desc");
     }
@@ -144,7 +139,6 @@ function ManageAssignments() {
             }}
           />
         </div>
-
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -155,7 +149,6 @@ function ManageAssignments() {
           <option value="acknowledged">Acknowledged</option>
           <option value="in_progress">In Progress</option>
         </select>
-
         <select
           value={categoryFilter}
           onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
@@ -178,7 +171,7 @@ function ManageAssignments() {
 
       <div style={{ display: "grid", gap: 12 }}>
         {paginated.length === 0 && (
-          <div className="holo-surface holo-border" style={{ borderRadius: 18, padding: 48, textAlign: "center", color: "var(--subtle)" }}>
+          <div style={{ borderRadius: 18, padding: 48, textAlign: "center", color: "var(--subtle)" }}>
             No issues match your filters
           </div>
         )}
@@ -186,54 +179,65 @@ function ManageAssignments() {
         {paginated.map((issue) => (
           <article
             key={issue.id}
-            className="holo-surface holo-border holo-glow"
             style={{
-              borderRadius: 16,
+              borderRadius: 18,
               padding: "16px 18px",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               gap: 16,
               flexWrap: "wrap",
+              background: "rgba(255,255,255,0.74)",
+              backdropFilter: "blur(16px) saturate(1.4)",
+              border: "1px solid rgba(255,255,255,0.75)",
+              boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
+              position: "relative",
+              overflow: "hidden",
+              transform: "perspective(900px) rotateX(2deg)",
+              transition: "transform 220ms, box-shadow 220ms",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+              e.currentTarget.style.boxShadow = "0 18px 40px rgba(14,165,233,0.16), inset 0 1px 0 rgba(255,255,255,0.9)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
+              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
             }}
           >
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)",
+            }} />
+
             <div style={{ flex: 1, minWidth: 260 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
-                  {issue.id}
-                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</span>
                 <span style={{ fontSize: 11, color: "var(--subtle)", display: "flex", alignItems: "center", gap: 4 }}>
                   <Calendar size={11} />
                   {formatDateTime(issue.createdAt)}
                 </span>
               </div>
-
-              <h3 style={{ fontSize: 15, fontFamily: "var(--font-display)", fontWeight: 600 }}>
-                {issue.title}
-              </h3>
-
+              <h3 style={{ fontSize: 15, fontFamily: "var(--font-display)", fontWeight: 600 }}>{issue.title}</h3>
               <p style={{ marginTop: 4, color: "var(--muted)", fontSize: 12.5, display: "flex", alignItems: "center", gap: 5 }}>
                 <MapPin size={12} />
                 {issue.ward} · {issue.location}
               </p>
-
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <IssueStatusBadge status={issue.status} />
                 <IssuePriorityBadge priority={issue.priority} />
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 11.5,
-                    fontWeight: 500,
-                    padding: "3px 10px",
-                    borderRadius: 999,
-                    background: "rgba(14,165,233,0.08)",
-                    color: "var(--primary-deep)",
-                    border: "1px solid rgba(14,165,233,0.2)",
-                  }}
-                >
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 11.5,
+                  fontWeight: 500,
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  background: "rgba(14,165,233,0.08)",
+                  color: "var(--primary-deep)",
+                  border: "1px solid rgba(14,165,233,0.2)",
+                }}>
                   <Tag size={11} />
                   {CATEGORY_LABEL[issue.category] || issue.category}
                 </span>
@@ -243,39 +247,60 @@ function ManageAssignments() {
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {issue.assignedTo ? (
                 <span style={{
-                  fontSize: 13, fontWeight: 500, color: "var(--primary-deep)",
-                  background: "var(--info-soft)", padding: "6px 14px", borderRadius: 999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "var(--primary-deep)",
+                  background: "var(--info-soft)",
+                  padding: "6px 14px",
+                  borderRadius: 999,
                 }}>
                   {issue.assignedTo}
                 </span>
               ) : (
                 <span style={{
-                  fontSize: 13, color: "var(--subtle)", padding: "6px 14px",
-                  border: "1px dashed var(--line)", borderRadius: 999,
+                  fontSize: 13,
+                  color: "var(--subtle)",
+                  padding: "6px 14px",
+                  border: "1px dashed var(--line)",
+                  borderRadius: 999,
                 }}>
                   Unassigned
                 </span>
               )}
-
               <button
                 onClick={() => openAssign(issue)}
                 style={{
-                  height: 38, padding: "0 14px", borderRadius: 11, border: "none",
-                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)", color: "white",
-                  fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
-                  cursor: "pointer", boxShadow: "0 6px 16px rgba(14,165,233,0.25)",
+                  height: 38,
+                  padding: "0 14px",
+                  borderRadius: 11,
+                  border: "none",
+                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                  color: "white",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                  boxShadow: "0 6px 16px rgba(14,165,233,0.25)",
                 }}
               >
                 {issue.assignedTo ? <><RefreshCw size={13} /> Re-assign</> : <><UserPlus size={14} /> Assign</>}
               </button>
-
               {issue.assignedTo && (
                 <button
                   onClick={() => handleUnassign(issue)}
                   title="Remove specialist"
                   style={{
-                    height: 38, width: 38, borderRadius: 11, border: "1px solid #fecaca",
-                    background: "#fef2f2", color: "#dc2626", display: "grid", placeItems: "center", cursor: "pointer",
+                    height: 38,
+                    width: 38,
+                    borderRadius: 11,
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    color: "#dc2626",
+                    display: "grid",
+                    placeItems: "center",
+                    cursor: "pointer",
                   }}
                 >
                   <UserMinus size={15} />

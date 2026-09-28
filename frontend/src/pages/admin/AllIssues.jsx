@@ -39,7 +39,6 @@ function AllIssues() {
     list.sort((a, b) => {
       let valA = a[sortKey];
       let valB = b[sortKey];
-
       if (sortKey === "createdAt" || sortKey === "updatedAt") {
         valA = new Date(valA).getTime();
         valB = new Date(valB).getTime();
@@ -53,7 +52,6 @@ function AllIssues() {
         valA = order[a.priority] || 0;
         valB = order[b.priority] || 0;
       }
-
       if (typeof valA === "string") {
         return sortDir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
       }
@@ -89,18 +87,12 @@ function AllIssues() {
       <button
         onClick={() => toggleSort(k)}
         style={{
-          height: 36,
-          padding: "0 12px",
-          borderRadius: 10,
+          height: 36, padding: "0 12px", borderRadius: 10,
           border: active ? "1.5px solid var(--primary)" : "1px solid var(--line)",
           background: active ? "rgba(14,165,233,0.12)" : "rgba(255,255,255,0.88)",
           color: active ? "var(--primary-deep)" : "var(--fg)",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          cursor: "pointer",
-          fontSize: 12.5,
-          fontWeight: active ? 600 : 500,
+          display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+          fontSize: 12.5, fontWeight: active ? 600 : 500,
         }}
       >
         {Icon && <Icon size={13} />}
@@ -138,11 +130,27 @@ function AllIssues() {
               borderRadius: 16,
               padding: "14px 16px",
               background: "rgba(255,255,255,0.75)",
-              backdropFilter: "blur(16px)",
+              backdropFilter: "blur(16px) saturate(1.4)",
               border: "1px solid rgba(255,255,255,0.8)",
-              boxShadow: "0 8px 28px rgba(14,165,233,0.07)",
+              boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
+              transform: "perspective(900px) rotateX(2deg)",
+              transition: "transform 220ms, box-shadow 220ms",
+              position: "relative",
+              overflow: "hidden",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+              e.currentTarget.style.boxShadow = `0 18px 40px ${s.color}25, inset 0 1px 0 rgba(255,255,255,0.9)`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
+              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
             }}
           >
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: `linear-gradient(90deg, transparent, ${s.color}55, transparent)`,
+            }} />
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: 10,
@@ -237,51 +245,46 @@ function AllIssues() {
             key={issue.id}
             onClick={() => setSelectedId(issue.id)}
             style={{
-              borderRadius: 16,
+              borderRadius: 18,
               padding: "16px 18px",
-              background: "rgba(255,255,255,0.78)",
-              backdropFilter: "blur(16px)",
-              border: "1px solid rgba(14,165,233,0.12)",
-              boxShadow: "0 8px 28px rgba(14,165,233,0.06)",
+              background: "rgba(255,255,255,0.74)",
+              backdropFilter: "blur(16px) saturate(1.4)",
+              border: "1px solid rgba(255,255,255,0.75)",
+              boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
               cursor: "pointer",
               display: "grid",
               gridTemplateColumns: "1fr auto",
               gap: 16,
               alignItems: "center",
-              transition: "transform 160ms, box-shadow 160ms",
+              position: "relative",
+              overflow: "hidden",
+              transform: "perspective(900px) rotateX(2deg)",
+              transition: "transform 220ms, box-shadow 220ms",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 14px 36px rgba(14,165,233,0.12)";
+              e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+              e.currentTarget.style.boxShadow = "0 18px 40px rgba(14,165,233,0.16), inset 0 1px 0 rgba(255,255,255,0.9)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.06)";
+              e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
+              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
             }}
           >
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)",
+            }} />
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
-                  {issue.id}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--subtle)" }}>
-                  {issue.ward}
-                </span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</span>
+                <span style={{ fontSize: 12, color: "var(--subtle)" }}>{issue.ward}</span>
                 <span style={{ fontSize: 12, color: "var(--primary-deep)", fontWeight: 500 }}>
                   {CATEGORY_LABEL[issue.category] || issue.category}
                 </span>
               </div>
-
-              <h3 style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 16,
-                fontWeight: 650,
-                margin: 0,
-                lineHeight: 1.3,
-              }}>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
                 {issue.title}
               </h3>
-
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <IssueStatusBadge status={issue.status} />
                 <IssuePriorityBadge priority={issue.priority} />
@@ -290,33 +293,17 @@ function AllIssues() {
                 </span>
               </div>
             </div>
-
             <div style={{ textAlign: "right", minWidth: 132 }}>
               <p style={{
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--subtle)",
-                marginBottom: 4,
+                fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em",
+                textTransform: "uppercase", color: "var(--subtle)", marginBottom: 4,
               }}>
                 Reported
               </p>
-              <p style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "var(--fg)",
-                whiteSpace: "nowrap",
-              }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap" }}>
                 {formatDate(issue.createdAt)}
               </p>
-              <p style={{
-                fontSize: 11,
-                color: "var(--subtle)",
-                marginTop: 6,
-                whiteSpace: "nowrap",
-              }}>
+              <p style={{ fontSize: 11, color: "var(--subtle)", marginTop: 6, whiteSpace: "nowrap" }}>
                 Updated {formatDate(issue.updatedAt)}
               </p>
             </div>

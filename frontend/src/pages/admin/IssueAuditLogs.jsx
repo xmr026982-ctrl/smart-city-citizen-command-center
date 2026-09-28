@@ -56,9 +56,13 @@ function IssueAuditLogs() {
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
           padding: "7px 14px", borderRadius: 999,
-          background: "rgba(14,165,233,0.1)", border: "1px solid rgba(14,165,233,0.25)",
-          fontSize: 12.5, fontWeight: 600, color: "var(--primary-deep)",
+          background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)",
+          fontSize: 12.5, fontWeight: 600, color: "#059669",
         }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: "50%", background: "#10b981",
+            boxShadow: "0 0 0 3px rgba(16,185,129,0.25)", animation: "livePulse 1.8s ease infinite",
+          }} />
           Live Trace
         </div>
       </div>
@@ -69,10 +73,10 @@ function IssueAuditLogs() {
         gap: 12,
         margin: "24px 0 20px",
       }}>
-        <MiniStat icon={FileText} label="Total Events" value={stats.total} color="#0ea5e9" />
-        <MiniStat icon={Shield} label="Admin Actions" value={stats.admin} color="#8b5cf6" />
-        <MiniStat icon={User} label="Staff Actions" value={stats.staff} color="#10b981" />
-        <MiniStat icon={Activity} label="Showing" value={filtered.length} color="#f59e0b" />
+        <GlassStat icon={FileText} label="Total Events" value={stats.total} color="#0ea5e9" />
+        <GlassStat icon={Shield} label="Admin Actions" value={stats.admin} color="#8b5cf6" />
+        <GlassStat icon={User} label="Staff Actions" value={stats.staff} color="#10b981" />
+        <GlassStat icon={Activity} label="Showing" value={filtered.length} color="#f59e0b" />
       </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
@@ -90,7 +94,6 @@ function IssueAuditLogs() {
             }}
           />
         </div>
-
         <select
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setPage(1); }}
@@ -110,75 +113,78 @@ function IssueAuditLogs() {
           </div>
         )}
 
-        {paginated.map((event, idx) => (
-          <div
-            key={event.id || idx}
-            style={{
-              borderRadius: 16,
-              padding: "16px 18px",
-              display: "flex",
-              gap: 16,
-              alignItems: "flex-start",
-              background: "rgba(255,255,255,0.7)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(14,165,233,0.12)",
-            }}
-          >
-            <div style={{
-              width: 36, height: 36, borderRadius: 11, flexShrink: 0,
-              background: event.role === "admin"
-                ? "rgba(139,92,246,0.12)"
-                : event.role === "staff"
-                  ? "rgba(16,185,129,0.12)"
-                  : "rgba(14,165,233,0.12)",
-              display: "grid", placeItems: "center",
-            }}>
-              {event.role === "admin" ? (
-                <Shield size={16} color="#8b5cf6" />
-              ) : event.role === "staff" ? (
-                <User size={16} color="#10b981" />
-              ) : (
-                <Activity size={16} color="#0ea5e9" />
-              )}
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4 }}>
-                {event.action}
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", fontSize: 12.5, color: "var(--muted)" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={12} />
-                  {formatDateTime(event.at)}
-                </span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <User size={12} />
-                  {event.actor}
-                </span>
-                <span style={{
-                  padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600,
-                  background: event.role === "admin"
-                    ? "rgba(139,92,246,0.1)"
-                    : event.role === "staff"
-                      ? "rgba(16,185,129,0.1)"
-                      : "rgba(14,165,233,0.1)",
-                  color: event.role === "admin"
-                    ? "#7c3aed"
-                    : event.role === "staff"
-                      ? "#059669"
-                      : "var(--primary-deep)",
-                }}>
-                  {ROLE_LABEL[event.role] || event.role}
-                </span>
-                {event.issueId && (
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--primary-deep)" }}>
-                    {event.issueId}
-                  </span>
+        {paginated.map((event, idx) => {
+          const color = event.role === "admin" ? "#8b5cf6" : event.role === "staff" ? "#10b981" : "#0ea5e9";
+          return (
+            <div
+              key={event.id || idx}
+              style={{
+                borderRadius: 18,
+                padding: "16px 18px",
+                display: "flex",
+                gap: 16,
+                alignItems: "flex-start",
+                background: "rgba(255,255,255,0.74)",
+                backdropFilter: "blur(16px) saturate(1.4)",
+                border: "1px solid rgba(255,255,255,0.75)",
+                boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
+                position: "relative",
+                overflow: "hidden",
+                transform: "perspective(900px) rotateX(2deg)",
+                transition: "transform 220ms, box-shadow 220ms",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+                e.currentTarget.style.boxShadow = `0 18px 40px ${color}25, inset 0 1px 0 rgba(255,255,255,0.9)`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
+                e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
+              }}
+            >
+              <div style={{
+                position: "absolute", top: 0, left: 0, right: 0, height: 2,
+                background: `linear-gradient(90deg, transparent, ${color}70, transparent)`,
+              }} />
+              <div style={{
+                width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+                background: `${color}18`, display: "grid", placeItems: "center",
+              }}>
+                {event.role === "admin" ? (
+                  <Shield size={16} color={color} />
+                ) : event.role === "staff" ? (
+                  <User size={16} color={color} />
+                ) : (
+                  <Activity size={16} color={color} />
                 )}
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: 14.5, marginBottom: 4 }}>{event.action}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", fontSize: 12.5, color: "var(--muted)" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <Clock size={12} />
+                    {formatDateTime(event.at)}
+                  </span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <User size={12} />
+                    {event.actor}
+                  </span>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+                    background: `${color}18`, color,
+                  }}>
+                    {ROLE_LABEL[event.role] || event.role}
+                  </span>
+                  {event.issueId && (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--primary-deep)" }}>
+                      {event.issueId}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {totalPages > 1 && (
@@ -210,17 +216,45 @@ function IssueAuditLogs() {
           </button>
         </div>
       )}
+
+      <style>{`
+        @keyframes livePulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.25); }
+          50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.1); }
+        }
+      `}</style>
     </main>
   );
 }
 
-function MiniStat({ icon: Icon, label, value, color }) {
+function GlassStat({ icon: Icon, label, value, color }) {
   return (
-    <div style={{
-      borderRadius: 14, padding: "14px 16px",
-      background: "rgba(255,255,255,0.7)", backdropFilter: "blur(12px)",
-      border: "1px solid rgba(14,165,233,0.1)",
-    }}>
+    <div
+      style={{
+        borderRadius: 16,
+        padding: "14px 16px",
+        background: "rgba(255,255,255,0.75)",
+        backdropFilter: "blur(16px) saturate(1.4)",
+        border: "1px solid rgba(255,255,255,0.8)",
+        boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
+        transform: "perspective(900px) rotateX(2deg)",
+        transition: "transform 220ms, box-shadow 220ms",
+        position: "relative",
+        overflow: "hidden",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
+        e.currentTarget.style.boxShadow = `0 18px 40px ${color}25, inset 0 1px 0 rgba(255,255,255,0.9)`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
+        e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: `linear-gradient(90deg, transparent, ${color}55, transparent)`,
+      }} />
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{
           width: 34, height: 34, borderRadius: 10,
@@ -229,12 +263,8 @@ function MiniStat({ icon: Icon, label, value, color }) {
           <Icon size={15} color={color} />
         </div>
         <div>
-          <p style={{ fontSize: 11, color: "var(--subtle)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            {label}
-          </p>
-          <p style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700 }}>
-            {value}
-          </p>
+          <p style={{ fontSize: 11, color: "var(--subtle)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700 }}>{value}</p>
         </div>
       </div>
     </div>
