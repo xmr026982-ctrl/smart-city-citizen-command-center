@@ -1,307 +1,246 @@
-import { useState } from "react";
-import { X, UserCheck, Search, MapPin, Zap, CheckCircle2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, X, UserPlus, Shield, Flag, MapPin } from "lucide-react";
 import { STAFF_ROSTER } from "../../../constants/issueConstants";
+import { ISSUE_STATUSES, STATUS_LABEL } from "../../../constants/issueStatuses";
+import { ISSUE_PRIORITIES, PRIORITY_LABEL } from "../../../constants/issuePriorities";
+import { useIssues } from "../../../store/issueStore";
+import { getStaffTitle } from "../../../store/staffTitleStore";
 
-// Extra visual data for the futuristic UI (does not change the real names)
-const STAFF_META = {
-  "Koushik Bhowmik": { role: "Field Specialist", zone: "Sector 7", load: 3, status: "online" },
-  "Subhomoy Ghosh":  { role: "Senior Resolver", zone: "Sector 3", load: 7, status: "busy" },
-  "Taras Hembram":   { role: "Field Specialist", zone: "Sector 12", load: 2, status: "online" },
-  "Sayan Majumder":  { role: "Rapid Response", zone: "Sector 1", load: 4, status: "online" },
-  "Swarup Sutradhar":{ role: "Moderator", zone: "City-wide", load: 1, status: "offline" },
-};
+function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
+  const issues = useIssues();
+  const [query, setQuery] = useState("");
+  const [staff, setStaff] = useState("");
+  const [status, setStatus] = useState("acknowledged");
+  const [priority, setPriority] = useState("medium");
 
-const statusColor = {
-  online: "#34d399",
-  busy: "#fbbf24",
-  offline: "#94a3b8",
-};
+  useEffect(() => {
+    if (!isOpen || !issue) return;
+    setQuery("");
+    setStaff(issue.assignedTo || "");
+    setStatus(issue.status === "submitted" ? "acknowledged" : issue.status);
+    setPriority(issue.priority || "medium");
+  }, [isOpen, issue]);
 
-export default function StaffAssignModal({
-  isOpen,
-  onClose,
-  issue = null,
-  onAssign = () => {},
-}) {
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(null);
-  const [isAssigning, setIsAssigning] = useState(false);
+  const rows = useMemo(() => {
+    return STAFF_ROSTER
+      .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+      .map((name) => ({
+        name,
+        title: getStaffTitle(name),
+        active: issues.filter((i) => i.assignedTo === name && i.status !== "resolved").length,
+      }));
+  }, [issues, query]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !issue) return null;
 
-  const filtered = STAFF_ROSTER.filter((name) =>
-    name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleAssign = async () => {
-    if (!selected) return;
-    setIsAssigning(true);
-    await new Promise((r) => setTimeout(r, 700));
-    onAssign(selected);          // sends the REAL name
-    setIsAssigning(false);
+  const confirm = () => {
+    onAssign({
+      staffName: staff || null,
+      status,
+      priority,
+    });
     onClose();
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 100,
-        display: "grid",
-        placeItems: "center",
-        background: "rgba(11, 18, 32, 0.45)",
-        backdropFilter: "blur(8px)",
-      }}
-      onClick={onClose}
-    >
+    <>
       <div
-        className="holo-surface holo-border"
+        onClick={onClose}
         style={{
-          width: "min(520px, 94vw)",
-          maxHeight: "86vh",
-          borderRadius: 24,
-          overflow: "hidden",
+          position: "fixed",
+          inset: 0,
+          zIndex: 80,
+          background: "rgba(8,15,28,0.45)",
+          backdropFilter: "blur(10px)",
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          zIndex: 90,
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "min(520px, calc(100vw - 24px))",
+          maxHeight: "86dvh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 32px 80px rgba(14, 165, 233, 0.18)",
+          borderRadius: 22,
+          background: "rgba(255,255,255,0.86)",
+          backdropFilter: "blur(22px) saturate(1.5)",
+          border: "1px solid rgba(255,255,255,0.8)",
+          boxShadow: "0 30px 80px rgba(14,165,233,0.18)",
+          overflow: "hidden",
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid var(--line)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
-                display: "grid",
-                placeItems: "center",
-                color: "white",
-              }}
-            >
-              <UserCheck size={18} />
+        <div style={{
+          height: 3,
+          background: "linear-gradient(90deg, transparent, #0ea5e9, #22d3ee, transparent)",
+        }} />
+
+        <div style={{
+          padding: "16px 18px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid rgba(14,165,233,0.1)",
+        }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+              display: "grid", placeItems: "center", color: "white",
+            }}>
+              <UserPlus size={18} />
             </div>
             <div>
-              <h3 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 18 }}>
-                Assign Specialist
-              </h3>
-              <p style={{ fontSize: 12, color: "var(--subtle)", marginTop: 2 }}>
-                {issue ? `Issue #${issue.id} · Neural match` : "Select field agent"}
+              <p style={{ fontWeight: 700, fontSize: 16 }}>Assign Specialist</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                Issue #{issue.id} · Command dispatch
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: "1px solid var(--line)",
-              background: "white",
-              display: "grid",
-              placeItems: "center",
-              cursor: "pointer",
+              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
+              background: "white", display: "grid", placeItems: "center", cursor: "pointer",
             }}
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Search */}
-        <div style={{ padding: "16px 24px 8px" }}>
-          <div style={{ position: "relative" }}>
-            <Search
-              size={15}
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--subtle)",
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Search by name…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: "100%",
-                height: 42,
-                paddingLeft: 38,
-                paddingRight: 14,
-                borderRadius: 12,
-                border: "1px solid var(--line)",
-                background: "rgba(255,255,255,0.85)",
-                fontSize: 13.5,
-                outline: "none",
-              }}
-            />
-          </div>
+        <div style={{ padding: 16, display: "grid", gap: 12, borderBottom: "1px solid rgba(14,165,233,0.08)" }}>
+          <label>
+            <span style={labelStyle}><Shield size={12} /> Status</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
+              {ISSUE_STATUSES.map((s) => (
+                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span style={labelStyle}><Flag size={12} /> Priority</span>
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={selectStyle}>
+              {ISSUE_PRIORITIES.map((p) => (
+                <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        {/* Staff list – REAL names only */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px 16px" }}>
-          {filtered.map((name) => {
-            const meta = STAFF_META[name] || { role: "Staff", zone: "—", load: 0, status: "offline" };
-            const isSelected = selected === name;
+        <div style={{ padding: "12px 16px 8px", position: "relative" }}>
+          <Search size={14} style={{ position: "absolute", left: 28, top: 24, color: "var(--subtle)" }} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name…"
+            style={{
+              width: "100%", height: 40, paddingLeft: 36, paddingRight: 12,
+              borderRadius: 12, border: "1px solid var(--line)",
+              background: "rgba(255,255,255,0.95)", outline: "none", fontSize: 13.5,
+            }}
+          />
+        </div>
 
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 12px 12px" }}>
+          {rows.map((row) => {
+            const active = staff === row.name;
             return (
               <button
-                key={name}
-                onClick={() => setSelected(name)}
+                key={row.name}
+                onClick={() => setStaff(row.name)}
                 style={{
                   width: "100%",
+                  textAlign: "left",
+                  border: active ? "1.5px solid var(--primary)" : "1px solid transparent",
+                  background: active ? "rgba(14,165,233,0.08)" : "transparent",
+                  borderRadius: 14,
+                  padding: "10px 10px",
                   display: "flex",
                   alignItems: "center",
-                  gap: 14,
-                  padding: "12px 14px",
-                  borderRadius: 14,
-                  border: isSelected ? "1.5px solid var(--primary)" : "1px solid transparent",
-                  background: isSelected ? "rgba(14, 165, 233, 0.08)" : "transparent",
+                  justifyContent: "space-between",
+                  gap: 10,
                   cursor: "pointer",
-                  transition: "all 180ms var(--ease)",
                   marginBottom: 4,
-                  textAlign: "left",
                 }}
               >
-                <div style={{ position: "relative" }}>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
-                      display: "grid",
-                      placeItems: "center",
-                      color: "white",
-                      fontWeight: 600,
-                      fontSize: 13,
-                    }}
-                  >
-                    {name.split(" ").map((n) => n[0]).join("")}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 12,
+                    background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
+                    color: "white", display: "grid", placeItems: "center",
+                    fontSize: 11, fontWeight: 700,
+                  }}>
+                    {row.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}
                   </div>
-                  <span
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      right: 0,
-                      width: 11,
-                      height: 11,
-                      borderRadius: "50%",
-                      background: statusColor[meta.status],
-                      border: "2px solid white",
-                    }}
-                  />
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontWeight: 500, fontSize: 14 }}>{name}</p>
-                  <p style={{ fontSize: 12, color: "var(--subtle)", marginTop: 1 }}>
-                    {meta.role} · {meta.zone}
-                  </p>
-                </div>
-
-                <div style={{ textAlign: "right" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      fontSize: 12,
-                      color: "var(--muted)",
-                    }}
-                  >
-                    <Zap size={12} />
-                    {meta.load} active
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: 13.5 }}>{row.name}</p>
+                    <p style={{ fontSize: 12, color: "var(--muted)" }}>{row.title}</p>
                   </div>
-                  {isSelected && (
-                    <CheckCircle2
-                      size={16}
-                      color="var(--primary)"
-                      style={{ marginTop: 4, marginLeft: "auto" }}
-                    />
-                  )}
                 </div>
+                <span style={{ fontSize: 12, color: "var(--subtle)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <MapPin size={11} /> {row.active} active
+                </span>
               </button>
             );
           })}
-
-          {filtered.length === 0 && (
-            <p style={{ textAlign: "center", padding: "32px 0", color: "var(--subtle)", fontSize: 13 }}>
-              No specialists match your search
-            </p>
-          )}
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: "16px 24px",
-            borderTop: "1px solid var(--line)",
-            display: "flex",
-            gap: 12,
-            justifyContent: "flex-end",
-          }}
-        >
+        <div style={{
+          padding: 14,
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          borderTop: "1px solid rgba(14,165,233,0.1)",
+        }}>
           <button
             onClick={onClose}
             style={{
-              height: 42,
-              padding: "0 18px",
-              borderRadius: 12,
-              border: "1px solid var(--line)",
-              background: "white",
-              fontSize: 13.5,
-              fontWeight: 500,
-              cursor: "pointer",
+              height: 40, padding: "0 16px", borderRadius: 11,
+              border: "1px solid var(--line)", background: "white", cursor: "pointer",
             }}
           >
             Cancel
           </button>
           <button
-            onClick={handleAssign}
-            disabled={!selected || isAssigning}
+            onClick={confirm}
             style={{
-              height: 42,
-              padding: "0 22px",
-              borderRadius: 12,
-              border: "none",
-              background: selected
-                ? "linear-gradient(135deg, #0ea5e9, #0284c7)"
-                : "#e2e8f0",
-              color: selected ? "white" : "var(--subtle)",
-              fontSize: 13.5,
-              fontWeight: 600,
-              cursor: selected ? "pointer" : "not-allowed",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: selected ? "0 8px 20px rgba(14, 165, 233, 0.3)" : "none",
+              height: 40, padding: "0 16px", borderRadius: 11, border: "none",
+              background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+              color: "white", fontWeight: 650, cursor: "pointer",
+              boxShadow: "0 8px 18px rgba(14,165,233,0.28)",
             }}
           >
-            {isAssigning ? (
-              "Assigning…"
-            ) : (
-              <>
-                <MapPin size={15} />
-                Assign Specialist
-              </>
-            )}
+            Confirm dispatch
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
+
+const labelStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 11,
+  fontWeight: 650,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--subtle)",
+  marginBottom: 6,
+};
+
+const selectStyle = {
+  width: "100%",
+  height: 42,
+  borderRadius: 12,
+  border: "1px solid var(--line)",
+  background: "white",
+  padding: "0 12px",
+  fontSize: 13.5,
+};
+
+export default StaffAssignModal;

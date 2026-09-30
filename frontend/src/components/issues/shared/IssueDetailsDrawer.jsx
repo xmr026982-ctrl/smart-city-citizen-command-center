@@ -8,19 +8,15 @@ import IssuePriorityBadge from "./IssuePriorityBadge";
 import IssueSLAIndicator from "./IssueSLAIndicator";
 import IssueStatusTimeline from "./IssueStatusTimeline";
 import IssueComments from "./IssueComments";
-import { Select } from "../../ui/Input";
 import { CATEGORY_LABEL } from "../../../constants/issueCategories";
-import { PRIORITY_LABEL, ISSUE_PRIORITIES } from "../../../constants/issuePriorities";
-import { STATUS_LABEL, ISSUE_STATUSES } from "../../../constants/issueStatuses";
+import { PRIORITY_LABEL } from "../../../constants/issuePriorities";
+import { STATUS_LABEL } from "../../../constants/issueStatuses";
 import { formatDateTime } from "../../../utils/formatDate";
-import { canSetPriority, canUpdateStatus } from "../../../utils/permissionHelper";
-import { setPriority, updateStatus } from "../../../store/issueStore";
 import { useAuth } from "../../../store/authStore";
 
 function IssueDetailsDrawer({ issue, onClose }) {
   const user = useAuth();
-  const canStatus = canUpdateStatus(user?.role);
-  const canPriority = canSetPriority(user?.role);
+  const isCitizen = user?.role === "citizen";
 
   useEffect(() => {
     if (issue) document.body.style.overflow = "hidden";
@@ -35,13 +31,11 @@ function IssueDetailsDrawer({ issue, onClose }) {
     ? `/map?lat=${issue.lat}&lng=${issue.lng}&issueId=${issue.id}`
     : "/map";
 
-  // Deterministic pin position for the mini-map preview
   const pinX = hasCoords ? 28 + (Math.abs(issue.lng * 100) % 44) : 50;
   const pinY = hasCoords ? 24 + (Math.abs(issue.lat * 100) % 40) : 46;
 
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -54,7 +48,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
         }}
       />
 
-      {/* Sliding glass panel */}
       <aside
         style={{
           position: "fixed",
@@ -73,13 +66,11 @@ function IssueDetailsDrawer({ issue, onClose }) {
           overflow: "hidden",
         }}
       >
-        {/* Neon top line */}
         <div style={{
           height: 3,
           background: "linear-gradient(90deg, transparent, #0ea5e9 15%, #22d3ee 50%, #0ea5e9 85%, transparent)",
         }} />
 
-        {/* Header */}
         <div style={{
           padding: "15px 22px",
           borderBottom: "1px solid rgba(14,165,233,0.1)",
@@ -115,10 +106,8 @@ function IssueDetailsDrawer({ issue, onClose }) {
           </button>
         </div>
 
-        {/* Scrollable body */}
         <div style={{ flex: 1, overflowY: "auto", padding: "22px" }}>
 
-          {/* Title + Badges */}
           <h2 style={{
             fontFamily: "var(--font-display)",
             fontSize: 21,
@@ -143,7 +132,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
             </span>
           </div>
 
-          {/* Meta grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
             <GlassMeta icon={User} label="Assignee" value={issue.assignedTo || "Unassigned"} />
             <GlassMeta icon={MapPin} label="Ward" value={issue.ward} />
@@ -151,7 +139,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
             <GlassMeta icon={Clock} label="Updated" value={formatDateTime(issue.updatedAt)} />
           </div>
 
-          {/* ========== 3D GEO CARD ========== */}
           <div style={{
             position: "relative",
             borderRadius: 18,
@@ -163,7 +150,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
             transform: "perspective(800px) rotateX(2deg)",
             transformStyle: "preserve-3d",
           }}>
-            {/* Mini map stage */}
             <div style={{
               position: "relative",
               height: 160,
@@ -174,7 +160,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
               `,
               overflow: "hidden",
             }}>
-              {/* Grid lines */}
               <div style={{
                 position: "absolute", inset: 0,
                 backgroundImage: `
@@ -184,7 +169,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                 backgroundSize: "28px 28px",
               }} />
 
-              {/* Scan rings */}
               <div style={{
                 position: "absolute",
                 left: `${pinX}%`, top: `${pinY}%`,
@@ -204,7 +188,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                 animation: "pulseRing 2.8s ease-out infinite 0.6s",
               }} />
 
-              {/* Pin */}
               <div style={{
                 position: "absolute",
                 left: `${pinX}%`, top: `${pinY}%`,
@@ -220,7 +203,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                 <LocateFixed size={15} />
               </div>
 
-              {/* Scan line */}
               <div style={{
                 position: "absolute", left: 0, right: 0, height: 2,
                 background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.6), transparent)",
@@ -228,7 +210,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
               }} />
             </div>
 
-            {/* Geo info + button */}
             <div style={{ padding: "14px 16px 16px" }}>
               <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>
                 {issue.location}
@@ -273,9 +254,7 @@ function IssueDetailsDrawer({ issue, onClose }) {
               </Link>
             </div>
           </div>
-          {/* ========== END GEO CARD ========== */}
 
-          {/* Description */}
           <div style={{ marginBottom: 18 }}>
             <p style={{
               fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
@@ -288,7 +267,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
             </p>
           </div>
 
-          {/* SLA */}
           <div style={{
             background: "rgba(255,255,255,0.55)",
             border: "1px solid rgba(14,165,233,0.15)",
@@ -304,44 +282,48 @@ function IssueDetailsDrawer({ issue, onClose }) {
             <IssueSLAIndicator issue={issue} />
           </div>
 
-          {/* Status / Priority controls */}
-          {(canStatus || canPriority) && (
+          {!isCitizen && (
             <div style={{
               display: "grid",
-              gridTemplateColumns: canStatus && canPriority ? "1fr 1fr" : "1fr",
+              gridTemplateColumns: "1fr 1fr",
               gap: 12,
               marginBottom: 22,
             }}>
-              {canStatus && (
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Status</span>
-                  <Select
-                    value={issue.status}
-                    onChange={(e) => updateStatus(issue.id, e.target.value, user.name)}
-                  >
-                    {ISSUE_STATUSES.map((s) => (
-                      <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                    ))}
-                  </Select>
-                </label>
-              )}
-              {canPriority && (
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Priority</span>
-                  <Select
-                    value={issue.priority}
-                    onChange={(e) => setPriority(issue.id, e.target.value, user.name, user.role)}
-                  >
-                    {ISSUE_PRIORITIES.map((p) => (
-                      <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
-                    ))}
-                  </Select>
-                </label>
-              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Status</span>
+                <div style={{
+                  height: 42,
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 12px",
+                  borderRadius: 12,
+                  border: "1px solid var(--line)",
+                  background: "rgba(255,255,255,0.7)",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                }}>
+                  {STATUS_LABEL[issue.status]}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Priority</span>
+                <div style={{
+                  height: 42,
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 12px",
+                  borderRadius: 12,
+                  border: "1px solid var(--line)",
+                  background: "rgba(255,255,255,0.7)",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                }}>
+                  {PRIORITY_LABEL[issue.priority]}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Timeline */}
           <div style={{ marginBottom: 22 }}>
             <p style={{
               fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
@@ -352,7 +334,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
             <IssueStatusTimeline current={issue.status} events={issue.timeline} />
           </div>
 
-          {/* Comments */}
           <IssueComments issue={issue} />
         </div>
       </aside>

@@ -9,7 +9,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import StaffAssignModal from "../../components/issues/admin/StaffAssignModal";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { useAuth } from "../../store/authStore";
-import { assignIssue, useIssues } from "../../store/issueStore";
+import { assignIssue, setPriority, updateStatus, useIssues } from "../../store/issueStore";
 import { formatDateTime } from "../../utils/formatDate";
 
 function ManageAssignments() {
@@ -72,8 +72,10 @@ function ManageAssignments() {
     setModalOpen(true);
   };
 
-  const handleAssign = (staffName) => {
+  const handleAssign = ({ staffName, status, priority }) => {
     assignIssue(selectedIssue.id, staffName || null, user.name, user.role);
+    if (status) updateStatus(selectedIssue.id, status, user.name, user.role);
+    if (priority) setPriority(selectedIssue.id, priority, user.name, user.role);
   };
 
   const handleUnassign = (issue) => {
@@ -95,18 +97,12 @@ function ManageAssignments() {
       <button
         onClick={() => toggleSort(sortKeyName)}
         style={{
-          height: 40,
-          padding: "0 14px",
-          borderRadius: 11,
+          height: 40, padding: "0 14px", borderRadius: 11,
           border: active ? "1.5px solid var(--primary)" : "1px solid var(--line)",
           background: active ? "rgba(14,165,233,0.08)" : "white",
           color: active ? "var(--primary-deep)" : "var(--fg)",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: active ? 600 : 500,
+          display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+          fontSize: 13, fontWeight: active ? 600 : 500,
         }}
       >
         {Icon && <Icon size={14} />}
@@ -121,7 +117,7 @@ function ManageAssignments() {
       <PageHeader
         eyebrow="Command Layer · Dispatch"
         title="Dispatch Board"
-        description="Assign, re-assign or remove specialists. Full neural routing with category, date & priority control."
+        description="Assign specialist, set status and priority in one command."
       />
 
       <div style={{ display: "flex", gap: 10, margin: "24px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
@@ -209,7 +205,6 @@ function ManageAssignments() {
               position: "absolute", top: 0, left: 0, right: 0, height: 2,
               background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)",
             }} />
-
             <div style={{ flex: 1, minWidth: 260 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</span>
@@ -227,15 +222,9 @@ function ManageAssignments() {
                 <IssueStatusBadge status={issue.status} />
                 <IssuePriorityBadge priority={issue.priority} />
                 <span style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 11.5,
-                  fontWeight: 500,
-                  padding: "3px 10px",
-                  borderRadius: 999,
-                  background: "rgba(14,165,233,0.08)",
-                  color: "var(--primary-deep)",
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  fontSize: 11.5, fontWeight: 500, padding: "3px 10px", borderRadius: 999,
+                  background: "rgba(14,165,233,0.08)", color: "var(--primary-deep)",
                   border: "1px solid rgba(14,165,233,0.2)",
                 }}>
                   <Tag size={11} />
@@ -247,22 +236,15 @@ function ManageAssignments() {
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {issue.assignedTo ? (
                 <span style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color: "var(--primary-deep)",
-                  background: "var(--info-soft)",
-                  padding: "6px 14px",
-                  borderRadius: 999,
+                  fontSize: 13, fontWeight: 500, color: "var(--primary-deep)",
+                  background: "var(--info-soft)", padding: "6px 14px", borderRadius: 999,
                 }}>
                   {issue.assignedTo}
                 </span>
               ) : (
                 <span style={{
-                  fontSize: 13,
-                  color: "var(--subtle)",
-                  padding: "6px 14px",
-                  border: "1px dashed var(--line)",
-                  borderRadius: 999,
+                  fontSize: 13, color: "var(--subtle)", padding: "6px 14px",
+                  border: "1px dashed var(--line)", borderRadius: 999,
                 }}>
                   Unassigned
                 </span>
@@ -270,19 +252,10 @@ function ManageAssignments() {
               <button
                 onClick={() => openAssign(issue)}
                 style={{
-                  height: 38,
-                  padding: "0 14px",
-                  borderRadius: 11,
-                  border: "none",
-                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-                  color: "white",
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  cursor: "pointer",
-                  boxShadow: "0 6px 16px rgba(14,165,233,0.25)",
+                  height: 38, padding: "0 14px", borderRadius: 11, border: "none",
+                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)", color: "white",
+                  fontSize: 12.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+                  cursor: "pointer", boxShadow: "0 6px 16px rgba(14,165,233,0.25)",
                 }}
               >
                 {issue.assignedTo ? <><RefreshCw size={13} /> Re-assign</> : <><UserPlus size={14} /> Assign</>}
@@ -292,15 +265,8 @@ function ManageAssignments() {
                   onClick={() => handleUnassign(issue)}
                   title="Remove specialist"
                   style={{
-                    height: 38,
-                    width: 38,
-                    borderRadius: 11,
-                    border: "1px solid #fecaca",
-                    background: "#fef2f2",
-                    color: "#dc2626",
-                    display: "grid",
-                    placeItems: "center",
-                    cursor: "pointer",
+                    height: 38, width: 38, borderRadius: 11, border: "1px solid #fecaca",
+                    background: "#fef2f2", color: "#dc2626", display: "grid", placeItems: "center", cursor: "pointer",
                   }}
                 >
                   <UserMinus size={15} />
