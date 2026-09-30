@@ -333,6 +333,11 @@
   color: var(--success);
 }
 
+.status-pending_review {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
 .priority-low {
   background: var(--bg);
   color: var(--muted);

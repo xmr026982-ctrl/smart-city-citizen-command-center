@@ -11,6 +11,8 @@ import StaffWorkQueue from "../pages/staff/StaffWorkQueue";
 import AssignedIssues from "../pages/staff/AssignedIssues";
 import StaffDashboard from "../pages/staff/StaffDashboard";
 import StaffIssueDetails from "../pages/staff/StaffIssueDetails";
+import StaffPerformance from "../pages/staff/StaffPerformance";
+import StaffNotifications from "../pages/staff/StaffNotifications";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AllIssues from "../pages/admin/AllIssues";
 import ManageAssignments from "../pages/admin/ManageAssignments";
@@ -24,7 +26,7 @@ import { useAuth } from "../store/authStore";
 function HomeRedirect() {
   const user = useAuth();
   if (!user) return <Navigate to="/sign-in" replace />;
-  if (user.role === "staff") return <Navigate to="/staff/assigned" replace />;
+  if (user.role === "staff") return <Navigate to="/staff" replace />;
   if (user.role === "admin") return <Navigate to="/admin/command" replace />;
   return <Navigate to="/citizen/report" replace />;
 }
@@ -38,7 +40,6 @@ function AppRoutes() {
         <Route element={<Layout />}>
           <Route path="/" element={<HomeRedirect />} />
 
-          {/* Citizen routes */}
           <Route element={<RoleRoute allow={["citizen"]} />}>
             <Route path="/citizen/report" element={<ReportIssue />} />
             <Route path="/citizen/my-reports" element={<MyReports />} />
@@ -46,15 +47,15 @@ function AppRoutes() {
             <Route path="/citizen/issues/:id" element={<CitizenIssueDetails />} />
           </Route>
 
-          {/* Staff routes */}
           <Route element={<RoleRoute allow={["staff"]} />}>
             <Route path="/staff" element={<StaffDashboard />} />
             <Route path="/staff/queue" element={<StaffWorkQueue />} />
             <Route path="/staff/assigned" element={<AssignedIssues />} />
+            <Route path="/staff/performance" element={<StaffPerformance />} />
+            <Route path="/staff/notifications" element={<StaffNotifications />} />
             <Route path="/staff/issues/:id" element={<StaffIssueDetails />} />
           </Route>
 
-          {/* Admin routes */}
           <Route element={<RoleRoute allow={["admin"]} />}>
             <Route path="/admin/command" element={<AdminDashboard />} />
             <Route path="/admin/queue" element={<AllIssues />} />

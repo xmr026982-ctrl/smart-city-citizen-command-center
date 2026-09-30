@@ -1,10 +1,12 @@
 import { NavLink } from "react-router-dom";
 import {
   Shield, ClipboardList, MapPin, Users,
-  BarChart3, FileText, Building2
+  BarChart3, FileText, Building2, LayoutDashboard,
+  FolderOpen, Activity
 } from "lucide-react";
+import { useAuth } from "../../store/authStore";
 
-const NAV = [
+const ADMIN_NAV = [
   { to: "/admin/command", label: "Command Center", icon: Shield },
   { to: "/admin/queue", label: "All Issues", icon: ClipboardList },
   { to: "/admin/assignments", label: "Assign Issues", icon: MapPin },
@@ -13,7 +15,30 @@ const NAV = [
   { to: "/admin/audit", label: "Audit Log", icon: FileText },
 ];
 
-function Sidebar({ open, onClose }) {
+const STAFF_NAV = [
+  { to: "/staff", label: "Operations", icon: LayoutDashboard },
+  { to: "/staff/assigned", label: "Assigned to Me", icon: FolderOpen },
+  { to: "/staff/queue", label: "City Intake", icon: ClipboardList },
+  { to: "/staff/performance", label: "Field Load", icon: Activity },
+];
+
+const CITIZEN_NAV = [
+  { to: "/citizen/report", label: "Report Issue", icon: MapPin },
+  { to: "/citizen/my-reports", label: "My Reports", icon: FolderOpen },
+  { to: "/citizen/saved", label: "Saved", icon: ClipboardList },
+];
+
+function Sidebar({ onClose }) {
+  const user = useAuth();
+  const nav =
+    user?.role === "admin" ? ADMIN_NAV :
+    user?.role === "staff" ? STAFF_NAV :
+    CITIZEN_NAV;
+  const layer =
+    user?.role === "admin" ? "Command Layer" :
+    user?.role === "staff" ? "Field Layer" :
+    "Citizen Layer";
+
   return (
     <aside
       className="sidebar"
@@ -40,44 +65,29 @@ function Sidebar({ open, onClose }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "4px 8px 22px" }}>
         <div
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 14,
-            display: "grid",
-            placeItems: "center",
-            color: "white",
+            width: 42, height: 42, borderRadius: 14,
+            display: "grid", placeItems: "center", color: "white",
             background: "linear-gradient(145deg, #0ea5e9 0%, #0369a1 100%)",
             boxShadow: "0 10px 24px rgba(14,165,233,0.35)",
-            position: "relative",
-            flexShrink: 0,
+            position: "relative", flexShrink: 0,
           }}
         >
           <Building2 size={20} strokeWidth={1.8} />
           <span style={{
-            position: "absolute",
-            width: 8, height: 8, borderRadius: "50%",
-            background: "#22d3ee",
-            right: 5, bottom: 5,
-            boxShadow: "0 0 8px #22d3ee",
+            position: "absolute", width: 8, height: 8, borderRadius: "50%",
+            background: "#22d3ee", right: 5, bottom: 5, boxShadow: "0 0 8px #22d3ee",
           }} />
         </div>
         <div>
           <p style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 18,
-            fontWeight: 750,
-            letterSpacing: "-0.02em",
-            lineHeight: 1,
+            fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 750,
+            letterSpacing: "-0.02em", lineHeight: 1,
           }}>
             Smart City
           </p>
           <p style={{
-            marginTop: 5,
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "var(--primary)",
+            marginTop: 5, fontSize: 10, fontWeight: 600,
+            letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--primary)",
           }}>
             Civic Command
           </p>
@@ -85,23 +95,20 @@ function Sidebar({ open, onClose }) {
       </div>
 
       <p style={{
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.16em",
-        textTransform: "uppercase",
-        color: "var(--subtle)",
-        padding: "0 10px 10px",
+        fontSize: 10, fontWeight: 700, letterSpacing: "0.16em",
+        textTransform: "uppercase", color: "var(--subtle)", padding: "0 10px 10px",
       }}>
-        Command Layer
+        {layer}
       </p>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === "/staff"}
               onClick={onClose}
               style={({ isActive }) => ({
                 display: "flex",

@@ -6,9 +6,17 @@ function StaffIssueSummary({ issue }) {
   if (!issue) return null;
 
   return (
-    <div className="panel" style={{ padding: 16 }}>
+    <div style={{
+      borderRadius: 16,
+      padding: 16,
+      background: "rgba(255,255,255,0.62)",
+      border: "1px solid rgba(14,165,233,0.16)",
+      backdropFilter: "blur(12px)",
+    }}>
       <p className="mono">{issue.id}</p>
-      <h3 style={{ marginTop: 8, fontSize: 16 }}>{issue.title}</h3>
+      <h3 style={{ marginTop: 8, fontSize: 16, fontFamily: "var(--font-display)" }}>
+        {issue.title}
+      </h3>
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <IssueStatusBadge status={issue.status} />
         <IssuePriorityBadge priority={issue.priority} />

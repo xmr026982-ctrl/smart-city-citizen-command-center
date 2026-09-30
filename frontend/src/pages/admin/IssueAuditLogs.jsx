@@ -4,10 +4,11 @@ import {
   ChevronLeft, ChevronRight
 } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
+import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
 import { ROLE_LABEL } from "../../constants/userRoles";
 import { ADMIN_ROSTER, STAFF_ROSTER } from "../../constants/issueConstants";
 import { formatDateTime } from "../../utils/formatDate";
-import { useAudit } from "../../store/issueStore";
+import { useAudit, useIssues } from "../../store/issueStore";
 
 function resolveRole(event) {
   if (ADMIN_ROSTER.includes(event.actor)) return "admin";
@@ -17,10 +18,14 @@ function resolveRole(event) {
 
 function IssueAuditLogs() {
   const audit = useAudit() || [];
+  const issues = useIssues();
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [selectedId, setSelectedId] = useState(null);
   const perPage = 8;
+
+  const selected = issues.find((issue) => issue.id === selectedId) || null;
 
   const normalized = useMemo(
     () => audit.map((event) => ({ ...event, role: resolveRole(event) })),
@@ -51,7 +56,7 @@ function IssueAuditLogs() {
         <PageHeader
           eyebrow="Audit Log · Neural Trace"
           title="Command History"
-          description="Admin and staff actions. Official city command trace."
+          description="Click a row to open the issue file. Status stays locked here."
         />
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
@@ -115,9 +120,11 @@ function IssueAuditLogs() {
 
         {paginated.map((event, idx) => {
           const color = event.role === "admin" ? "#8b5cf6" : event.role === "staff" ? "#10b981" : "#0ea5e9";
+          const canOpen = Boolean(event.issueId);
           return (
             <div
               key={event.id || idx}
+              onClick={() => canOpen && setSelectedId(event.issueId)}
               style={{
                 borderRadius: 18,
                 padding: "16px 18px",
@@ -132,6 +139,7 @@ function IssueAuditLogs() {
                 overflow: "hidden",
                 transform: "perspective(900px) rotateX(2deg)",
                 transition: "transform 220ms, box-shadow 220ms",
+                cursor: canOpen ? "pointer" : "default",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
@@ -216,6 +224,8 @@ function IssueAuditLogs() {
           </button>
         </div>
       )}
+
+      <IssueDetailsDrawer issue={selected} onClose={() => setSelectedId(null)} />
 
       <style>{`
         @keyframes livePulse {

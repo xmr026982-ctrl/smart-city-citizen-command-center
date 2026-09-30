@@ -8,15 +8,17 @@ import IssuePriorityBadge from "./IssuePriorityBadge";
 import IssueSLAIndicator from "./IssueSLAIndicator";
 import IssueStatusTimeline from "./IssueStatusTimeline";
 import IssueComments from "./IssueComments";
+import AdminConfirmClose from "../admin/AdminConfirmClose";
 import { CATEGORY_LABEL } from "../../../constants/issueCategories";
 import { PRIORITY_LABEL } from "../../../constants/issuePriorities";
-import { STATUS_LABEL } from "../../../constants/issueStatuses";
+import { STATUS_LABEL, publicStatus } from "../../../constants/issueStatuses";
 import { formatDateTime } from "../../../utils/formatDate";
 import { useAuth } from "../../../store/authStore";
 
 function IssueDetailsDrawer({ issue, onClose }) {
   const user = useAuth();
   const isCitizen = user?.role === "citizen";
+  const shownStatus = isCitizen ? publicStatus(issue?.status) : issue?.status;
 
   useEffect(() => {
     if (issue) document.body.style.overflow = "hidden";
@@ -107,7 +109,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "22px" }}>
-
           <h2 style={{
             fontFamily: "var(--font-display)",
             fontSize: 21,
@@ -119,8 +120,8 @@ function IssueDetailsDrawer({ issue, onClose }) {
           </h2>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-            <IssueStatusBadge status={issue.status} />
-            <IssuePriorityBadge priority={issue.priority} />
+            <IssueStatusBadge status={issue.status} citizen={isCitizen} />
+            {!isCitizen && <IssuePriorityBadge priority={issue.priority} />}
             <span style={{
               display: "inline-flex", alignItems: "center", gap: 5,
               fontSize: 12, fontWeight: 500, padding: "4px 11px", borderRadius: 999,
@@ -133,8 +134,10 @@ function IssueDetailsDrawer({ issue, onClose }) {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
-            <GlassMeta icon={User} label="Assignee" value={issue.assignedTo || "Unassigned"} />
-            <GlassMeta icon={MapPin} label="Ward" value={issue.ward} />
+            {!isCitizen && (
+              <GlassMeta icon={User} label="Assignee" value={issue.assignedTo || "Unassigned"} />
+            )}
+            <GlassMeta icon={MapPin} label="Zone" value={issue.ward} />
             <GlassMeta icon={Calendar} label="Reported" value={formatDateTime(issue.createdAt)} />
             <GlassMeta icon={Clock} label="Updated" value={formatDateTime(issue.updatedAt)} />
           </div>
@@ -168,7 +171,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                 `,
                 backgroundSize: "28px 28px",
               }} />
-
               <div style={{
                 position: "absolute",
                 left: `${pinX}%`, top: `${pinY}%`,
@@ -187,7 +189,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                 transform: "translate(-50%, -50%)",
                 animation: "pulseRing 2.8s ease-out infinite 0.6s",
               }} />
-
               <div style={{
                 position: "absolute",
                 left: `${pinX}%`, top: `${pinY}%`,
@@ -202,7 +203,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
               }}>
                 <LocateFixed size={15} />
               </div>
-
               <div style={{
                 position: "absolute", left: 0, right: 0, height: 2,
                 background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.6), transparent)",
@@ -211,9 +211,7 @@ function IssueDetailsDrawer({ issue, onClose }) {
             </div>
 
             <div style={{ padding: "14px 16px 16px" }}>
-              <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>
-                {issue.location}
-              </p>
+              <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{issue.location}</p>
               <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
                 {issue.ward}
                 {hasCoords && (
@@ -222,7 +220,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                   </span>
                 )}
               </p>
-
               <Link
                 to={mapTo}
                 style={{
@@ -238,15 +235,6 @@ function IssueDetailsDrawer({ issue, onClose }) {
                   fontWeight: 600,
                   textDecoration: "none",
                   boxShadow: "0 8px 20px rgba(14,165,233,0.3)",
-                  transition: "transform 180ms, box-shadow 180ms",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 12px 28px rgba(14,165,233,0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(14,165,233,0.3)";
                 }}
               >
                 Open exact site on city map
@@ -267,20 +255,24 @@ function IssueDetailsDrawer({ issue, onClose }) {
             </p>
           </div>
 
-          <div style={{
-            background: "rgba(255,255,255,0.55)",
-            border: "1px solid rgba(14,165,233,0.15)",
-            borderRadius: 12,
-            padding: "11px 16px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            backdropFilter: "blur(8px)",
-          }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>Service Window (SLA)</span>
-            <IssueSLAIndicator issue={issue} />
-          </div>
+          {!isCitizen && (
+            <div style={{
+              background: "rgba(255,255,255,0.55)",
+              border: "1px solid rgba(14,165,233,0.15)",
+              borderRadius: 12,
+              padding: "11px 16px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backdropFilter: "blur(8px)",
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>Service Window (SLA)</span>
+              <IssueSLAIndicator issue={issue} />
+            </div>
+          )}
+
+          <AdminConfirmClose issue={issue} />
 
           {!isCitizen && (
             <div style={{
@@ -292,15 +284,9 @@ function IssueDetailsDrawer({ issue, onClose }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Status</span>
                 <div style={{
-                  height: 42,
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 12px",
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  background: "rgba(255,255,255,0.7)",
-                  fontSize: 13.5,
-                  fontWeight: 600,
+                  height: 42, display: "flex", alignItems: "center",
+                  padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)",
+                  background: "rgba(255,255,255,0.7)", fontSize: 13.5, fontWeight: 600,
                 }}>
                   {STATUS_LABEL[issue.status]}
                 </div>
@@ -308,19 +294,33 @@ function IssueDetailsDrawer({ issue, onClose }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Priority</span>
                 <div style={{
-                  height: 42,
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 12px",
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  background: "rgba(255,255,255,0.7)",
-                  fontSize: 13.5,
-                  fontWeight: 600,
+                  height: 42, display: "flex", alignItems: "center",
+                  padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)",
+                  background: "rgba(255,255,255,0.7)", fontSize: 13.5, fontWeight: 600,
                 }}>
                   {PRIORITY_LABEL[issue.priority]}
                 </div>
               </div>
+            </div>
+          )}
+
+          {isCitizen && (
+            <div style={{
+              borderRadius: 14,
+              padding: 14,
+              marginBottom: 22,
+              background: "rgba(255,255,255,0.55)",
+              border: "1px solid rgba(14,165,233,0.14)",
+            }}>
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)" }}>
+                Official update
+              </p>
+              <p style={{ marginTop: 8, fontSize: 14 }}>
+                Current status: <strong>{STATUS_LABEL[shownStatus]}</strong>
+              </p>
+              <p style={{ marginTop: 6, fontSize: 12.5, color: "var(--muted)" }}>
+                City operations is handling this report.
+              </p>
             </div>
           )}
 
@@ -331,7 +331,11 @@ function IssueDetailsDrawer({ issue, onClose }) {
             }}>
               Status Timeline
             </p>
-            <IssueStatusTimeline current={issue.status} events={issue.timeline} />
+            <IssueStatusTimeline
+              current={issue.status}
+              events={issue.timeline}
+              citizen={isCitizen}
+            />
           </div>
 
           <IssueComments issue={issue} />

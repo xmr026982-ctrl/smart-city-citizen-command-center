@@ -161,6 +161,9 @@ export function addIssue(issue) {
 }
 
 export function updateStatus(id, status, by, role = "staff") {
+  const current = issues.find((issue) => issue.id === id);
+  if (!current || current.status === status) return;
+
   issues = issues.map((issue) =>
     issue.id !== id
       ? issue

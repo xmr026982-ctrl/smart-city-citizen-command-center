@@ -9,7 +9,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import StaffAssignModal from "../../components/issues/admin/StaffAssignModal";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { useAuth } from "../../store/authStore";
-import { assignIssue, setPriority, updateStatus, useIssues } from "../../store/issueStore";
+import { assignIssue, setPriority, useIssues } from "../../store/issueStore";
 import { formatDateTime } from "../../utils/formatDate";
 
 function ManageAssignments() {
@@ -72,9 +72,8 @@ function ManageAssignments() {
     setModalOpen(true);
   };
 
-  const handleAssign = ({ staffName, status, priority }) => {
+  const handleAssign = ({ staffName, priority }) => {
     assignIssue(selectedIssue.id, staffName || null, user.name, user.role);
-    if (status) updateStatus(selectedIssue.id, status, user.name, user.role);
     if (priority) setPriority(selectedIssue.id, priority, user.name, user.role);
   };
 
@@ -117,7 +116,7 @@ function ManageAssignments() {
       <PageHeader
         eyebrow="Command Layer · Dispatch"
         title="Dispatch Board"
-        description="Assign specialist, set status and priority in one command."
+        description="Acknowledge + assign on first dispatch. Field owns In Progress. Confirm close from the issue file."
       />
 
       <div style={{ display: "flex", gap: 10, margin: "24px 0 16px", flexWrap: "wrap", alignItems: "center" }}>
@@ -144,6 +143,7 @@ function ManageAssignments() {
           <option value="submitted">Submitted</option>
           <option value="acknowledged">Acknowledged</option>
           <option value="in_progress">In Progress</option>
+          <option value="pending_review">Pending confirmation</option>
         </select>
         <select
           value={categoryFilter}

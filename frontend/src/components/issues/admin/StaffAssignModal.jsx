@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, X, UserPlus, Shield, Flag, MapPin } from "lucide-react";
 import { STAFF_ROSTER } from "../../../constants/issueConstants";
-import { ISSUE_STATUSES, STATUS_LABEL } from "../../../constants/issueStatuses";
+import { STATUS_LABEL } from "../../../constants/issueStatuses";
 import { ISSUE_PRIORITIES, PRIORITY_LABEL } from "../../../constants/issuePriorities";
 import { useIssues } from "../../../store/issueStore";
 import { getStaffTitle } from "../../../store/staffTitleStore";
@@ -10,14 +10,12 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
   const issues = useIssues();
   const [query, setQuery] = useState("");
   const [staff, setStaff] = useState("");
-  const [status, setStatus] = useState("acknowledged");
   const [priority, setPriority] = useState("medium");
 
   useEffect(() => {
     if (!isOpen || !issue) return;
     setQuery("");
     setStaff(issue.assignedTo || "");
-    setStatus(issue.status === "submitted" ? "acknowledged" : issue.status);
     setPriority(issue.priority || "medium");
   }, [isOpen, issue]);
 
@@ -33,10 +31,12 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
 
   if (!isOpen || !issue) return null;
 
+  const dispatchStatus = issue.status === "submitted" ? "acknowledged" : issue.status;
+
   const confirm = () => {
     onAssign({
       staffName: staff || null,
-      status,
+      status: dispatchStatus,
       priority,
     });
     onClose();
@@ -96,7 +96,7 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
             <div>
               <p style={{ fontWeight: 700, fontSize: 16 }}>Assign Specialist</p>
               <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                Issue #{issue.id} · Command dispatch
+                Issue #{issue.id} · Acknowledge + dispatch
               </p>
             </div>
           </div>
@@ -112,14 +112,17 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
         </div>
 
         <div style={{ padding: 16, display: "grid", gap: 12, borderBottom: "1px solid rgba(14,165,233,0.08)" }}>
-          <label>
+          <div>
             <span style={labelStyle}><Shield size={12} /> Status</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} style={selectStyle}>
-              {ISSUE_STATUSES.map((s) => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-              ))}
-            </select>
-          </label>
+            <div style={{ ...selectStyle, display: "flex", alignItems: "center", fontWeight: 650 }}>
+              {STATUS_LABEL[dispatchStatus]}
+            </div>
+            <p style={{ fontSize: 12, color: "var(--subtle)", marginTop: 6 }}>
+              {issue.status === "submitted"
+                ? "First dispatch acknowledges the ticket. Admin cannot set In Progress or Resolved here."
+                : "Field owns In Progress. Admin only confirms close from the issue file."}
+            </p>
+          </div>
           <label>
             <span style={labelStyle}><Flag size={12} /> Priority</span>
             <select value={priority} onChange={(e) => setPriority(e.target.value)} style={selectStyle}>
@@ -206,10 +209,13 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
           </button>
           <button
             onClick={confirm}
+            disabled={!staff}
             style={{
               height: 40, padding: "0 16px", borderRadius: 11, border: "none",
               background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-              color: "white", fontWeight: 650, cursor: "pointer",
+              color: "white", fontWeight: 650,
+              cursor: staff ? "pointer" : "not-allowed",
+              opacity: staff ? 1 : 0.5,
               boxShadow: "0 8px 18px rgba(14,165,233,0.28)",
             }}
           >
