@@ -100,13 +100,23 @@ function StaffDashboard() {
         </Link>
       </div>
 
-      <p style={{
-        marginTop: 26, marginBottom: 10,
-        fontSize: 11, fontWeight: 650, letterSpacing: "0.1em",
-        textTransform: "uppercase", color: "var(--subtle)",
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 26,
+        marginBottom: 10,
       }}>
-        Live field feed
-      </p>
+        <p style={{
+          fontSize: 11, fontWeight: 650, letterSpacing: "0.1em",
+          textTransform: "uppercase", color: "var(--subtle)",
+        }}>
+          Live field feed
+        </p>
+        <Link to="/staff/assigned" style={{ fontSize: 13, fontWeight: 500, color: "var(--primary)", textDecoration: "none" }}>
+          View all →
+        </Link>
+      </div>
 
       <div style={{ display: "grid", gap: 10 }}>
         {feed.length === 0 && (

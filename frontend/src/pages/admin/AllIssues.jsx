@@ -12,6 +12,8 @@ import { STATUS_LABEL } from "../../constants/issueStatuses";
 import { useIssues } from "../../store/issueStore";
 import { formatDate } from "../../utils/formatDate";
 
+const PER_PAGE = 8;
+
 function AllIssues() {
   const issues = useIssues();
   const [query, setQuery] = useState("");
@@ -22,7 +24,6 @@ function AllIssues() {
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
-  const perPage = 8;
 
   const wards = [...new Set(issues.map((i) => i.ward))];
 
@@ -61,8 +62,9 @@ function AllIssues() {
     return list;
   }, [issues, query, statusFilter, wardFilter, categoryFilter, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(filtered.length / perPage) || 1;
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  const totalPages = Math.ceil(filtered.length / PER_PAGE) || 1;
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
   const selected = issues.find((i) => i.id === selectedId) || null;
 
   const stats = {
@@ -314,26 +316,28 @@ function AllIssues() {
       {totalPages > 1 && (
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 22 }}>
           <button
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
+            type="button"
+            disabled={safePage === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             style={{
               width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
               background: "white", display: "grid", placeItems: "center",
-              cursor: page === 1 ? "not-allowed" : "pointer", opacity: page === 1 ? 0.4 : 1,
+              cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? 0.4 : 1,
             }}
           >
             <ChevronLeft size={16} />
           </button>
           <span style={{ fontSize: 13, color: "var(--muted)" }}>
-            Page {page} of {totalPages} · {filtered.length} issues
+            Page {safePage} of {totalPages} · {filtered.length} issues
           </span>
           <button
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
+            type="button"
+            disabled={safePage === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             style={{
               width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
               background: "white", display: "grid", placeItems: "center",
-              cursor: page === totalPages ? "not-allowed" : "pointer", opacity: page === totalPages ? 0.4 : 1,
+              cursor: safePage === totalPages ? "not-allowed" : "pointer", opacity: safePage === totalPages ? 0.4 : 1,
             }}
           >
             <ChevronRight size={16} />

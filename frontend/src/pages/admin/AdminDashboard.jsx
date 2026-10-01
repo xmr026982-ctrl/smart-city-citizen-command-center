@@ -53,14 +53,16 @@ function AdminDashboard() {
     count: issues.filter((i) => i.category === key).length,
   }));
 
-  const recent = issues.slice(0, 5);
+  const recent = [...issues]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 4);
 
   return (
     <main className="page-wrap">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <PageHeader
-          eyebrow="Command · Neural Hub"
-          title="Admin Control"
+          eyebrow="Command Layer · Hub"
+          title="Command Center"
           description="City-wide issue load, assignment gaps, and category mix."
         />
         <div style={{
@@ -172,7 +174,7 @@ function AdminDashboard() {
               Recent Issues
             </h3>
           </div>
-          <Link to="/admin/queue" style={{ fontSize: 13, fontWeight: 500, color: "var(--primary)" }}>
+          <Link to="/admin/queue" style={{ fontSize: 13, fontWeight: 500, color: "var(--primary)", textDecoration: "none" }}>
             View all →
           </Link>
         </div>

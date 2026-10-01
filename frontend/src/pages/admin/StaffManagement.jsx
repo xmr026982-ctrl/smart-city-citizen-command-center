@@ -1,16 +1,19 @@
 import { useMemo, useState } from "react";
-import { Search, User, Activity, Shield, Layers, Zap } from "lucide-react";
+import { Search, User, Activity, Shield, Layers, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
 import StaffDetailsDrawer from "../../components/issues/admin/StaffDetailsDrawer";
 import { STAFF_ROSTER } from "../../constants/issueConstants";
 import { useIssues, useAudit } from "../../store/issueStore";
 import { useStaffTitles, getStaffTitle } from "../../store/staffTitleStore";
 
+const PER_PAGE = 8;
+
 function StaffManagement() {
   const issues = useIssues();
   const audit = useAudit();
   const titles = useStaffTitles();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
 
   const rows = useMemo(() => {
@@ -27,6 +30,10 @@ function StaffManagement() {
         };
       });
   }, [issues, titles, query]);
+
+  const totalPages = Math.ceil(rows.length / PER_PAGE) || 1;
+  const safePage = Math.min(page, totalPages);
+  const paginated = rows.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   const stats = {
     force: STAFF_ROSTER.length,
@@ -73,7 +80,7 @@ function StaffManagement() {
         <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => { setQuery(e.target.value); setPage(1); }}
           placeholder="Search staff…"
           style={{
             width: "100%", height: 42, paddingLeft: 38, paddingRight: 14,
@@ -84,7 +91,16 @@ function StaffManagement() {
       </div>
 
       <div style={{ display: "grid", gap: 12 }}>
-        {rows.map((row) => {
+        {paginated.length === 0 && (
+          <div style={{
+            borderRadius: 18, padding: 40, textAlign: "center", color: "var(--subtle)",
+            background: "rgba(255,255,255,0.7)", border: "1px solid rgba(14,165,233,0.12)",
+          }}>
+            No staff match this search
+          </div>
+        )}
+
+        {paginated.map((row) => {
           const loadPct = Math.min(100, row.assigned * 34);
           return (
             <button
@@ -156,6 +172,38 @@ function StaffManagement() {
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 22 }}>
+          <button
+            type="button"
+            disabled={safePage === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            style={{
+              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
+              background: "white", display: "grid", placeItems: "center",
+              cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? 0.4 : 1,
+            }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>
+            Page {safePage} of {totalPages} · {rows.length} staff
+          </span>
+          <button
+            type="button"
+            disabled={safePage === totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            style={{
+              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
+              background: "white", display: "grid", placeItems: "center",
+              cursor: safePage === totalPages ? "not-allowed" : "pointer", opacity: safePage === totalPages ? 0.4 : 1,
+            }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       <StaffDetailsDrawer
         staff={selected}
