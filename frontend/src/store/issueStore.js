@@ -17,6 +17,7 @@ const seed = [
     status: "in_progress",
     priority: "high",
     assignedTo: "Koushik Bhowmik",
+    assignedAt: "2026-09-12T14:40:00.000Z",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-12T08:10:00.000Z", by: "Aanya Mehra" },
@@ -43,6 +44,7 @@ const seed = [
     status: "acknowledged",
     priority: "critical",
     assignedTo: "Koushik Bhowmik",
+    assignedAt: "2026-09-11T08:15:00.000Z",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-10T11:00:00.000Z", by: "Aanya Mehra" },
@@ -68,6 +70,7 @@ const seed = [
     status: "resolved",
     priority: "medium",
     assignedTo: "Sayan Majumder",
+    assignedAt: "2026-09-05T12:00:00.000Z",
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-05T07:30:00.000Z", by: "Aanya Mehra" },
@@ -95,6 +98,7 @@ const seed = [
     status: "submitted",
     priority: "high",
     assignedTo: null,
+    assignedAt: null,
     comments: [],
     timeline: [
       { status: "submitted", at: "2026-09-16T18:40:00.000Z", by: "Vikram Joshi" },
@@ -197,6 +201,7 @@ export function assignIssue(id, staffName, by, role = "admin") {
       : {
           ...issue,
           assignedTo: staffName || null,
+          assignedAt: staffName ? now() : null,
           updatedAt: now(),
           status: issue.status === "submitted" && staffName ? "acknowledged" : issue.status,
           timeline:

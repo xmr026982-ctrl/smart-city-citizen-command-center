@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Layers, Activity, FolderOpen, CheckCircle2, ArrowRight
-} from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, FolderOpen, Layers } from "lucide-react";
 import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
-import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
 import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
+import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
 import PageHeader from "../../components/layout/PageHeader";
 import GlassCard from "../../components/ui/GlassCard";
 import { useAuth } from "../../store/authStore";
@@ -16,20 +14,26 @@ function StaffDashboard() {
   const user = useAuth();
   const issues = useIssues();
   const [selectedId, setSelectedId] = useState(null);
-  const mine = issues.filter((issue) => issue.assignedTo === user.name);
-  const openMine = mine.filter((i) => i.status !== "resolved");
-  const selected = issues.find((i) => i.id === selectedId) || null;
 
-  const stats = [
-    { label: "Assigned to me", value: mine.length, icon: FolderOpen, color: "#0ea5e9", sub: "Total tickets on you" },
-    { label: "Open field work", value: openMine.length, icon: Activity, color: "#f59e0b", sub: "Still live" },
-    { label: "In progress", value: mine.filter((i) => i.status === "in_progress").length, icon: Layers, color: "#8b5cf6", sub: "On site" },
-    { label: "Resolved", value: mine.filter((i) => i.status === "resolved").length, icon: CheckCircle2, color: "#10b981", sub: "Closed by you" },
+  const mine = issues.filter((issue) => issue.assignedTo === user.name);
+  const open = mine.filter((issue) => issue.status !== "resolved");
+  const inProgress = mine.filter((issue) => issue.status === "in_progress");
+  const resolved = mine.filter((issue) => issue.status === "resolved");
+  const feed = [...mine]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 4);
+  const selected = issues.find((issue) => issue.id === selectedId) || null;
+
+  const cards = [
+    { label: "Assigned to me", value: mine.length, hint: "Total tickets on you", icon: FolderOpen, color: "#0ea5e9" },
+    { label: "Open field work", value: open.length, hint: "Still live", icon: Activity, color: "#f59e0b" },
+    { label: "In progress", value: inProgress.length, hint: "On site", icon: Layers, color: "#8b5cf6" },
+    { label: "Resolved", value: resolved.length, hint: "Closed by you", icon: CheckCircle2, color: "#10b981" },
   ];
 
   return (
     <main className="page-wrap">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <PageHeader
           eyebrow="Field Layer · Operations"
           title="Staff Operations"
@@ -51,64 +55,81 @@ function StaffDashboard() {
 
       <div style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-        gap: 14,
-        margin: "28px 0 24px",
+        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: 12,
+        marginTop: 22,
       }}>
-        {stats.map((s, i) => (
-          <GlassCard key={s.label} delay={i * 50}>
-            <div style={{ padding: "16px 16px 14px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        {cards.map((card, idx) => (
+          <GlassCard key={card.label} delay={idx * 40}>
+            <div style={{ padding: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <div style={{
-                  width: 38, height: 38, borderRadius: 11,
-                  background: `${s.color}16`, display: "grid", placeItems: "center",
+                  width: 32, height: 32, borderRadius: 10,
+                  background: `${card.color}18`, display: "grid", placeItems: "center",
                 }}>
-                  <s.icon size={17} color={s.color} />
+                  <card.icon size={15} color={card.color} />
                 </div>
-                <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)" }}>
-                  {s.label}
+                <p style={{ fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--subtle)" }}>
+                  {card.label}
                 </p>
               </div>
-              <p style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, lineHeight: 1 }}>{s.value}</p>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>{s.sub}</p>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 720 }}>{card.value}</p>
+              <p style={{ marginTop: 4, fontSize: 12.5, color: "var(--muted)" }}>{card.hint}</p>
             </div>
           </GlassCard>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 11, flexWrap: "wrap", marginBottom: 24 }}>
-        <Link to="/staff/assigned" style={primaryBtn}>Open assigned work <ArrowRight size={15} /></Link>
-        <Link to="/staff/queue" style={secondaryBtn}>City intake</Link>
+      <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+        <Link to="/staff/assigned" style={{
+          height: 40, padding: "0 16px", borderRadius: 12,
+          background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+          color: "white", fontWeight: 650, fontSize: 13.5,
+          display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none",
+          boxShadow: "0 8px 18px rgba(14,165,233,0.28)",
+        }}>
+          Open assigned work <ArrowRight size={15} />
+        </Link>
+        <Link to="/staff/queue" style={{
+          height: 40, padding: "0 16px", borderRadius: 12,
+          background: "white", border: "1px solid var(--line)",
+          color: "var(--fg)", fontWeight: 600, fontSize: 13.5,
+          display: "inline-flex", alignItems: "center", textDecoration: "none",
+        }}>
+          City intake
+        </Link>
       </div>
 
-      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)", marginBottom: 10 }}>
-        Live Field Feed
+      <p style={{
+        marginTop: 26, marginBottom: 10,
+        fontSize: 11, fontWeight: 650, letterSpacing: "0.1em",
+        textTransform: "uppercase", color: "var(--subtle)",
+      }}>
+        Live field feed
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {openMine.length === 0 && (
+      <div style={{ display: "grid", gap: 10 }}>
+        {feed.length === 0 && (
           <GlassCard>
-            <p style={{ padding: 28, textAlign: "center", color: "var(--subtle)" }}>
-              No open tickets on you.
-            </p>
+            <p style={{ padding: 28, textAlign: "center", color: "var(--subtle)" }}>No tickets on you yet.</p>
           </GlassCard>
         )}
-        {openMine.slice(0, 6).map((issue, idx) => (
-          <GlassCard key={issue.id} delay={idx * 40} onClick={() => setSelectedId(issue.id)}>
+        {feed.map((issue, idx) => (
+          <GlassCard key={issue.id} delay={idx * 30} onClick={() => setSelectedId(issue.id)}>
             <div style={{
-              padding: "14px 18px",
+              padding: "14px 16px",
               display: "flex",
-              alignItems: "center",
               justifyContent: "space-between",
-              gap: 14,
+              alignItems: "center",
+              gap: 12,
               flexWrap: "wrap",
               cursor: "pointer",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 220 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "baseline", minWidth: 0 }}>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</span>
-                <span style={{ fontWeight: 500, fontSize: 13.5 }}>{issue.title}</span>
+                <strong style={{ fontSize: 14 }}>{issue.title}</strong>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{issue.ward}</span>
                 <IssueStatusBadge status={issue.status} />
                 <IssuePriorityBadge priority={issue.priority} />
@@ -122,6 +143,7 @@ function StaffDashboard() {
       </div>
 
       <IssueDetailsDrawer issue={selected} onClose={() => setSelectedId(null)} />
+
       <style>{`
         @keyframes livePulse {
           0%, 100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.25); }
@@ -131,20 +153,5 @@ function StaffDashboard() {
     </main>
   );
 }
-
-const primaryBtn = {
-  display: "inline-flex", alignItems: "center", gap: 8,
-  height: 42, padding: "0 20px", borderRadius: 12,
-  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-  color: "white", fontSize: 13.5, fontWeight: 600, textDecoration: "none",
-  boxShadow: "0 8px 22px rgba(14,165,233,0.3)",
-};
-
-const secondaryBtn = {
-  display: "inline-flex", alignItems: "center", gap: 8,
-  height: 42, padding: "0 18px", borderRadius: 12,
-  background: "rgba(255,255,255,0.85)", border: "1px solid var(--line)",
-  color: "var(--fg)", fontSize: 13.5, fontWeight: 600, textDecoration: "none",
-};
 
 export default StaffDashboard;

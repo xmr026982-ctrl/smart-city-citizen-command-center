@@ -1,17 +1,21 @@
-import { useState } from "react";
-import { Activity, CheckCircle2, FolderOpen, Timer, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, CheckCircle2, ChevronLeft, ChevronRight, FolderOpen, Timer, Zap } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader";
 import GlassCard from "../../components/ui/GlassCard";
 import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
+import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { useAuth } from "../../store/authStore";
 import { useIssues } from "../../store/issueStore";
 import { formatDate } from "../../utils/formatDate";
 
+const PER_PAGE = 6;
+
 function StaffPerformance() {
   const user = useAuth();
   const mine = useIssues().filter((issue) => issue.assignedTo === user.name);
   const [chip, setChip] = useState("all");
+  const [page, setPage] = useState(1);
 
   const open = mine.filter((i) => i.status !== "resolved").length;
   const resolved = mine.filter((i) => i.status === "resolved").length;
@@ -51,6 +55,17 @@ function StaffPerformance() {
     if (chip === "pressure") return issue.priority === "critical" || issue.priority === "high";
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(traced.length / PER_PAGE));
+  const paginated = traced.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [chip]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   return (
     <main className="page-wrap">
@@ -204,12 +219,12 @@ function StaffPerformance() {
         Field trace · {traced.length}
       </p>
       <div style={{ display: "grid", gap: 10 }}>
-        {traced.length === 0 && (
+        {paginated.length === 0 && (
           <GlassCard>
             <p style={{ padding: 28, textAlign: "center", color: "var(--subtle)" }}>Nothing in this mark.</p>
           </GlassCard>
         )}
-        {traced.slice(0, 8).map((issue, idx) => (
+        {paginated.map((issue, idx) => (
           <GlassCard key={issue.id} delay={idx * 35}>
             <div style={{
               padding: "14px 16px",
@@ -223,8 +238,9 @@ function StaffPerformance() {
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</p>
                 <p style={{ fontWeight: 600, marginTop: 3 }}>{issue.title}</p>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <IssueStatusBadge status={issue.status} />
+                <IssuePriorityBadge priority={issue.priority} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
                   {formatDate(issue.updatedAt)}
                 </span>
@@ -233,6 +249,55 @@ function StaffPerformance() {
           </GlassCard>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 10,
+          marginTop: 16,
+        }}>
+          <button
+            type="button"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: page === 1 ? "var(--subtle)" : "var(--primary-deep)",
+              cursor: page === 1 ? "default" : "pointer",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 12,
+            letterSpacing: "0.08em",
+            color: "var(--subtle)",
+          }}>
+            {page} / {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: page === totalPages ? "var(--subtle)" : "var(--primary-deep)",
+              cursor: page === totalPages ? "default" : "pointer",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
 
       <style>{`
         @keyframes livePulse {
