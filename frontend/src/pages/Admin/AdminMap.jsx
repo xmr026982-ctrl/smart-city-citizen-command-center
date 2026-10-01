@@ -10,7 +10,7 @@ export default function AdminMap() {
         height: "100vh",
       }}
     >
-      <MapView />
+      <MapView role="admin" />
     </div>
   );
 }

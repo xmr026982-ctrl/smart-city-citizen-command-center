@@ -10,7 +10,7 @@ export default function StaffMap() {
         height: "100vh",
       }}
     >
-      <MapView />
+      <MapView role="staff" />
     </div>
   );
 }

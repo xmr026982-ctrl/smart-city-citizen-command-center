@@ -6,6 +6,9 @@ import { isInsideKolkata } from "./MapUtils";
 function MapButtons({
   getUserLocation,
   locationLoading,
+  role,
+  showAssignedIssues,
+  setShowAssignedIssues,
 }) {
   const map = useMap();
   const controlRef = useRef(null);
@@ -19,9 +22,12 @@ function MapButtons({
         "custom-map-controls"
       );
 
-      // VERY IMPORTANT
       L.DomEvent.disableClickPropagation(container);
       L.DomEvent.disableScrollPropagation(container);
+
+      /* =========================
+         MY LOCATION
+      ========================= */
 
       const locationButton = L.DomUtil.create(
         "button",
@@ -43,6 +49,37 @@ function MapButtons({
         }
       });
 
+      /* =========================
+         ASSIGNED ISSUES
+         STAFF ONLY
+      ========================= */
+
+      if (role === "staff") {
+        const issueButton = L.DomUtil.create(
+          "button",
+          "assigned-issues-control",
+          container
+        );
+
+        issueButton.type = "button";
+        issueButton.title = "Assigned Issues";
+
+        issueButton.innerHTML =
+          showAssignedIssues ? "📌" : "📍";
+
+        L.DomEvent.on(issueButton, "click", (event) => {
+          L.DomEvent.stop(event);
+
+          setShowAssignedIssues(
+            (previous) => !previous
+          );
+        });
+      }
+
+      /* =========================
+         ZOOM IN
+      ========================= */
+
       const zoomInButton = L.DomUtil.create(
         "button",
         "",
@@ -57,6 +94,10 @@ function MapButtons({
         L.DomEvent.stop(event);
         map.zoomIn();
       });
+
+      /* =========================
+         ZOOM OUT
+      ========================= */
 
       const zoomOutButton = L.DomUtil.create(
         "button",
@@ -84,17 +125,27 @@ function MapButtons({
       map.removeControl(control);
       controlRef.current = null;
     };
-  }, [map, getUserLocation, locationLoading]);
+  }, [
+    map,
+    getUserLocation,
+    locationLoading,
+    role,
+    showAssignedIssues,
+    setShowAssignedIssues,
+  ]);
 
   return null;
 }
+
+/* =========================
+   MAP CLICK
+========================= */
 
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
     click: (event) => {
       const target = event.originalEvent?.target;
 
-      // Ignore clicks coming from UI panels
       if (target?.closest(".playlist-card")) {
         return;
       }
@@ -118,18 +169,31 @@ function MapClickHandler({ onMapClick }) {
 
   return null;
 }
+
+/* =========================
+   MAIN
+========================= */
+
 export default function MapControls({
   onMapClick,
   getUserLocation,
   locationLoading,
+  role,
+  showAssignedIssues,
+  setShowAssignedIssues,
 }) {
   return (
     <>
-      <MapClickHandler onMapClick={onMapClick} />
+      <MapClickHandler
+        onMapClick={onMapClick}
+      />
 
       <MapButtons
         getUserLocation={getUserLocation}
         locationLoading={locationLoading}
+        role={role}
+        showAssignedIssues={showAssignedIssues}
+        setShowAssignedIssues={setShowAssignedIssues}
       />
     </>
   );

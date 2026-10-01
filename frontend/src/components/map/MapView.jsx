@@ -29,6 +29,7 @@ import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import markerRetina from "leaflet/dist/images/marker-icon-2x.png";
 
 import "./MapView.css";
+import "./AdminIssueDetailsPanel.css";
 
 import MapSearch from "./MapSearch";
 import MapControls from "./MapControls";
@@ -37,6 +38,8 @@ import MyLocation from "./MyLocation";
 import NearbyPlaces from "./NearbyPlaces";
 import TrafficLayer from "./TrafficLayer";
 import LocationPlaylist from "./LocationPlaylist";
+import LayerSelector from "./LayerSelector";
+import AdminLayerManager from "./AdminLayerManager";
 
 
 
@@ -117,9 +120,28 @@ const createCategoryLeafletIcon = (category) => {
    MAIN MAP COMPONENT
 ===================================================== */
 
-export default function MapView() {
+  const getStaffIcon = (status) => {
+  let icon = "👨‍🔧";
+
+  if (status === "Active") {
+    icon = "🟢👨‍🔧";
+  } else if (status === "Busy") {
+    icon = "🟠👨‍🔧";
+  } else if (status === "Offline") {
+    icon = "🔴👨‍🔧";
+  }
+
+  return L.divIcon({
+    className: "staff-location-icon",
+    html: `<div style="font-size: 26px; white-space: nowrap;">${icon}</div>`,
+    iconSize: [55, 40],
+    iconAnchor: [27, 40],
+  });
+};
+
+ export default function MapView({ role = "user", onReportIssue }) {
   /* ===================================================
-     BASIC
+                   BASIC
   =================================================== */
 
   const defaultPosition = useMemo(
@@ -129,6 +151,12 @@ export default function MapView() {
 
   const MAPTILER_KEY =
     import.meta.env.VITE_MAPTILER_KEY;
+
+  const [baseLayer, setBaseLayer] = useState({
+   id: "Streets",
+   url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+   attribution: "&copy; OpenStreetMap contributors",
+   });
 
   /* ===================================================
      ABORT CONTROLLERS
@@ -210,6 +238,32 @@ export default function MapView() {
 
   const [nearbyCategory, setNearbyCategory] =
     useState(null);
+
+    /* ===================================================
+                        MAP FILTERS
+    =================================================== */
+
+  const [showFilters, setShowFilters] =
+    useState(false);
+
+  const [activeFilters, setActiveFilters] = useState({
+    cityHub: true,
+    selectedLocation: true,
+    nearbyPlaces: true,
+    issues: true,
+    staffLocations: true, 
+  });
+
+    const handleFilterClick = () => {
+    setShowFilters((previous) => !previous);
+  };
+
+    const handleFilterChange = (filter) => {
+    setActiveFilters((previous) => ({
+      ...previous,
+      [filter]: !previous[filter],
+    }));
+ };
   
   /* ===================================================
      TRAFFIC
@@ -228,6 +282,9 @@ export default function MapView() {
 
   const [routeLoading, setRouteLoading] =
     useState(false);
+  
+  const [alternativeRoutes, setAlternativeRoutes] = 
+    useState([]);
 
   const [routeError, setRouteError] =
     useState("");
@@ -237,6 +294,92 @@ export default function MapView() {
 
   const [routeDestination, setRouteDestination] =
     useState(null);
+
+  const [showAssignedIssues, setShowAssignedIssues] = 
+    useState(true);
+
+  const [staffStatusFilter, setStaffStatusFilter] = useState("All");
+  const [adminStatusFilter, setAdminStatusFilter] = useState("All");
+  const [selectedAdminIssue, setSelectedAdminIssue] = useState(null);
+
+  const [workUpdates, setWorkUpdates] = useState({});
+
+  const [evidenceFiles, setEvidenceFiles] = useState({});
+  
+  const [staffLocations] = useState([
+  {
+    id: 1,
+    name: "Demo Staff",
+    latitude: 22.5755,
+    longitude: 88.4271,
+    status: "Active",
+  },
+  {
+    id: 2,
+    name: "Staff 2",
+    latitude: 22.5720,
+    longitude: 88.3650,
+    status: "Busy",
+ },
+  ]);
+  
+  const [assignedIssues, setAssignedIssues] = useState([
+  {
+    id: 1,
+    title: "Broken Street Light",
+    type: "Electricity",
+    status: "Assigned",
+    latitude: 22.5729,
+    longitude: 88.3645,
+    description: "Street light is not working.",
+  },
+  {
+    id: 2,
+    title: "Road Damage",
+    type: "Road",
+    status: "In Progress",
+    latitude: 22.5685,
+    longitude: 88.3690,
+    description: "Road surface is damaged.",
+  },
+]);
+
+  const filteredAssignedIssues = assignedIssues.filter(
+  (issue) =>
+    staffStatusFilter === "All" ||
+    issue.status === staffStatusFilter
+  );
+
+  const filteredAdminIssues = assignedIssues.filter(
+    (issue) =>
+      adminStatusFilter === "All" ||
+      issue.status === adminStatusFilter
+  );
+
+  const adminIssueStats = useMemo(() => {
+    return {
+      total: assignedIssues.length,
+      assigned: assignedIssues.filter((issue) => issue.status === "Assigned").length,
+      inProgress: assignedIssues.filter((issue) => issue.status === "In Progress").length,
+      completed: assignedIssues.filter((issue) => issue.status === "Completed").length,
+    };
+  }, [assignedIssues]);
+
+  useEffect(() => {
+    if (role !== "admin") {
+      setSelectedAdminIssue(null);
+      return;
+    }
+
+    if (
+      selectedAdminIssue &&
+      !filteredAdminIssues.some(
+        (issue) => issue.id === selectedAdminIssue.id
+      )
+    ) {
+      setSelectedAdminIssue(null);
+    }
+  }, [role, filteredAdminIssues, selectedAdminIssue]);
 
   /* ===================================================
      CLEANUP
@@ -313,170 +456,250 @@ export default function MapView() {
      GET ROUTE
   =================================================== */
 
-  const getRoute = useCallback(
-    async (destination) => {
+    const getRoute = useCallback(
+     async (destination) => {
       if (!destination) {
-        return;
-      }
+       return;
+    }
 
-      if (!userLocation) {
-        alert(
-          "Please click 'My Location' first to get your current location."
-        );
-        return;
-      }
+    if (!userLocation) {
+      alert(
+        "Please click 'My Location' first to get your current location."
+      );
+      return;
+    }
 
-      const [
-        userLatitude,
-        userLongitude,
-      ] = userLocation;
+    const [
+      userLatitude,
+      userLongitude,
+    ] = userLocation;
 
-      const {
-        latitude: destinationLatitude,
-        longitude: destinationLongitude,
-        name = "Destination",
-      } = destination;
+    const {
+      latitude: destinationLatitude,
+      longitude: destinationLongitude,
+      name = "Destination",
+    } = destination;
 
-      if (
-        !isInsideKolkata(
-          destinationLatitude,
-          destinationLongitude
-        )
-      ) {
-        alert(
-          "Destination is outside Kolkata boundaries."
-        );
-        return;
-      }
+    if (
+      !isInsideKolkata(
+        destinationLatitude,
+        destinationLongitude
+      )
+    ) {
+      alert(
+        "Destination is outside Kolkata boundaries."
+      );
+      return;
+    }
 
-      /* Cancel previous route request */
-      routeAbortRef.current?.abort();
+    /* Cancel previous route request */
+    routeAbortRef.current?.abort();
 
-      const controller =
-        new AbortController();
+    const controller =
+      new AbortController();
 
-      routeAbortRef.current = controller;
+    routeAbortRef.current = controller;
 
-      setRouteLoading(true);
-      setRouteError("");
-      setRouteCoordinates([]);
-      setRouteInfo(null);
+    setRouteLoading(true);
+    setRouteError("");
+    setRouteCoordinates([]);
+    setRouteInfo(null);
 
-      setRouteDestination({
-        latitude: destinationLatitude,
-        longitude: destinationLongitude,
-        name,
+    setRouteDestination({
+      latitude: destinationLatitude,
+      longitude: destinationLongitude,
+      name,
+    });
+
+    try {
+      /* ==========================================
+         1. OSRM
+         Route geometry + normal ETA
+      ========================================== */
+
+      const url =
+        `${OSRM_SERVER}/` +
+        `${userLongitude},${userLatitude};` +
+        `${destinationLongitude},${destinationLatitude}` +
+        `?overview=full` +
+        `&geometries=geojson` +
+        `&steps=true` +
+        `&alternatives=true`;
+
+      const response = await fetch(url, {
+        signal: controller.signal,
       });
 
-      try {
-        /*
-          OSRM coordinate order:
+      if (!response.ok) {
+        throw new Error(
+          `Routing server error: ${response.status}`
+        );
+      }
 
-          longitude,latitude
-        */
+      const data = await response.json();
 
-        const url =
-          `${OSRM_SERVER}/` +
-          `${userLongitude},${userLatitude};` +
-          `${destinationLongitude},${destinationLatitude}` +
-          `?overview=full` +
-          `&geometries=geojson` +
-          `&steps=true`;
+      if (
+        data.code !== "Ok" ||
+        !data.routes ||
+        data.routes.length === 0
+      ) {
+        throw new Error("No route found.");
+      }
+      
+      console.log("OSRM routes:", data.routes.length, data.routes);
+      const route = data.routes[0];
+      const alternativeRoutes = data.routes.slice(1);
 
-        const response = await fetch(url, {
+      /*
+        OSRM:
+        [longitude, latitude]
+
+        Leaflet:
+        [latitude, longitude]
+      */
+
+      const coordinates =
+        route.geometry.coordinates.map(
+          ([longitude, latitude]) => [
+            latitude,
+            longitude,
+          ]
+        );
+
+      const alternativeRouteCoordinates = alternativeRoutes.map(
+         (alternativeRoute) =>
+         alternativeRoute.geometry.coordinates.map(
+         ([longitude, latitude]) => [latitude, longitude]
+        )
+      );
+
+      /* ==========================================
+         2. TOMTOM
+         Traffic ETA
+      ========================================== */
+
+      const tomTomUrl =
+        `https://api.tomtom.com/routing/1/calculateRoute/` +
+        `${userLatitude},${userLongitude}:` +
+        `${destinationLatitude},${destinationLongitude}/json` +
+        `?traffic=true` +
+        `&computeTravelTimeFor=all` +
+        `&key=${import.meta.env.VITE_TOMTOM_API_KEY}`;
+
+      const trafficResponse =
+        await fetch(tomTomUrl, {
           signal: controller.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(
-            `Routing server error: ${response.status}`
-          );
-        }
-
-        const data = await response.json();
-
-        if (
-          data.code !== "Ok" ||
-          !data.routes ||
-          data.routes.length === 0
-        ) {
-          throw new Error(
-            "No route found."
-          );
-        }
-
-        const route = data.routes[0];
-
-        /*
-          OSRM:
-
-          [longitude, latitude]
-
-          Leaflet:
-
-          [latitude, longitude]
-        */
-
-        const coordinates =
-          route.geometry.coordinates.map(
-            ([longitude, latitude]) => [
-              latitude,
-              longitude,
-            ]
-          );
-
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setRouteCoordinates(
-          coordinates
+      if (!trafficResponse.ok) {
+        throw new Error(
+          `TomTom traffic error: ${trafficResponse.status}`
         );
-
-        setRouteInfo({
-          distance: route.distance,
-          duration: route.duration,
-        });
-      } catch (error) {
-        if (
-          error.name ===
-          "AbortError"
-        ) {
-          return;
-        }
-
-        console.error(
-          "Routing error:",
-          error
-        );
-
-        setRouteCoordinates([]);
-        setRouteInfo(null);
-
-        setRouteError(
-          "Unable to find a route. Please try again."
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setRouteLoading(false);
-        }
       }
-    },
-    [userLocation]
-  );
 
+      const trafficData =
+        await trafficResponse.json();
+
+      const trafficRoute =
+        trafficData.routes?.[0];
+
+      if (!trafficRoute) {
+        throw new Error(
+          "No traffic route found."
+        );
+      }
+
+      const trafficSummary =
+        trafficRoute.summary;
+
+      const trafficDuration =
+        trafficSummary?.travelTimeInSeconds;
+
+      const trafficDelay =
+        trafficSummary?.trafficDelayInSeconds;
+
+      console.log(
+        "TomTom Summary:",
+        trafficSummary
+      );
+
+      console.log(
+        "trafficDuration:",
+        trafficDuration
+      );
+
+      console.log(
+        "trafficDelay:",
+        trafficDelay
+      );
+
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      /* ==========================================
+         3. SAVE ROUTE DATA
+      ========================================== */
+
+      setRouteCoordinates(coordinates);
+
+      setAlternativeRoutes(alternativeRouteCoordinates);
+
+      setRouteInfo({
+        distance: route.distance,
+        duration: route.duration,
+        trafficDuration,
+        trafficDelay,
+      });
+
+    } catch (error) {
+      if (
+        error.name === "AbortError"
+      ) {
+        return;
+      }
+
+      console.error(
+        "Routing error:",
+        error
+      );
+
+      setRouteCoordinates([]);
+      setRouteInfo(null);
+
+      setRouteError(
+        "Unable to find a route. Please try again."
+      );
+
+    } finally {
+      if (!controller.signal.aborted) {
+        setRouteLoading(false);
+      }
+    }
+  },
+  [userLocation]
+);
   /* ===================================================
      CLEAR ROUTE
   =================================================== */
 
-  const clearRoute = useCallback(() => {
-    routeAbortRef.current?.abort();
+   useEffect(() => {
+   if (!userLocation || !routeDestination) return;
 
-    setRouteCoordinates([]);
-    setRouteInfo(null);
-    setRouteError("");
-    setRouteDestination(null);
-    setRouteLoading(false);
+   getRoute(routeDestination);
+
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [userLocation]);
+  
+  const clearRoute = useCallback(() => {
+  routeAbortRef.current?.abort();
+
+  setRouteCoordinates([]);
+  setAlternativeRoutes([]);
+  setRouteInfo(null);
+  setRouteError("");
+  setRouteDestination(null);
+  setRouteLoading(false);
   }, []);
 
   /* ===================================================
@@ -975,48 +1198,186 @@ export default function MapView() {
      SEARCH
   =================================================== */
 
-  const handleSearch = async (event) => {
+   const handleSearch = async (event) => {
     event.preventDefault();
 
-    const searchText =
-      query.trim();
+    const searchText = query.trim();
 
     if (!searchText) {
       return;
     }
 
     if (!MAPTILER_KEY) {
-      alert(
-        "MapTiler API Key is missing. Check your .env file."
-      );
+      alert("MapTiler API Key is missing. Check your .env file.");
       return;
     }
 
+    /* ===================================================
+       COORDINATE SEARCH
+       Supported:
+       22.5726, 88.3639
+       22.5448° N, 88.3426° E
+       22.5448 N, 88.3426 E
+       22.5448°N, 88.3426°E
+    =================================================== */
+
+    let latitude = null;
+    let longitude = null;
+
+    const decimalMatch = searchText.match(
+      /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/
+    );
+
+    const directionMatch = searchText.match(
+      /^\s*(\d+(?:\.\d+)?)\s*°?\s*([NS])\s*,\s*(\d+(?:\.\d+)?)\s*°?\s*([EW])\s*$/i
+    );
+
+    if (decimalMatch) {
+      latitude = Number(decimalMatch[1]);
+      longitude = Number(decimalMatch[2]);
+    } else if (directionMatch) {
+      const latValue = Number(directionMatch[1]);
+      const latDirection = directionMatch[2].toUpperCase();
+      const lonValue = Number(directionMatch[3]);
+      const lonDirection = directionMatch[4].toUpperCase();
+
+      latitude = latDirection === "S" ? -latValue : latValue;
+      longitude = lonDirection === "W" ? -lonValue : lonValue;
+    }
+
+    /* ===================================================
+       COORDINATE RESULT
+    =================================================== */
+
+    if (latitude !== null && longitude !== null) {
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180
+      ) {
+        alert("Invalid coordinates.");
+        return;
+      }
+
+      if (!isInsideKolkata(latitude, longitude)) {
+        alert("These coordinates are outside Kolkata boundaries.");
+        return;
+      }
+
+      searchAbortRef.current?.abort();
+
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+
+      setLoading(true);
+      setResults([]);
+      setNearbyPlaces([]);
+      setNearbyError("");
+      setNearbyCategory(null);
+
+      const location = [latitude, longitude];
+
+      try {
+        const reverseUrl =
+          `https://api.maptiler.com/geocoding/` +
+          `${longitude},${latitude}.json` +
+          `?key=${MAPTILER_KEY}` +
+          `&language=bn,en` +
+          `&limit=1`;
+
+        const response = await fetch(reverseUrl, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`MapTiler reverse geocoding error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const feature = data.features?.[0];
+
+        const placeName =
+          feature?.place_name_bn ||
+          feature?.text_bn ||
+          feature?.place_name ||
+          feature?.text ||
+          "নির্বাচিত স্থান";
+
+        const address =
+          feature?.place_name ||
+          "স্থানটির ঠিকানা পাওয়া যায়নি";
+
+        setSelectedLocation({
+          position: location,
+          latitude,
+          longitude,
+          name: placeName,
+          address,
+        });
+
+        setClickedLocation(null);
+        setCopied(false);
+        setMapTarget(location);
+        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        setResults([]);
+      } catch (error) {
+        if (error.name === "AbortError") {
+          return;
+        }
+
+        console.error("Reverse geocoding failed:", error);
+
+        setSelectedLocation({
+          position: location,
+          latitude,
+          longitude,
+          name: "নির্বাচিত স্থান",
+          address: "স্থানটির নাম পাওয়া যায়নি",
+        });
+
+        setClickedLocation(null);
+        setCopied(false);
+        setMapTarget(location);
+        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        setResults([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+
+      return;
+    }
+
+    /* ===================================================
+       NORMAL PLACE SEARCH
+    =================================================== */
+
     searchAbortRef.current?.abort();
 
-    const controller =
-      new AbortController();
-
-    searchAbortRef.current =
-      controller;
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
 
     setLoading(true);
     setResults([]);
-
     setNearbyPlaces([]);
     setNearbyError("");
     setNearbyCategory(null);
 
     try {
-      const center =
-        mapTarget ||
-        defaultPosition;
+      const center = mapTarget || defaultPosition;
 
       const url =
         `https://api.maptiler.com/geocoding/` +
-        `${encodeURIComponent(
-          searchText
-        )}.json` +
+        `${encodeURIComponent(searchText)}.json` +
         `?key=${MAPTILER_KEY}` +
         `&country=in` +
         `&autocomplete=true` +
@@ -1029,68 +1390,44 @@ export default function MapView() {
         `${KOLKATA_BOUNDS.east},` +
         `${KOLKATA_BOUNDS.north}`;
 
-      const response =
-        await fetch(url, {
-          signal:
-            controller.signal,
-        });
+      const response = await fetch(url, {
+        signal: controller.signal,
+      });
 
       if (!response.ok) {
-        throw new Error(
-          `MapTiler error: ${response.status}`
-        );
+        throw new Error(`MapTiler error: ${response.status}`);
       }
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
-      const kolkataResults =
-        (data.features || []).filter(
-          (feature) => {
-            if (
-              !feature.center ||
-              feature.center.length < 2
-            ) {
-              return false;
-            }
-
-            return isInsideKolkata(
-              feature.center[1],
-              feature.center[0]
-            );
-          }
-        );
-
-      if (
-        controller.signal.aborted
-      ) {
+      if (controller.signal.aborted) {
         return;
       }
 
-      if (
-        kolkataResults.length === 0
-      ) {
-        alert(
-          "No results found within Kolkata boundaries."
+      const kolkataResults = (data.features || []).filter((feature) => {
+        if (!feature.center || feature.center.length < 2) {
+          return false;
+        }
+
+        return isInsideKolkata(
+          feature.center[1],
+          feature.center[0]
         );
-      } else {
-        setResults(
-          kolkataResults
-        );
+      });
+
+      if (kolkataResults.length === 0) {
+        alert("No results found within Kolkata boundaries.");
+        return;
       }
+
+      setResults(kolkataResults);
     } catch (error) {
-      if (
-        error.name !==
-        "AbortError"
-      ) {
-        alert(
-          "Location search failed. Please try again."
-        );
+      if (error.name !== "AbortError") {
+        console.error("Location search failed:", error);
+        alert("Location search failed. Please try again.");
       }
     } finally {
-      if (
-        !controller.signal.aborted
-      ) {
+      if (!controller.signal.aborted) {
         setLoading(false);
       }
     }
@@ -1133,9 +1470,6 @@ export default function MapView() {
 
       // Map current location-এ যাবে
       setMapTarget(location);
-
-      // পুরনো route clear
-      clearRoute();
 
       setLocationLoading(false);
     },
@@ -1437,37 +1771,46 @@ export default function MapView() {
           MAP
       ================================================= */}
 
-      <MapContainer
-         center={defaultPosition}
-         zoom={12}
-         zoomControl={false}
-         minZoom={3}
-         maxZoom={18}
-         scrollWheelZoom={true}
-           className="leaflet-full-height"
-          >
+     <MapContainer
+     center={defaultPosition}
+     zoom={12}
+     zoomControl={false}
+     minZoom={11}
+     maxZoom={18}
+     maxBounds={[
+    [22.35, 88.15],
+    [22.80, 88.60],
+  ]}
+  maxBoundsViscosity={1.0}
+  scrollWheelZoom={true}
+  className="leaflet-full-height"
+  >
+  <MapControls
+  onMapClick={handleMapClick}
+  getUserLocation={getUserLocation}
+  locationLoading={locationLoading}
+  role={role}
+  showAssignedIssues={showAssignedIssues}
+  setShowAssignedIssues={setShowAssignedIssues}
+/>
 
-        <MapControls
-          onMapClick={handleMapClick}
-          getUserLocation={getUserLocation}
-          locationLoading={locationLoading}
-        />
+  {role !== "admin" && (
+  <LocationPlaylist
+    userLocation={userLocation}
+  />
+)}
 
-        <LocationPlaylist userLocation={userLocation} />
+  {showTraffic && <TrafficLayer />}
 
-        {showTraffic && <TrafficLayer />}
-        
-        {/* =================================================
-            ROUTE
-        ================================================= */}
-
-        <RouteLayer
-          routeCoordinates={routeCoordinates}
-          routeDestination={routeDestination}
-          routeInfo={routeInfo}
-          formatDistance={formatDistance}
-          formatDuration={formatDuration}
-        />
+  {/* Route */}
+  <RouteLayer
+    routeCoordinates={routeCoordinates}
+    alternativeRoutes={alternativeRoutes}
+    routeDestination={routeDestination}
+    routeInfo={routeInfo}
+    formatDistance={formatDistance}
+    formatDuration={formatDuration}
+  />
 
         {/* =================================================
             LIVE TRACKING PATH
@@ -1491,77 +1834,57 @@ export default function MapView() {
             MAP LAYERS
         ================================================= */}
 
-        <LayersControl position="topright">
+        {/* 🗺️ Dynamic Base Layer */}
+      <TileLayer
+        key={baseLayer.id}
+        url={baseLayer.url}
+        attribution={baseLayer.attribution}
+        keepBuffer={4}
+      />
 
-          {/* STREETS */}
+     {/* 🎛️ Custom Layer Selector */}
+     <LayerSelector
+        activeBaseLayer={baseLayer.id}
+        onBaseLayerChange={(selectedLayer) =>
+        setBaseLayer(selectedLayer)
+      }
+      activeFilters={activeFilters}
+      onFilterChange={handleFilterChange}
+      showTraffic={showTraffic}
+     onTrafficToggle={setShowTraffic}
+    />
 
-          <LayersControl.BaseLayer
-            checked
-            name="Streets"
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              keepBuffer={4}
-            />
-          </LayersControl.BaseLayer>
+    {/* 📍 CITY HUB */}
+    {activeFilters.cityHub && (
+     <LayerGroup>
+       <Marker position={[22.5726, 88.3639]}>
+          <Popup>
+           📍 Central Kolkata Command Hub
+          </Popup>
+       </Marker>
+     </LayerGroup>
+    )}
 
-          {/* SATELLITE */}
-
-          <LayersControl.BaseLayer
-            name="Satellite"
-          >
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution="Tiles &copy; Esri"
-              keepBuffer={4}
-            />
-          </LayersControl.BaseLayer>
-
-           {/* TERRAIN */}
-
-          <LayersControl.BaseLayer
-            name="Terrain"
-          >
-         <TileLayer
-            url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-            attribution='Map data &copy; OpenStreetMap contributors, SRTM | Map style &copy; OpenTopoMap'
-            keepBuffer={4}
-          />
-         </LayersControl.BaseLayer>
-
-          {/* CITY HUB */}
-
-          <LayersControl.Overlay
-            checked
-            name="City Hub"
-          >
-            <LayerGroup>
-
-              <Marker
-                position={[
-                  22.5726,
-                  88.3639,
-                ]}
-              >
-                <Popup>
-                  <strong>
-                    📍 Central Kolkata
-                    Command Hub
-                  </strong>
-
-                  <br />
-
-                  <small>
-                    Kolkata Smart City
-                  </small>
-                </Popup>
-              </Marker>
-
-            </LayerGroup>
-          </LayersControl.Overlay>
-
-        </LayersControl>
+     {/* 👨‍🔧 STAFF LOCATIONS */}
+    {role === "admin" && activeFilters.staffLocations && (
+    <LayerGroup>
+    {staffLocations.map((staff) => (
+      <Marker
+        key={staff.id}
+        position={[staff.latitude, staff.longitude]}
+        icon={getStaffIcon(staff.status)}
+      >
+           <Popup>
+            <strong>👨‍🔧 Staff Location</strong>
+           <br />
+           Staff: {staff.name}
+           <br />
+           Status: 🟢 {staff.status}
+         </Popup>
+       </Marker>
+     ))}
+   </LayerGroup>
+   )}
 
         {/* =================================================
             USER LOCATION
@@ -1576,7 +1899,7 @@ export default function MapView() {
             SELECTED SEARCH LOCATION
         ================================================= */}
 
-        {selectedLocation && (
+        {activeFilters.selectedLocation && selectedLocation && (
           <Marker
             position={
               selectedLocation.position
@@ -1638,139 +1961,493 @@ export default function MapView() {
         )}
 
         {/* =================================================
-            CLICKED LOCATION
-        ================================================= */}
+    CLICKED LOCATION
+================================================= */}
 
-        {clickedLocation && (
-          <Marker
-            position={
-              clickedLocation.position
-            }
+{clickedLocation && (
+  <Marker
+    position={clickedLocation.position}
+  >
+    <Popup>
+
+      <div className="clicked-popup-wrapper">
+
+        <strong>
+          📍 Selected Coordinates
+        </strong>
+
+        <hr className="popup-divider" />
+
+        <div className="popup-coordinates">
+
+          <div>
+            <strong>Latitude:</strong>{" "}
+            {clickedLocation.latitude.toFixed(6)}
+          </div>
+
+          <div>
+            <strong>Longitude:</strong>{" "}
+            {clickedLocation.longitude.toFixed(6)}
+          </div>
+
+        </div>
+
+        <button
+          type="button"
+          className={`copy-btn ${
+            copied ? "copied" : ""
+          }`}
+          onClick={copyCoordinates}
+        >
+          {copied
+            ? "✓ Copied!"
+            : "📋 Copy Coordinates"}
+        </button>
+
+        <button
+          type="button"
+          className="route-btn"
+          onClick={() =>
+            getRoute({
+              latitude: clickedLocation.latitude,
+              longitude: clickedLocation.longitude,
+              name: "Selected Location",
+            })
+          }
+        >
+          🚗 Get Route
+        </button>
+
+        {/* REPORT ISSUE */}
+        {role === "user" && (
+          <button
+            type="button"
+            className="report-issue-btn"
+            onClick={() => {
+              if (onReportIssue) {
+                onReportIssue({
+                  latitude: clickedLocation.latitude,
+                  longitude: clickedLocation.longitude,
+                });
+              } else {
+                alert(
+                  "Report Issue feature is not connected yet."
+                );
+              }
+            }}
           >
-            <Popup>
-
-              <div className="clicked-popup-wrapper">
-
-                <strong>
-                  📍 Selected Coordinates
-                </strong>
-
-                <hr className="popup-divider" />
-
-                <div className="popup-coordinates">
-
-                  <div>
-                    <strong>
-                      Latitude:
-                    </strong>{" "}
-                    {clickedLocation.latitude.toFixed(
-                      6
-                    )}
-                  </div>
-
-                  <div>
-                    <strong>
-                      Longitude:
-                    </strong>{" "}
-                    {clickedLocation.longitude.toFixed(
-                      6
-                    )}
-                  </div>
-
-                </div>
-
-                <button
-                  type="button"
-                  className={`copy-btn ${
-                    copied
-                      ? "copied"
-                      : ""
-                  }`}
-                  onClick={
-                    copyCoordinates
-                  }
-                >
-                  {copied
-                    ? "✓ Copied!"
-                    : "📋 Copy Coordinates"}
-                </button>
-
-                <button
-                  type="button"
-                  className="route-btn"
-                  onClick={() =>
-                    getRoute({
-                      latitude:
-                        clickedLocation.latitude,
-                      longitude:
-                        clickedLocation.longitude,
-                      name:
-                        "Selected Location",
-                    })
-                  }
-                >
-                  🚗 Get Route
-                </button>
-
-              </div>
-
-            </Popup>
-          </Marker>
+            📝 Report Issue Here
+          </button>
         )}
 
+      </div>
+
+    </Popup>
+  </Marker>
+)}
+         {/* =================================================
+    ADMIN ISSUES
+================================================= */}
+
+{role === "admin" &&
+  activeFilters.issues &&
+  filteredAdminIssues.map((issue) => (
+    <Marker
+      key={`admin-${issue.id}`}
+      position={[issue.latitude, issue.longitude]}
+      eventHandlers={{
+        click: () => setSelectedAdminIssue(issue),
+      }}
+    >
+      <Popup>
+        <div className="admin-issue-popup">
+          <strong>{issue.title}</strong>
+          <span>{issue.type} • {issue.status}</span>
+          <button
+            type="button"
+            className="admin-popup-details-btn"
+            onClick={() => setSelectedAdminIssue(issue)}
+          >
+            View Details →
+          </button>
+        </div>
+      </Popup>
+    </Marker>
+  ))}
+
+         {/* =================================================
+    STAFF ASSIGNED ISSUES
+================================================= */}
+
+{role === "staff" &&
+  showAssignedIssues &&
+  filteredAssignedIssues.map((issue) => (
+    <Marker
+      key={issue.id}
+      position={[issue.latitude, issue.longitude]}
+    >
+      <Popup>
+        <div className="issue-card">
+          <h4>{issue.title}</h4>
+
+          <p>📂 Type: {issue.type}</p>
+
+          <p>
+            🔄 Status: <strong>{issue.status}</strong>
+          </p>
+
+          <p>{issue.description}</p>
+
+          <textarea
+            value={workUpdates[issue.id] || ""}
+            onChange={(event) =>
+              setWorkUpdates((previous) => ({
+                ...previous,
+                [issue.id]: event.target.value,
+              }))
+            }
+            placeholder="Write your work update..."
+            rows="3"
+          />
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+
+              if (!file) {
+                return;
+              }
+
+              setEvidenceFiles((previous) => ({
+                ...previous,
+                [issue.id]: file,
+              }));
+            }}
+          />
+
+          {evidenceFiles[issue.id] && (
+            <p>
+              📎 {evidenceFiles[issue.id].name}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setAssignedIssues((previous) =>
+                previous.map((item) =>
+                  item.id === issue.id
+                    ? {
+                        ...item,
+                        status: "In Progress",
+                      }
+                    : item
+                )
+              );
+
+              alert("Work update saved successfully!");
+            }}
+          >
+            💾 Save Work Update
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setAssignedIssues((previous) =>
+                previous.map((item) =>
+                  item.id === issue.id
+                    ? {
+                        ...item,
+                        status: "Completed",
+                      }
+                    : item
+                )
+              );
+
+              alert("Issue marked as completed!");
+            }}
+          >
+            ✅ Mark Completed
+          </button>
+        </div>
+      </Popup>
+    </Marker>
+  ))}
         {/* =================================================
             NEARBY PLACES
         ================================================= */}
 
-        <NearbyPlaces
-            places={filteredNearbyPlaces}
-            createCategoryLeafletIcon={createCategoryLeafletIcon}
-            getRoute={getRoute}
-        />
+        {activeFilters.nearbyPlaces && (
+          <NearbyPlaces
+             places={filteredNearbyPlaces}
+             createCategoryLeafletIcon={createCategoryLeafletIcon}
+             getRoute={getRoute}
+          />
+        )}
 
       </MapContainer>
 
-   
-     
-      <MapSearch 
-  query={query} 
-  setQuery={setQuery} 
-  handleSearch={handleSearch} 
-  clearSearch={clearSearch} 
-  loading={loading} 
-  getUserLocation={getUserLocation} 
-  locationLoading={locationLoading} 
-  isTracking={isTracking} 
-  startLiveTracking={startLiveTracking} 
-  stopLiveTracking={stopLiveTracking} 
-  trackingError={trackingError} 
-  results={results} 
-  selectLocation={selectLocation} 
-  routeLoading={routeLoading} 
-  routeInfo={routeInfo} 
-  routeDestination={routeDestination} 
-  routeError={routeError} 
-  getRoute={getRoute} 
-  clearRoute={clearRoute} 
-  formatDistance={formatDistance} 
-  formatDuration={formatDuration} 
-  selectedLocation={selectedLocation} 
-  userLocation={userLocation} 
-  clickedLocation={clickedLocation} 
-  nearbyCategory={nearbyCategory} 
-  nearbyLoading={nearbyLoading} 
-  nearbyPlaces={nearbyPlaces} 
-  nearbyError={nearbyError} 
-  filteredNearbyPlaces={filteredNearbyPlaces} 
-  handleCategoryChange={handleCategoryChange} 
-  getCurrentSelectedPosition={getCurrentSelectedPosition} 
-  getNearbyPlaces={getNearbyPlaces} 
-  NEARBY_RADIUS={NEARBY_RADIUS}
+      {role === "admin" && selectedAdminIssue && (
+        <aside className="admin-issue-details-panel" aria-label="Issue details">
+          <div className="admin-issue-panel-header">
+            <div>
+              <span className="admin-panel-eyebrow">ISSUE DETAILS</span>
+              <h3>{selectedAdminIssue.title}</h3>
+            </div>
 
-  // Traffic
-  showTraffic={showTraffic}
-  setShowTraffic={setShowTraffic}
-/>
+            <button
+              type="button"
+              className="admin-panel-close"
+              onClick={() => setSelectedAdminIssue(null)}
+              aria-label="Close issue details"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="admin-issue-panel-body">
+            <div className={`admin-issue-status-badge ${
+              selectedAdminIssue.status === "Completed"
+                ? "resolved"
+                : selectedAdminIssue.status === "In Progress"
+                  ? "progress"
+                  : "assigned"
+            }`}>
+              <span className="admin-status-badge-dot"></span>
+              {selectedAdminIssue.status}
+            </div>
+
+            <div className="admin-issue-detail-grid">
+              <div className="admin-detail-item">
+                <span>Category</span>
+                <strong>{selectedAdminIssue.type || "Not specified"}</strong>
+              </div>
+
+              <div className="admin-detail-item">
+                <span>Issue ID</span>
+                <strong>#{selectedAdminIssue.id}</strong>
+              </div>
+            </div>
+
+            <div className="admin-detail-section">
+              <span className="admin-detail-label">Description</span>
+              <p>{selectedAdminIssue.description || "No description provided."}</p>
+            </div>
+
+            <div className="admin-detail-section">
+              <span className="admin-detail-label">Location</span>
+              <div className="admin-coordinate-box">
+                <div>
+                  <span>Latitude</span>
+                  <strong>{Number(selectedAdminIssue.latitude).toFixed(6)}</strong>
+                </div>
+                <div>
+                  <span>Longitude</span>
+                  <strong>{Number(selectedAdminIssue.longitude).toFixed(6)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="admin-issue-meta-list">
+              <div>
+                <span>👨‍🔧 Assigned Staff</span>
+                <strong>
+                  {selectedAdminIssue.assignedStaffName ||
+                    selectedAdminIssue.assignedTo?.name ||
+                    "Not assigned"}
+                </strong>
+              </div>
+
+              <div>
+                <span>🏙️ Ward / Zone</span>
+                <strong>{selectedAdminIssue.ward || selectedAdminIssue.zone || "Not available"}</strong>
+              </div>
+
+              <div>
+                <span>🕒 Reported</span>
+                <strong>
+                  {selectedAdminIssue.createdAt
+                    ? new Date(selectedAdminIssue.createdAt).toLocaleString()
+                    : "Not available"}
+                </strong>
+              </div>
+            </div>
+
+            {Array.isArray(selectedAdminIssue.photos) &&
+              selectedAdminIssue.photos.length > 0 && (
+                <div className="admin-detail-section">
+                  <span className="admin-detail-label">Evidence</span>
+                  <div className="admin-evidence-count">
+                    📷 {selectedAdminIssue.photos.length} evidence file(s)
+                  </div>
+                </div>
+              )}
+
+            <div className="admin-issue-panel-actions">
+              <button
+                type="button"
+                className="admin-route-btn"
+                onClick={() =>
+                  getRoute({
+                    latitude: selectedAdminIssue.latitude,
+                    longitude: selectedAdminIssue.longitude,
+                    name: selectedAdminIssue.title,
+                  })
+                }
+              >
+                🚗 Route to Issue
+              </button>
+
+              <button
+                type="button"
+                className="admin-copy-location-btn"
+                onClick={async () => {
+                  const coordinates =
+                    `${Number(selectedAdminIssue.latitude).toFixed(6)}, ${Number(selectedAdminIssue.longitude).toFixed(6)}`;
+
+                  try {
+                    await navigator.clipboard.writeText(coordinates);
+                    alert("Issue coordinates copied!");
+                  } catch {
+                    alert(coordinates);
+                  }
+                }}
+              >
+                📋 Copy Coordinates
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+      
+      {role === "staff" && (
+        <div className="staff-status-filter">
+          <label htmlFor="issue-status">🔄 Status</label>
+          <select
+            id="issue-status"
+            value={staffStatusFilter}
+            onChange={(event) => setStaffStatusFilter(event.target.value)}
+          >
+            <option value="All">All</option>
+            <option value="Assigned">Assigned</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      )}
+
+      {role === "admin" && (
+        <div className="admin-city-status-bar">
+          <div className="admin-status-title">
+            <span className="status-dot"></span>
+            <div>
+              <strong>City Operations</strong>
+              <small>Live Command Center</small>
+            </div>
+          </div>
+
+          <div className="admin-status-item">
+            <span>📍</span>
+            <div>
+              <strong>{adminIssueStats.total}</strong>
+              <small>Total Issues</small>
+            </div>
+          </div>
+
+          <div className="admin-status-item">
+            <span>🟡</span>
+            <div>
+              <strong>{adminIssueStats.assigned}</strong>
+              <small>Pending</small>
+            </div>
+          </div>
+
+          <div className="admin-status-item">
+            <span>🔵</span>
+            <div>
+              <strong>{adminIssueStats.inProgress}</strong>
+              <small>In Progress</small>
+            </div>
+          </div>
+
+          <div className="admin-status-item">
+            <span>✅</span>
+            <div>
+              <strong>{adminIssueStats.completed}</strong>
+              <small>Resolved</small>
+            </div>
+          </div>
+
+          <div className="admin-system-status">
+            <span className="status-dot"></span>
+            System Operational
+          </div>
+        </div>
+      )}
+
+      {role === "admin" && (
+        <div className="admin-issue-filter">
+          <label htmlFor="admin-issue-status">🔎 Issues</label>
+          <select
+            id="admin-issue-status"
+            value={adminStatusFilter}
+            onChange={(event) => setAdminStatusFilter(event.target.value)}
+          >
+            <option value="All">All Issues</option>
+            <option value="Assigned">Assigned</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      )}
+
+      <MapSearch
+        role={role}
+        query={query}
+        setQuery={setQuery}
+        handleSearch={handleSearch}
+        clearSearch={clearSearch}
+        loading={loading}
+        getUserLocation={getUserLocation}
+        locationLoading={locationLoading}
+        isTracking={isTracking}
+        startLiveTracking={startLiveTracking}
+        stopLiveTracking={stopLiveTracking}
+        trackingError={trackingError}
+        results={results}
+        selectLocation={selectLocation}
+        routeLoading={routeLoading}
+        routeInfo={routeInfo}
+        routeDestination={routeDestination}
+        routeError={routeError}
+        getRoute={getRoute}
+        clearRoute={clearRoute}
+        formatDistance={formatDistance}
+        formatDuration={formatDuration}
+        selectedLocation={selectedLocation}
+        userLocation={userLocation}
+        clickedLocation={clickedLocation}
+        nearbyCategory={nearbyCategory}
+        nearbyLoading={nearbyLoading}
+        nearbyPlaces={nearbyPlaces}
+        nearbyError={nearbyError}
+        filteredNearbyPlaces={filteredNearbyPlaces}
+        handleCategoryChange={handleCategoryChange}
+        getCurrentSelectedPosition={getCurrentSelectedPosition}
+        getNearbyPlaces={getNearbyPlaces}
+        NEARBY_RADIUS={NEARBY_RADIUS}
+        onReportIssue={onReportIssue}
+        showTraffic={showTraffic}
+        setShowTraffic={setShowTraffic}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        handleFilterClick={handleFilterClick}
+        activeFilters={activeFilters}
+        handleFilterChange={handleFilterChange}
+      />
     </div>
   );
 }

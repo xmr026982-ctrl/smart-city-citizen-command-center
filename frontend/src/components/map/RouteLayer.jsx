@@ -9,6 +9,7 @@ import L from "leaflet";
 
 function RouteLayer({
   routeCoordinates,
+  alternativeRoutes,
   routeDestination,
   routeInfo,
   formatDistance,
@@ -20,20 +21,25 @@ function RouteLayer({
      FIT MAP TO ROUTE
   =================================================== */
 
-  useEffect(() => {
-    if (!routeCoordinates || routeCoordinates.length < 2) {
-      return;
-    }
+   useEffect(() => {
+   if (!routeCoordinates || routeCoordinates.length < 2) {
+     return;
+   }
 
-    const bounds = L.latLngBounds(routeCoordinates);
+   const allRoutes = [
+     routeCoordinates,
+     ...(alternativeRoutes || []),
+   ].flat();
 
-    map.fitBounds(bounds, {
-      padding: [60, 60],
-      maxZoom: 16,
-      animate: true,
-      duration: 1,
-    });
-  }, [routeCoordinates, map]);
+   const bounds = L.latLngBounds(allRoutes);
+
+   map.fitBounds(bounds, {
+     padding: [60, 60],
+     maxZoom: 16,
+     animate: true,
+     duration: 1,
+   });
+   }, [routeCoordinates, alternativeRoutes, map]);
 
   /* ===================================================
      NO ROUTE
@@ -69,6 +75,21 @@ function RouteLayer({
         }}
       />
 
+      {alternativeRoutes?.map((route, index) => (
+      <Polyline
+         key={`alternative-route-${index}`}
+         positions={route}
+         pathOptions={{
+           color: "#f97316",
+           weight: 4,
+           opacity: 0.6,
+           dashArray: "10 10",
+           lineCap: "round",
+           lineJoin: "round",
+         }}
+      />
+    ))}
+
       {/* =================================================
           START LOCATION
       ================================================= */}
@@ -92,9 +113,34 @@ function RouteLayer({
               {routeDestination.name}
             </div>
           )}
+           
+          {console.log("RouteLayer routeInfo:", routeInfo)}
 
           {routeInfo && (
             <div style={{ marginTop: "8px" }}>
+              {routeInfo.trafficDuration != null && (
+                <div>
+                   🚦 Traffic ETA:{" "}
+                    {formatDuration
+                       ? formatDuration(
+                       routeInfo.trafficDuration
+                    )
+                     : `${Math.round(
+                     routeInfo.trafficDuration / 60
+                    )} min`}
+                 </div>
+           )} 
+
+          {routeInfo.trafficDelay != null && (
+           <div>
+              🚗 Traffic Delay:{" "}
+              {routeInfo.trafficDelay === 0
+                 ? "No extra delay"
+                 : formatDuration
+                 ? formatDuration(routeInfo.trafficDelay)
+                 : `${Math.round(routeInfo.trafficDelay / 60)} min`}
+            </div>
+          )}
               {routeInfo.distance != null && (
                 <div>
                   📏{" "}
