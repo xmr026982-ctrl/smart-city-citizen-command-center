@@ -146,16 +146,19 @@ function MapClickHandler({ onMapClick }) {
     click: (event) => {
       const target = event.originalEvent?.target;
 
-      if (target?.closest(".playlist-card")) {
+      // Ignore clicks on map overlay controls
+      if (
+        target?.closest(".playlist-card") ||
+        target?.closest(".pick-confirm-button") ||
+        target?.closest(".pick-mode-bar")
+      ) {
         return;
       }
 
       const { lat, lng } = event.latlng;
 
       if (!isInsideKolkata(lat, lng)) {
-        alert(
-          "Please select a location inside Kolkata boundaries."
-        );
+        alert("Please select a location inside Kolkata boundaries.");
         return;
       }
 
@@ -181,6 +184,7 @@ export default function MapControls({
   role,
   showAssignedIssues,
   setShowAssignedIssues,
+  pickMode,
 }) {
   return (
     <>

@@ -14,6 +14,7 @@ import {
   LayersControl,
   LayerGroup,
   Polyline,
+  useMap,
 } from "react-leaflet";
 
 import {
@@ -40,6 +41,7 @@ import TrafficLayer from "./TrafficLayer";
 import LocationPlaylist from "./LocationPlaylist";
 import LayerSelector from "./LayerSelector";
 import AdminLayerManager from "./AdminLayerManager";
+import ZONE_BOUNDARIES from "./zoneBoundaries";
 
 
 
@@ -71,6 +73,57 @@ const OVERPASS_SERVERS = [
 
 const OSRM_SERVER =
   "https://router.project-osrm.org/route/v1/driving";
+
+  /* =====================================================
+   ZONE CONFIG
+===================================================== */
+
+const ZONE_CONFIG = {
+  Shyambazar: {
+    center: [22.599, 88.373],
+    bounds: null,
+  },
+
+  "B.B.D. Bagh": {
+    center: [22.573, 88.348],
+    bounds: null,
+  },
+
+  Ballygunge: {
+    center: [22.527, 88.363],
+    bounds: null,
+  },
+
+  "College Street": {
+    center: [22.575, 88.363],
+    bounds: null,
+  },
+
+  "B.P Township": {
+    center: [22.484, 88.405],
+    bounds: null,
+  },
+
+  Dharmatala: {
+    center: [22.562, 88.352],
+    bounds: null,
+  },
+  };
+
+const isInsideZone = (latitude, longitude, bounds) => {
+  if (!bounds) {
+    return true;
+  }
+
+  const [[south, west], [north, east]] = bounds;
+
+  return (
+    latitude >= south &&
+    latitude <= north &&
+    longitude >= west &&
+    longitude <= east
+  );
+};
 
 /* =====================================================
    CATEGORY ICONS
@@ -138,6 +191,24 @@ const createCategoryLeafletIcon = (category) => {
     iconAnchor: [27, 40],
   });
 };
+
+/* =====================================================
+   PICK MODE CONTROLLER
+===================================================== */
+
+function PickModeController({ center, enabled }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!enabled || !center) {
+      return;
+    }
+
+    map.setView(center, 14);
+  }, [map, center, enabled]);
+
+  return null;
+ }
 
  export default function MapView({ role = "user", onReportIssue }) {
   /* ===================================================
@@ -1593,16 +1664,10 @@ const createCategoryLeafletIcon = (category) => {
       latitude,
     ] = feature.center;
 
-    if (
-      !isInsideKolkata(
-        latitude,
-        longitude
-      )
-    ) {
+    if (!isInsideKolkata(latitude, longitude)) {
       alert(
         "Selected location is outside the map region."
       );
-
       return;
     }
 
@@ -1610,6 +1675,28 @@ const createCategoryLeafletIcon = (category) => {
       latitude,
       longitude,
     ];
+
+    if (pickMode) {
+      const bounds = ZONE_BOUNDARIES[zone];
+
+      if (!isInsideZone(latitude, longitude, bounds)) {
+        alert(`Pin must stay inside ${zone}`);
+        return;
+      }
+
+      setClickedLocation({
+        position: location,
+        latitude,
+        longitude,
+        name: feature.text || feature.place_name || "Dropped pin",
+        address: feature.place_name || "",
+      });
+
+      setMapTarget(location);
+      setQuery(feature.text || feature.place_name || "");
+      setResults([]);
+      return;
+    }
 
     setSelectedLocation({
       position: location,
@@ -1643,18 +1730,45 @@ const createCategoryLeafletIcon = (category) => {
   /* ===================================================
      MAP CLICK
   =================================================== */
+  
+  const searchParams = new URLSearchParams(window.location.search);
 
-  const handleMapClick = (
-    location
-  ) => {
+  const zone = searchParams.get("zone");
+  const pickMode = searchParams.get("pick") === "1";
+  const returnTo = searchParams.get("return");
+
+  const zoneConfig = ZONE_CONFIG[zone];
+  
+  const handleMapClick = (location) => {
+
+  if (pickMode) {
+
+    const bounds = ZONE_BOUNDARIES[zone];
+
+    const insideZone = isInsideZone(
+      location.latitude,
+      location.longitude,
+      bounds
+    );
+
+    if (!insideZone) {
+      alert(`Pin must stay inside ${zone}`);
+      return;
+    }
+
     setClickedLocation(location);
 
-    setSelectedLocation(null);
-    setCopied(false);
+    return;
+  }
 
-    setNearbyPlaces([]);
-    setNearbyError("");
-    setNearbyCategory(null);
+  setClickedLocation(location);
+
+  setSelectedLocation(null);
+  setCopied(false);
+
+  setNearbyPlaces([]);
+  setNearbyError("");
+  setNearbyCategory(null);
   };
 
   /* ===================================================
@@ -1772,19 +1886,30 @@ const createCategoryLeafletIcon = (category) => {
       ================================================= */}
 
      <MapContainer
-     center={defaultPosition}
-     zoom={12}
-     zoomControl={false}
-     minZoom={11}
-     maxZoom={18}
-     maxBounds={[
+  center={defaultPosition}
+  zoom={12}
+  zoomControl={false}
+  minZoom={11}
+  maxZoom={18}
+  maxBounds={[
     [22.35, 88.15],
     [22.80, 88.60],
   ]}
   maxBoundsViscosity={1.0}
   scrollWheelZoom={true}
   className="leaflet-full-height"
-  >
+>
+  <PickModeController
+    center={zoneConfig?.center}
+    enabled={pickMode}
+  />
+
+  {pickMode && (
+    <div className="pick-mode-bar">
+      📍 {zone || "Selected Zone"} — Drop a pin inside this zone
+    </div>
+  )}
+
   <MapControls
   onMapClick={handleMapClick}
   getUserLocation={getUserLocation}
@@ -1792,6 +1917,7 @@ const createCategoryLeafletIcon = (category) => {
   role={role}
   showAssignedIssues={showAssignedIssues}
   setShowAssignedIssues={setShowAssignedIssues}
+  pickMode={pickMode}
 />
 
   {role !== "admin" && (
@@ -1803,14 +1929,52 @@ const createCategoryLeafletIcon = (category) => {
   {showTraffic && <TrafficLayer />}
 
   {/* Route */}
-  <RouteLayer
-    routeCoordinates={routeCoordinates}
-    alternativeRoutes={alternativeRoutes}
-    routeDestination={routeDestination}
-    routeInfo={routeInfo}
-    formatDistance={formatDistance}
-    formatDuration={formatDuration}
-  />
+  {!pickMode && (
+    <RouteLayer
+      routeCoordinates={routeCoordinates}
+      alternativeRoutes={alternativeRoutes}
+      routeDestination={routeDestination}
+      routeInfo={routeInfo}
+      formatDistance={formatDistance}
+      formatDuration={formatDuration}
+    />
+  )}
+
+  {/* Pick Mode Selected Marker */}
+  {pickMode && clickedLocation && (
+   <Marker position={clickedLocation.position}>
+     <Popup>
+       <strong>Selected Location</strong>
+       <br />
+        {clickedLocation.latitude.toFixed(6)},{" "}
+        {clickedLocation.longitude.toFixed(6)}
+     </Popup>
+   </Marker>
+  )}
+
+   {/* Confirm selected location */}
+   {pickMode && clickedLocation && (
+   <button
+      className="pick-confirm-button"
+     onClick={(e) => {
+       e.preventDefault();
+      e.stopPropagation();
+
+    if (!returnTo) return;
+
+    const params = new URLSearchParams({
+    zone: zone || "",
+    lat: clickedLocation.latitude.toFixed(6),
+    lng: clickedLocation.longitude.toFixed(6),
+    label: clickedLocation.name || "Dropped pin",
+  });
+
+   window.location.href = `${returnTo}?${params.toString()}`;
+  }}
+   >
+    Confirm Location
+  </button>
+  )}
 
         {/* =================================================
             LIVE TRACKING PATH
