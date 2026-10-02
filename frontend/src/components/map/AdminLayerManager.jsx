@@ -31,18 +31,23 @@ export default function AdminLayerManager({
   ];
 
   return (
-    <div className="admin-layer-manager">
-      <div className="admin-layer-header">
-        <div>
-          <span className="admin-layer-icon">🗺️</span>
+    <div
+  className="admin-layer-manager"
+  onClick={(e) => e.stopPropagation()}
+  >
+   {/* Header */}
+   <div className="admin-layer-header">
+     <div className="admin-layer-header-content">
+       <span className="admin-layer-icon">🗺️</span>
 
-          <div>
-            <strong>Map Layers</strong>
-            <small>Admin Controls</small>
-          </div>
-        </div>
-      </div>
+       <div>
+         <strong>Map Layers</strong>
+         <small>Admin Controls</small>
+       </div>
+     </div>
+   </div>
 
+      {/* Layer List */}
       <div className="admin-layer-list">
         {layers.map((layer) => {
           const enabled = Boolean(activeFilters?.[layer.key]);
@@ -77,7 +82,7 @@ export default function AdminLayerManager({
           );
         })}
 
-        {/* Traffic is controlled separately */}
+        {/* Traffic */}
         <button
           type="button"
           className={`admin-layer-row ${

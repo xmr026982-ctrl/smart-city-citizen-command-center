@@ -78,7 +78,7 @@ const OSRM_SERVER =
    ZONE CONFIG
 ===================================================== */
 
-const ZONE_CONFIG = {
+  const ZONE_CONFIG = {
   Shyambazar: {
     center: [22.599, 88.373],
     bounds: null,
@@ -99,7 +99,7 @@ const ZONE_CONFIG = {
     bounds: null,
   },
 
-  "B.P Township": {
+  "B.P. Township": {
     center: [22.484, 88.405],
     bounds: null,
   },
@@ -108,7 +108,7 @@ const ZONE_CONFIG = {
     center: [22.562, 88.352],
     bounds: null,
   },
-  };
+};
 
 const isInsideZone = (latitude, longitude, bounds) => {
   if (!bounds) {
@@ -1956,21 +1956,20 @@ function PickModeController({ center, enabled }) {
    {pickMode && clickedLocation && (
    <button
       className="pick-confirm-button"
-     onClick={(e) => {
-       e.preventDefault();
-      e.stopPropagation();
+      onClick={() => {
+        if (!returnTo) {
+         return;
+       }
 
-    if (!returnTo) return;
+      const params = new URLSearchParams({
+        zone: zone || "",
+        lat: clickedLocation.latitude.toFixed(6),
+        lng: clickedLocation.longitude.toFixed(6),
+        label: clickedLocation.name || "Dropped pin",
+      });
 
-    const params = new URLSearchParams({
-    zone: zone || "",
-    lat: clickedLocation.latitude.toFixed(6),
-    lng: clickedLocation.longitude.toFixed(6),
-    label: clickedLocation.name || "Dropped pin",
-  });
-
-   window.location.href = `${returnTo}?${params.toString()}`;
-  }}
+      window.location.href = `${returnTo}?${params.toString()}`;
+    }}
    >
     Confirm Location
   </button>
@@ -2007,16 +2006,25 @@ function PickModeController({ center, enabled }) {
       />
 
      {/* 🎛️ Custom Layer Selector */}
-     <LayerSelector
-        activeBaseLayer={baseLayer.id}
-        onBaseLayerChange={(selectedLayer) =>
-        setBaseLayer(selectedLayer)
-      }
-      activeFilters={activeFilters}
-      onFilterChange={handleFilterChange}
-      showTraffic={showTraffic}
-     onTrafficToggle={setShowTraffic}
-    />
+     {role === "admin" ? (
+       <AdminLayerManager
+         activeFilters={activeFilters}
+         onFilterChange={handleFilterChange}
+         showTraffic={showTraffic}
+         onTrafficToggle={setShowTraffic}
+       />
+     ) : (
+       <LayerSelector
+         activeBaseLayer={baseLayer.id}
+         onBaseLayerChange={(selectedLayer) =>
+           setBaseLayer(selectedLayer)
+         }
+         activeFilters={activeFilters}
+         onFilterChange={handleFilterChange}
+         showTraffic={showTraffic}
+         onTrafficToggle={setShowTraffic}
+       />
+     )}
 
     {/* 📍 CITY HUB */}
     {activeFilters.cityHub && (
