@@ -41,7 +41,8 @@ function IssueStatusTimeline({ current, events = [], citizen = false }) {
               </p>
               {event ? (
                 <p className="mono" style={{ marginTop: 4 }}>
-                  {formatDateTime(event.at)} · {event.by}
+                  {formatDateTime(event.at)}
+                  {citizen ? "" : ` · ${event.by}`}
                 </p>
               ) : null}
             </div>
