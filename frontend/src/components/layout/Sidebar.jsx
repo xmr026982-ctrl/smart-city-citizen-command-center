@@ -38,6 +38,10 @@ function Sidebar({ onClose }) {
     user?.role === "admin" ? "Command Layer" :
     user?.role === "staff" ? "Field Layer" :
     "Citizen Layer";
+  const desk =
+    user?.role === "admin" ? "Civic Command" :
+    user?.role === "staff" ? "Field Desk" :
+    "Citizen Services";
 
   return (
     <aside
@@ -89,7 +93,7 @@ function Sidebar({ onClose }) {
             marginTop: 5, fontSize: 10, fontWeight: 600,
             letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--primary)",
           }}>
-            Civic Command
+            {desk}
           </p>
         </div>
       </div>
