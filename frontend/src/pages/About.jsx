@@ -1,6 +1,11 @@
+import SmartCityMark from "../components/SmartCityMark.jsx";
+
 export default function About() {
   return (
     <main className="about-page">
+      <div className="contact-logo">
+        <SmartCityMark />
+      </div>
       <section className="about-card" aria-labelledby="about-title">
         <p className="home-eyebrow">ABOUT SMART CITY</p>
         <h1 id="about-title">Building a smarter, more connected city.</h1>
@@ -15,5 +20,5 @@ export default function About() {
         </p>
       </section>
     </main>
-  )
+  );
 }
