@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import SmartCityMark from "../components/SmartCityMark.jsx";
 
 
 const issues = [
@@ -82,7 +83,9 @@ function PlatformPreview({ onNavigate }) {
 
   return (
     <main className="app preview-page">
-
+<div className="contact-logo">
+      <SmartCityMark />
+    </div>
     
 
       <nav className="nav preview-nav">
@@ -93,13 +96,7 @@ function PlatformPreview({ onNavigate }) {
             onNavigate('home')
           }
         >
-          <span className="brand-mark">
-            ✦
-          </span>
-
-          <span>
-            Smart<span>City</span>
-          </span>
+          
         </button>
 
         <div className="nav-actions">
