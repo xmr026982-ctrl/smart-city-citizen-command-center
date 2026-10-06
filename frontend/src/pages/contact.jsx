@@ -1,19 +1,71 @@
-import { useState } from "react";
 
+import { useState } from "react";
+import SmartCityMark from "../components/SmartCityMark.jsx";
 
 export default function Contact() {
   const [showSupport, setShowSupport] = useState(false);
 
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    issueType: "",
+    message: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    alert("Your support request has been submitted!");
+    setLoading(true);
 
-    setShowSupport(false);
+    try {
+      const response = await fetch("http://localhost:5000/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert("Your support request has been sent successfully!");
+
+        setFormData({
+          name: "",
+          email: "",
+          issueType: "",
+          message: "",
+        });
+
+        setShowSupport(false);
+      } else {
+        alert(data.message || "Failed to send support request.");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert(
+        "Unable to connect to the server. Please make sure your backend is running."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <main className="contact-page">
+      <div className="contact-logo">
+      <SmartCityMark />
+    </div>
 
       <section className="contact-hero">
         <div className="contact-overlay"></div>
@@ -28,11 +80,8 @@ export default function Contact() {
         </div>
       </section>
 
-
-    
       <section className="contact-cards">
 
-        {/* Talk to City Team */}
         <div className="contact-card">
 
           <div className="contact-icon">
@@ -53,20 +102,17 @@ export default function Contact() {
             +91 33 1234 5678
           </a>
 
-        <a
-  href="https://mail.google.com/mail/?view=cm&fs=1&to=supportsmartkolkata@gmail.com"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="contact-link"
->
-  Send us an email
-</a>
-
+          <a
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=supportsmartkolkata@gmail.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="contact-link"
+          >
+            Send us an email
+          </a>
 
         </div>
 
-
-        
         <div className="contact-card">
 
           <div className="contact-icon">
@@ -80,7 +126,6 @@ export default function Contact() {
             and our support team will help you.
           </p>
 
-          {/* OPEN POPUP */}
           <button
             className="support-btn"
             onClick={() => setShowSupport(true)}
@@ -88,12 +133,9 @@ export default function Contact() {
             Contact Support
           </button>
 
-        
-
         </div>
 
       </section>
-
 
       <section className="contact-bottom">
 
@@ -125,21 +167,17 @@ export default function Contact() {
 
       </section>
 
-
-
       {showSupport && (
         <div
           className="support-modal"
           onClick={() => setShowSupport(false)}
         >
 
-          {/* Popup Box */}
           <div
             className="support-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
 
-            {/* Header */}
             <div className="support-modal-header">
 
               <div>
@@ -159,8 +197,6 @@ export default function Contact() {
 
             </div>
 
-
-        
             <form onSubmit={handleSubmit}>
 
               <div className="form-group">
@@ -169,12 +205,14 @@ export default function Contact() {
 
                 <input
                   type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
                   placeholder="Enter your name"
                   required
                 />
 
               </div>
-
 
               <div className="form-group">
 
@@ -182,21 +220,32 @@ export default function Contact() {
 
                 <input
                   type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
                   placeholder="Enter your email"
                   required
                 />
 
               </div>
 
-
               <div className="form-group">
 
-               <select required>
-    <option value="">
+                <label>Issue Type</label>
+
+                <select
+                  name="issueType"
+                  value={formData.issueType}
+                  onChange={handleChange}
+                  required
+                >
+
+                     <option value="">
       Select a topic
     </option>
 
-    <option value="account">
+
+                  <option value="account">
       Account / Sign In Problem
     </option>
 
@@ -223,18 +272,25 @@ export default function Contact() {
     <option value="other">
       Other
     </option>
-  </select>
-</div>
+                </select>
 
-<div className="form-group">
-  <label>Message</label>
+              </div>
 
-  <textarea
-    rows="4"
-    placeholder="Describe your problem or question..."
-    required
-  ></textarea>
-</div>
+              <div className="form-group">
+
+                <label>Message</label>
+
+                <textarea
+                  name="message"
+                  value={formData.message}
+                  onChange={handleChange}
+                  rows="4"
+                  placeholder="Describe your problem..."
+                  required
+                ></textarea>
+
+              </div>
+
               <div className="modal-actions">
 
                 <button
@@ -248,8 +304,9 @@ export default function Contact() {
                 <button
                   type="submit"
                   className="send-btn"
+                  disabled={loading}
                 >
-                  Send Request
+                  {loading ? "Sending..." : "Send Request"}
                 </button>
 
               </div>
@@ -264,3 +321,4 @@ export default function Contact() {
     </main>
   );
 }
+
