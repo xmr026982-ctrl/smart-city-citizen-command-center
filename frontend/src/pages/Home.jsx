@@ -1,15 +1,24 @@
-import { useNavigate } from "react-router-dom";
 import VideoComponents from "../components/videocomponents.jsx";
+import SmartCityMark from "../components/SmartCityMark.jsx";
 
-export default function Home() {
-  const navigate = useNavigate();
-
+export default function Home({ onNavigate }) {
   return (
     <main className="home-page">
+
       <VideoComponents />
 
-      <section className="home-corner-content" aria-labelledby="home-title">
-        <p className="home-eyebrow">WELCOME TO KOLKATA</p>
+      {/* Smart City Logo */}
+      <div className="home-logo">
+        <SmartCityMark />
+      </div>
+
+      <section
+        className="home-corner-content"
+        aria-labelledby="home-title"
+      >
+        <p className="home-eyebrow">
+          WELCOME TO KOLKATA
+        </p>
 
         <h1 id="home-title">
           Building a smarter city together
@@ -23,11 +32,12 @@ export default function Home() {
         <button
           type="button"
           className="home-cta"
-          onClick={() => navigate("/preview")}
+          onClick={() => onNavigate?.("preview")}
         >
           Explore smart services
         </button>
       </section>
+
     </main>
   );
 }
