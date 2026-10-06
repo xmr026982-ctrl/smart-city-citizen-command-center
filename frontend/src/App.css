@@ -240,6 +240,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .home-contact { margin: 8px 0 0; font-size: 17px; }
 .home-contact span { font-weight: 600; }
 
+.home-logo {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  z-index: 10;
+}
+
 
 
 /* About page */
@@ -263,6 +270,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 .about-card h1 { margin: 0 0 18px; color: #123a32; font-size: clamp(32px, 5vw, 48px); line-height: 1.08; }
 .about-card p:not(.home-eyebrow) { max-width: 540px; margin: 0 0 28px; color: #526b61; line-height: 1.7; }
+.contact-page {
+  position: relative;
+}
+
+
+
+
 
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -986,3 +1000,13 @@ button { font: inherit; cursor: pointer; }
 
 @media (max-width: 800px) { .preview-hero { display: block; padding-top: 50px; }.hero-stat { margin-top: 35px; }.feature-grid { grid-template-columns: repeat(2, 1fr); }.extra-grid { gap: 45px; }.map-legend { display: none; } }
 @media (max-width: 560px) { .nav, .preview-hero, .dashboard-grid, .feature-grid, .section-heading, .extra-grid { width: min(100% - 30px, 1160px); }.nav { padding: 19px 0; }.nav-actions { gap: 12px; }.preview-hero h1 { font-size: 47px; }.map-card { padding: 15px; }.map { height: 390px; }.selected-issue { left: 25%; }.feature-grid, .extra-grid, .mini-tools { grid-template-columns: 1fr; }.section-heading { padding-top: 80px; }.extra-grid { padding: 90px 0; }.mini-tools { grid-template-columns: repeat(3, 1fr); }.mini-tools > div { padding: 13px 9px; }.mini-tools strong { font-size: 11px; }.final-cta { padding: 70px 18px; }.final-cta > div { flex-direction: column; align-items: stretch; max-width: 260px; margin-inline: auto; } }
+.contact-page {
+  position: relative;
+}
+
+.contact-logo {
+  position: absolute;
+  top: 25px;
+  left: 30px;
+  z-index: 20;
+}
