@@ -1,5 +1,5 @@
 import VideoComponents from "../components/videocomponents.jsx";
-import SmartCityMark from "../components/SmartCityMark.jsx";
+
 
 export default function Home({ onNavigate }) {
   return (
@@ -8,9 +8,7 @@ export default function Home({ onNavigate }) {
       <VideoComponents />
 
       {/* Smart City Logo */}
-      <div className="home-logo">
-        <SmartCityMark />
-      </div>
+     
 
       <section
         className="home-corner-content"
