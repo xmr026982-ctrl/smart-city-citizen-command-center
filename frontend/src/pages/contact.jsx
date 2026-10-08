@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import SmartCityMark from "../components/SmartCityMark.jsx";
+
 
 export default function Contact() {
   const [showSupport, setShowSupport] = useState(false);
@@ -63,10 +63,7 @@ export default function Contact() {
 
   return (
     <main className="contact-page">
-      <div className="contact-logo">
-      <SmartCityMark />
-    </div>
-
+   
       <section className="contact-hero">
         <div className="contact-overlay"></div>
 
