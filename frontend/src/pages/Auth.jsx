@@ -1,605 +1,427 @@
-import { useState } from "react";
-import { Building2 } from "lucide-react";
-
+import { useState } from 'react'
+import { Building2 } from 'lucide-react'
 import {
   GoogleAuthProvider,
-  signInWithPopup
-} from "firebase/auth";
-
-import { auth } from "../firebase";
+  signInWithPopup,
+} from 'firebase/auth'
+import { auth } from '../firebase'
 
 const roles = [
   {
     id: 'admin',
     name: 'Admin',
     description: 'Manage city operations',
-    icon: '⚙️'
+    icon: '⚙️',
   },
   {
     id: 'staff',
     name: 'Staff',
     description: 'Access staff services',
-    icon: '🧑‍💼'
+    icon: '🧑‍💼',
   },
   {
     id: 'user',
-    name: 'User',
+    name: 'Citizen',
     description: 'Access smart city services',
-    icon: '👤'
-  }
+    icon: '👤',
+  },
 ]
 
-function SmartCityMark() {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        width: "100%",
-      }}
-    >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: 14,
-          display: "grid",
-          placeItems: "center",
-          color: "white",
-          background: "linear-gradient(145deg, #0ea5e9 0%, #0369a1 100%)",
-          boxShadow: "0 10px 24px rgba(24, 164, 207, 0.7)",
-          position: "relative",
-          flexShrink: 0,
-        }}
-      >
-        <Building2 size={20} strokeWidth={1.8} />
 
-        <span
-          style={{
-            position: "absolute",
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: "#22d3ee",
- 
-          }}
-        />
+function CityMark({ role }) {
+  const serviceLabel =
+    role === 'admin'
+      ? 'ADMIN'
+      : role === 'staff'
+        ? 'STAFF'
+        : role === 'user'
+          ? 'CITIZEN'
+          : null
+
+  return (
+    <div className="brand-lockup">
+      <div className="brand-mark" aria-hidden="true">
+        <Building2 size={26} strokeWidth={1.8} />
       </div>
 
-      <p
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 18,
-          fontWeight: 750,
-          letterSpacing: "-0.02em",
-          lineHeight: 1,
-          margin: 0,
-        }}
-      >
-        Smart City
-      </p>
+      <div className="brand-copy">
+        <strong>Smart City</strong>
+        {serviceLabel && <span>{serviceLabel}</span>}
+      </div>
     </div>
-  );
+  )
 }
 
-function GoogleButton({ onClick, label }) {
+
+
+function GoogleButton({ onClick, disabled }) {
   return (
     <button
-      className="google-button"
       type="button"
+      className="google-button"
       onClick={onClick}
+      disabled={disabled}
     >
       <svg
         className="google-icon"
-        viewBox="0 0 24 24"
+        viewBox="0 0 18 18"
         aria-hidden="true"
       >
         <path
           fill="#4285F4"
-          d="M21.35 12.22c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.7 2.91-4.2 2.91-7.26Z"
+          d="M17.6 9.2c0-.6-.1-1.2-.2-1.8H9v3.4h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"
         />
-
         <path
           fill="#34A853"
-          d="M12 21.99c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.7-1.72-5.47-4.03H3.29v2.53A9.74 9.74 0 0 0 12 21.99Z"
+          d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.6-1.9.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"
         />
-
         <path
           fill="#FBBC05"
-          d="M6.53 14.07a5.86 5.86 0 0 1 0-3.74V7.8H3.29a9.75 9.75 0 0 0 0 8.8l3.24-2.53Z"
+          d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8l3-2.3z"
         />
-
         <path
           fill="#EA4335"
-          d="M12 6.3c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.4 14.63 2.5 12 2.5a9.74 9.74 0 0 0-8.71 5.3l3.24 2.53C7.3 8.02 9.46 6.3 12 6.3Z"
+          d="M9 3.6c1.3 0 2.5.5 3.4 1.3L15 2.3A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"
         />
       </svg>
 
-      {label}
+      <span>
+        {disabled ? 'Connecting to Google...' : 'Continue with Google'}
+      </span>
     </button>
   )
 }
 
-function AuthPage({ initialMode }) {
-  const [mode, setMode] = useState(initialMode)
-
-  const [step, setStep] = useState(
-    initialMode === 'login'
-      ? 'role'
-      : 'credentials'
-  )
-
+export default function App() {
+  const [mode, setMode] = useState('login')
+  const [step, setStep] = useState('role')
   const [role, setRole] = useState(null)
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
   const [showPassword, setShowPassword] = useState(false)
-
+  const [passwordStep, setPasswordStep] = useState(false)
   const [message, setMessage] = useState('')
+  const [googleLoading, setGoogleLoading] = useState(false)
 
-  const [signupStep, setSignupStep] =
-    useState('email')
+  const selectedRole = roles.find((item) => item.id === role)
 
-  const [userPasswordStep, setUserPasswordStep] =
-    useState(false)
+  const citizenLogin = mode === 'login' && role === 'user'
 
-  const handleGoogleLogin = async () => {
+  const showPasswordField =
+    mode === 'signup' || !citizenLogin || passwordStep
+
+  // FIREBASE GOOGLE LOGIN
+  async function handleGoogleLogin() {
+    setMessage('')
+    setGoogleLoading(true)
+
     try {
       const provider = new GoogleAuthProvider()
 
-      const result = await signInWithPopup(
-        auth,
-        provider
-      )
+      provider.setCustomParameters({
+        prompt: 'select_account',
+      })
 
-      const user = result.user
+      const result = await signInWithPopup(auth, provider)
+      const googleUser = result.user
 
-      console.log('Google User:', user)
+      setEmail(googleUser.email || '')
 
       setMessage(
-        `Welcome ${user.displayName || 'User'}!`
+        `Google sign-in successful! Welcome, ${
+          googleUser.displayName || googleUser.email
+        }.`
       )
+
+      console.log('Firebase user:', {
+        uid: googleUser.uid,
+        name: googleUser.displayName,
+        email: googleUser.email,
+      })
     } catch (error) {
       console.error(
-        'Google Login Error:',
-        error
+        'Google sign-in error:',
+        error.code,
+        error.message
       )
 
-      setMessage(
-        'Google sign-in failed. Please try again.'
-      )
+      if (error.code === 'auth/popup-closed-by-user') {
+        setMessage('Google sign-in was cancelled.')
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setMessage(
+          'This website is not authorized in Firebase. Add localhost to Authorized domains.'
+        )
+      } else if (error.code === 'auth/popup-blocked') {
+        setMessage(
+          'Your browser blocked the popup. Allow popups and try again.'
+        )
+      } else {
+        setMessage(error.message || 'Google sign-in failed.')
+      }
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
-  const selectedRole = roles.find(
-    (item) => item.id === role
-  )
-
-  const switchMode = (nextMode) => {
+  function switchMode(nextMode) {
     setMode(nextMode)
-
-    setStep(
-      nextMode === 'login'
-        ? 'role'
-        : 'credentials'
-    )
-
+    setStep(nextMode === 'login' ? 'role' : 'credentials')
     setRole(null)
     setEmail('')
     setPassword('')
     setShowPassword(false)
-    setSignupStep('email')
-    setUserPasswordStep(false)
+    setPasswordStep(false)
     setMessage('')
   }
 
-  const submit = (event) => {
+  function submit(event) {
     event.preventDefault()
+    setMessage('')
 
-    /*
-      USER LOGIN
-
-      First step:
-      User enters email.
-
-      Second step:
-      User enters password.
-    */
-    if (
-      mode === 'login' &&
-      role === 'user' &&
-      !userPasswordStep
-    ) {
-      setUserPasswordStep(true)
+    if (citizenLogin && !passwordStep) {
+      setPasswordStep(true)
       return
     }
 
-    /*
-      SIGN UP
-
-      First step:
-      User enters email.
-
-      Second step:
-      User creates password.
-    */
-    if (
-      mode === 'signup' &&
-      signupStep === 'email'
-    ) {
-      setSignupStep('password')
-      return
+    if (mode === 'login') {
+      setMessage(
+        `${selectedRole?.name || 'User'} login submitted successfully.`
+      )
+    } else {
+      setMessage('Your account details are ready.')
     }
-
-    /*
-      Temporary frontend message.
-
-      Later this section can be connected
-      to your backend API.
-
-      Person 6 can connect Admin login here.
-    */
-    setMessage(
-      mode === 'login'
-        ? `${selectedRole?.name} login submitted successfully.`
-        : 'Your account has been created successfully.'
-    )
   }
 
-  const showPasswordField =
-    (mode === 'signup' &&
-      signupStep === 'password') ||
-    (mode === 'login' &&
-      (role !== 'user' ||
-        userPasswordStep))
+  if (mode === 'login' && step === 'role') {
+    return (
+      <main className="auth-page">
+        <div className="ambient ambient-one" aria-hidden="true" />
+        <div className="ambient ambient-two" aria-hidden="true" />
+        <div className="city-silhouette" aria-hidden="true" />
 
-  return (
-    <main className="auth-page">
+        <section className="auth-card role-selection-card">
+          <CityMark />
 
-      <section
-        className={`auth-card ${
-          mode === 'login' && role
-            ? `${role}-login-card`
-            : ''
-        }`}
-      >
+          <h1>Login to Smart City</h1>
+          <p className="intro">
+            Choose your login type to continue.
+          </p>
 
-        <SmartCityMark />
-
-        {/* ========================= */}
-        {/* LOGIN ROLE SELECTION       */}
-        {/* ========================= */}
-
-        {mode === 'login' &&
-        step === 'role' ? (
-          <>
-            <h1>Login to Smart City</h1>
-
-            <p className="intro">
-              Choose your login type to continue.
-            </p>
-
-            <div className="role-page-options">
-
-              {roles.map((item) => (
-                <button
-                  className="role-card"
-                  type="button"
-                  key={item.id}
-                  onClick={() => {
-                    setRole(item.id)
-                    setStep('credentials')
-                    setMessage('')
-                  }}
-                >
-                  <span className="role-card-icon">
-                    {item.icon}
-                  </span>
-
-                  <span className="role-card-copy">
-                    <strong>
-                      {item.name} Login
-                    </strong>
-
-                    <small>
-                      {item.description}
-                    </small>
-                  </span>
-
-                  <span className="role-arrow">
-                    →
-                  </span>
-                </button>
-              ))}
-
-            </div>
-          </>
-        ) : (
-          <>
-            {/* ========================= */}
-            {/* BACK BUTTON                 */}
-            {/* ========================= */}
-
-            {mode === 'login' && (
+          <div className="role-options">
+            {roles.map((item) => (
               <button
-                className="back-button"
+                key={item.id}
                 type="button"
+                className="role-card"
                 onClick={() => {
-                  setStep('role')
-                  setRole(null)
+                  setRole(item.id)
+                  setStep('credentials')
                   setMessage('')
                 }}
               >
-                ← Back to login options
+                <span className="role-icon">{item.icon}</span>
+
+                <span className="role-copy">
+                  <strong>{item.name} Login</strong>
+                  <small>{item.description}</small>
+                </span>
+
+                <span className="role-arrow" aria-hidden="true">
+                  →
+                </span>
               </button>
-            )}
+            ))}
+          </div>
 
-            {/* ========================= */}
-            {/* SELECTED ROLE               */}
-            {/* ========================= */}
+          <p className="switch-copy">
+            Don't have an account?{' '}
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => switchMode('signup')}
+            >
+              Create account
+            </button>
+          </p>
+        </section>
+      </main>
+    )
+  }
 
-            {mode === 'login' &&
-              selectedRole && (
-                <div
-                  className={`login-identity ${role}-identity`}
-                >
-                  <span className="login-identity-icon">
-                    {selectedRole.icon}
-                  </span>
+  return (
+    <main className="auth-page">
+      <div className="ambient ambient-one" aria-hidden="true" />
+      <div className="ambient ambient-two" aria-hidden="true" />
+      <div className="city-silhouette" aria-hidden="true" />
 
-                  <div>
-                    <strong>
-                      {selectedRole.name} Portal
-                    </strong>
+      <section
+        className={`auth-card ${
+          role === 'admin'
+            ? 'admin-card'
+            : role === 'staff'
+              ? 'staff-card'
+              : ''
+        }`}
+      >
+        {mode === 'login' && (
+          <button
+            className="back-button"
+            type="button"
+            onClick={() => {
+              setStep('role')
+              setRole(null)
+              setMessage('')
+              setPasswordStep(false)
+            }}
+          >
+            <span aria-hidden="true">←</span> ROLES
+          </button>
+        )}
 
-                    <small>
-                      {selectedRole.description}
-                    </small>
-                  </div>
-                </div>
-              )}
+        <CityMark role={mode === 'login' ? role : null} />
 
-            {/* ========================= */}
-            {/* TITLE                       */}
-            {/* ========================= */}
+        <h1>
+          {mode === 'login' ? 'Sign in' : 'Create account'}
+        </h1>
 
-            <h1>
-              {mode === 'login'
-                ? `${selectedRole?.name} Login`
-                : 'Create your account'}
-            </h1>
+        {mode === 'signup' && (
+          <p className="intro">
+            Create your account to access smart city services.
+          </p>
+        )}
 
-            <p className="intro">
-              {mode === 'login'
-                ? `Log in as ${selectedRole?.name} to continue.`
-                : 'Create your account to access smart city services.'}
-            </p>
+        {citizenLogin && (
+          <p className="intro">
+            Sign in to access your city services.
+          </p>
+        )}
 
-            {/* ========================= */}
-            {/* GOOGLE LOGIN                */}
-            {/* ========================= */}
+        {(mode === 'signup' || citizenLogin) && (
+          <>
+            <GoogleButton
+              onClick={handleGoogleLogin}
+              disabled={googleLoading}
+            />
 
-            {(mode === 'signup' ||
-              (mode === 'login' &&
-                role === 'user')) && (
-              <>
-                <GoogleButton
-                  label="Continue with Google"
-                  onClick={handleGoogleLogin}
-                />
-
-                <div className="divider">
-                  <span>or</span>
-                </div>
-              </>
-            )}
-
-            {/* ========================= */}
-            {/* LOGIN / SIGNUP FORM         */}
-            {/* ========================= */}
-
-            <form onSubmit={submit}>
-
-              <label htmlFor="identity">
-                {mode === 'login' &&
-                role === 'staff'
-                  ? 'Staff ID'
-                  : 'Email address'}
-              </label>
-
-              <input
-                id="identity"
-                type={
-                  mode === 'login' &&
-                  role === 'staff'
-                    ? 'text'
-                    : 'email'
-                }
-                placeholder={
-                  mode === 'login' &&
-                  role === 'staff'
-                    ? 'Enter your staff ID'
-                    : 'Enter your email address'
-                }
-                value={email}
-                onChange={(event) =>
-                  setEmail(event.target.value)
-                }
-                required
-              />
-
-              {/* ========================= */}
-              {/* PASSWORD                    */}
-              {/* ========================= */}
-
-              {showPasswordField && (
-                <>
-                  <div className="password-label">
-
-                    <label htmlFor="password">
-                      Password
-                    </label>
-
-                    {mode === 'login' && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() =>
-                          setMessage(
-                            'Password reset option selected.'
-                          )
-                        }
-                      >
-                        Forgot password?
-                      </button>
-                    )}
-
-                  </div>
-
-                  <div className="password-input-wrap">
-
-                    <input
-                      id="password"
-                      type={
-                        showPassword
-                          ? 'text'
-                          : 'password'
-                      }
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(event) =>
-                        setPassword(
-                          event.target.value
-                        )
-                      }
-                      autoComplete={
-                        mode === 'login'
-                          ? 'current-password'
-                          : 'new-password'
-                      }
-                      required
-                    />
-
-                    <button
-                      type="button"
-                      className="password-toggle"
-                      onClick={() =>
-                        setShowPassword(
-                          !showPassword
-                        )
-                      }
-                      aria-label={
-                        showPassword
-                          ? 'Hide password'
-                          : 'Show password'
-                      }
-                    >
-                      {showPassword
-                        ? '🙈 Hide'
-                        : '👁️ Show'}
-                    </button>
-
-                  </div>
-                </>
-              )}
-
-              {/* ========================= */}
-              {/* SUBMIT BUTTON              */}
-              {/* ========================= */}
-
-              <button
-                className="submit-button"
-                type="submit"
-              >
-                {mode === 'login'
-                  ? role === 'user' &&
-                    !userPasswordStep
-                    ? 'CONTINUE'
-                    : 'LOGIN'
-                  : signupStep === 'email'
-                    ? 'CONTINUE'
-                    : 'CREATE ACCOUNT'}
-              </button>
-
-            </form>
-
-            {/* ========================= */}
-            {/* MESSAGE                     */}
-            {/* ========================= */}
-
-            {message && (
-              <p
-                className="success-message"
-                role="status"
-              >
-                {message}
-              </p>
-            )}
-
-            {/* ========================= */}
-            {/* LOGIN / SIGNUP SWITCH       */}
-            {/* ========================= */}
-
-            <p className="switch-copy">
-
-              {mode === 'login'
-                ? "Don't have an account?"
-                : 'Already have an account?'}
-
-              {' '}
-
-              <button
-                type="button"
-                className="text-button switch-button"
-                onClick={() =>
-                  switchMode(
-                    mode === 'login'
-                      ? 'signup'
-                      : 'login'
-                  )
-                }
-              >
-                {mode === 'login'
-                  ? 'Sign up'
-                  : 'Log in'}
-              </button>
-
-            </p>
+            <div className="divider">
+              <span>or</span>
+            </div>
           </>
         )}
 
-        {/* ========================= */}
-        {/* SIGNUP FROM ROLE PAGE      */}
-        {/* ========================= */}
+        <form onSubmit={submit}>
+          <label htmlFor="identity">
+            {mode === 'login' && role === 'staff'
+              ? 'Staff ID'
+              : 'Email address'}
+          </label>
 
-        {mode === 'login' &&
-          step === 'role' && (
-            <p className="switch-copy role-switch">
-              Don't have an account?{' '}
+          <input
+            id="identity"
+            className="field"
+            type={
+              mode === 'login' && role === 'staff'
+                ? 'text'
+                : 'email'
+            }
+            placeholder={
+              mode === 'login' && role === 'staff'
+                ? 'Enter your staff ID'
+                : 'name@email.com'
+            }
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            autoComplete={
+              mode === 'login' ? 'username' : 'email'
+            }
+            required
+          />
 
-              <button
-                type="button"
-                className="text-button switch-button"
-                onClick={() =>
-                  switchMode('signup')
-                }
-              >
-                Sign up
-              </button>
-            </p>
+          {showPasswordField && (
+            <>
+              <div className="password-label">
+                <label htmlFor="password">Password</label>
+
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() =>
+                      setMessage(
+                        'Connect your password reset flow to enable password recovery.'
+                      )
+                    }
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+
+              <div className="password-input-wrap">
+                <input
+                  id="password"
+                  className="field"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(event.target.value)
+                  }
+                  autoComplete={
+                    mode === 'login'
+                      ? 'current-password'
+                      : 'new-password'
+                  }
+                  required
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() =>
+                    setShowPassword((visible) => !visible)
+                  }
+                  aria-label={
+                    showPassword ? 'Hide password' : 'Show password'
+                  }
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </>
           )}
 
+          <button className="submit-button" type="submit">
+            {mode === 'login'
+              ? citizenLogin && !passwordStep
+                ? 'CONTINUE'
+                : 'CONTINUE'
+              : 'CREATE ACCOUNT'}
+          </button>
+        </form>
+
+        {message && (
+          <p className="status-message" role="status">
+            {message}
+          </p>
+        )}
+
+        <p className="switch-copy">
+          {mode === 'login'
+            ? 'New here?'
+            : 'Already have an account?'}{' '}
+
+          <button
+            className="text-button"
+            type="button"
+            onClick={() =>
+              switchMode(mode === 'login' ? 'signup' : 'login')
+            }
+          >
+            {mode === 'login' ? 'Create account' : 'Log in'}
+          </button>
+        </p>
       </section>
-
     </main>
-  )
-}
-
-export default function Auth({ initialMode = 'login' }) {
-  return (
-    <AuthPage initialMode={initialMode} />
   )
 }
