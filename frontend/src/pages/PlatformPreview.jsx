@@ -56,6 +56,9 @@ function PlatformPreview({ onNavigate }) {
   const [resolvedIssues, setResolvedIssues] =
     useState(0)
 
+  const [isHovered, setIsHovered] =
+    useState(false)
+
   const issue = issues[activeIssue]
 
   useEffect(() => {
@@ -123,16 +126,34 @@ function PlatformPreview({ onNavigate }) {
             Home
           </button>
 
-          <button
-            className="login-button"
-            onClick={() =>
-              onNavigate('auth')
-            }
-          >
-            <span aria-hidden="true">👤</span>
-            Log in
-          </button>
-
+              <button
+      className="login-button"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+        padding: '0.7rem 1.15rem',
+        border: 'none',
+        borderRadius: '999px',
+        background: isHovered
+          ? 'linear-gradient(135deg, #087c66, #0a967a)'
+          : 'linear-gradient(135deg, #064f45, #087c66)',
+        color: '#eaf7f3',
+        fontSize: '0.95rem',
+        fontWeight: 700,
+        cursor: 'pointer',
+        transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: isHovered ? '0 6px 14px rgba(6, 79, 69, 0.25)' : 'none',
+        transition: 'all 180ms ease'
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocus={() => setIsHovered(true)}
+      onBlur={() => setIsHovered(false)}
+      onClick={() => onNavigate?.('auth')}
+    >
+      Log in
+    </button>
         </div>
 
       </nav>
@@ -320,7 +341,7 @@ function PlatformPreview({ onNavigate }) {
               <span>
                 <i
                   style={{
-                    background: '#f59e0b'
+                    background: '#f5a70b'
                   }}
                 />
                 Garbage
