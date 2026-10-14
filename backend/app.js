@@ -1,13 +1,17 @@
-const express = require("express");
+const path = require("path");
 const cors = require("cors");
-
-const issueRoutes = require("./routes/issueRoutes");
+const express = require("express");
+const routes = require("./routes");
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// All API routes
+app.use("/api", routes);
 
 // Test route
 app.get("/", (req, res) => {
@@ -17,7 +21,8 @@ app.get("/", (req, res) => {
   });
 });
 
-// Issue routes
-app.use("/api/issues", issueRoutes);
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
+});
 
 module.exports = app;

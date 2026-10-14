@@ -54,7 +54,7 @@ export default function LayerSelector({
 
   return (
     <div ref={selectorRef} className="layer-control-wrapper">
-      {/* ট্রিপল-লেয়ার আইকন বটন */}
+
       <button
         type="button"
         className={`layer-toggle-btn ${isOpen ? "active" : ""}`}
@@ -75,7 +75,6 @@ export default function LayerSelector({
         </svg>
       </button>
 
-      {/* পপআপ লেয়ার উইজেট */}
       {isOpen && (
         <div className="layer-popup-card">
           <div className="layer-popup-header">
@@ -89,7 +88,6 @@ export default function LayerSelector({
             </button>
           </div>
 
-          {/* বেস লেয়ার (থাম্বনেল কার্ডসমূহ) */}
           <div className="layer-card-grid">
             {BASE_LAYERS.map((layer) => (
               <div
@@ -114,7 +112,6 @@ export default function LayerSelector({
 
           <div className="layer-divider" />
 
-          {/* ওভারলে ও ফিচারস (কাস্টম সুইচ/চেকবক্স) */}
           <div className="layer-overlays">
             <span className="section-title">Map Details</span>
 

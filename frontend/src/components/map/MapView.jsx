@@ -11,16 +11,15 @@ import {
   TileLayer,
   Marker,
   Popup,
-  LayersControl,
   LayerGroup,
   Polyline,
   useMap,
 } from "react-leaflet";
 
-import {
-  KOLKATA_BOUNDS,
-  isInsideKolkata,
-} from "./MapUtils";
+import { fetchIssues } from "../../services/api.js";  // 
+
+
+import { KOLKATA_BOUNDS, isInsideKolkata } from "./MapUtils";
 
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -42,8 +41,7 @@ import LocationPlaylist from "./LocationPlaylist";
 import LayerSelector from "./LayerSelector";
 import AdminLayerManager from "./AdminLayerManager";
 import ZONE_BOUNDARIES from "./zoneBoundaries";
-
-
+import { getUser, logout } from "../../store/authStore";
 
 /* =====================================================
    LEAFLET DEFAULT ICON FIX
@@ -63,6 +61,10 @@ L.Icon.Default.mergeOptions({
 
 const DEFAULT_POSITION = [22.5726, 88.3639];
 
+const API_URL = (
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+).replace(/\/+$/, "");
+
 const NEARBY_RADIUS = 1000;
 
 const OVERPASS_SERVERS = [
@@ -71,49 +73,26 @@ const OVERPASS_SERVERS = [
   "https://overpass.private.coffee/api/interpreter",
 ];
 
-const OSRM_SERVER =
-  "https://router.project-osrm.org/route/v1/driving";
+const OSRM_SERVER = "https://router.project-osrm.org/route/v1/driving";
 
-  /* =====================================================
+const COMPLETED_STATUSES = ["pending_review", "resolved", "completed"];
+const ASSIGNED_STATUSES = ["submitted", "acknowledged"];
+
+/* =====================================================
    ZONE CONFIG
 ===================================================== */
 
-  const ZONE_CONFIG = {
-  Shyambazar: {
-    center: [22.599, 88.373],
-    bounds: null,
-  },
-
-  "B.B.D. Bagh": {
-    center: [22.573, 88.348],
-    bounds: null,
-  },
-
-  Ballygunge: {
-    center: [22.527, 88.363],
-    bounds: null,
-  },
-
-  "College Street": {
-    center: [22.575, 88.363],
-    bounds: null,
-  },
-
-  "B.P. Township": {
-    center: [22.484, 88.405],
-    bounds: null,
-  },
-
-  Dharmatala: {
-    center: [22.562, 88.352],
-    bounds: null,
-  },
+const ZONE_CONFIG = {
+  Shyambazar: { center: [22.599, 88.373], bounds: null },
+  "B.B.D. Bagh": { center: [22.573, 88.348], bounds: null },
+  Ballygunge: { center: [22.527, 88.363], bounds: null },
+  "College Street": { center: [22.575, 88.363], bounds: null },
+  "B.P. Township": { center: [22.484, 88.405], bounds: null },
+  Dharmatala: { center: [22.562, 88.352], bounds: null },
 };
 
 const isInsideZone = (latitude, longitude, bounds) => {
-  if (!bounds) {
-    return true;
-  }
+  if (!bounds) return true;
 
   const [[south, west], [north, east]] = bounds;
 
@@ -123,6 +102,128 @@ const isInsideZone = (latitude, longitude, bounds) => {
     longitude >= west &&
     longitude <= east
   );
+};
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+const matchesIssueId = (item, id) => {
+  if (!item || id == null) return false;
+
+  const target = String(id).trim().toLowerCase();
+  if (!target) return false;
+
+  const candidates = [
+    item.id,
+    item._id,
+    item.issueId,
+    item.ticketId,
+    item.ticketNumber,
+    item.issue_id,
+    item.ticket_id,
+    item.number,
+  ]
+    .filter((value) => value != null)
+    .map((value) => String(value).trim().toLowerCase());
+
+  if (candidates.some((value) => value === target)) return true;
+
+  // Match trailing digits (e.g. "ISS-2410" vs "2410")
+  const targetNum = target.replace(/\D/g, "");
+  if (targetNum.length >= 3) {
+    if (
+      candidates.some((value) => {
+        const num = value.replace(/\D/g, "");
+        return num === targetNum || value.endsWith(targetNum);
+      })
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+function getActorHeaders({ json = false } = {}) {
+  const user = getUser();
+
+  if (!user?.id || !user?.role) {
+    throw new Error("Your session is missing. Please sign in again.");
+  }
+
+  return {
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    "x-role": user.role === "citizen" ? "citizen" : user.role,
+    "x-name": user.name || "Unknown user",
+    "x-user-id": String(user.id),
+  };
+}
+
+function formatIssueStatus(value) {
+  const status = String(value || "submitted").toLowerCase();
+  const labels = {
+    submitted: "Pending",
+    acknowledged: "Assigned",
+    in_progress: "In Progress",
+    pending_review: "Pending Review",
+    resolved: "Completed",
+    completed: "Completed",
+  };
+  return labels[status] || status.replace(/_/g, " ");
+}
+
+/* Backend issue -> consistent shape (numeric lat/lng, lowercase status) */
+function resolveAssignedStaffName(issue) {
+  if (
+    typeof issue?.assignedStaffName === "string" &&
+    issue.assignedStaffName.trim()
+  ) {
+    return issue.assignedStaffName.trim();
+  }
+
+  if (typeof issue?.assignedTo === "string" && issue.assignedTo.trim()) {
+    return issue.assignedTo.trim();
+  }
+
+  if (issue?.assignedTo && typeof issue.assignedTo === "object") {
+    const name = issue.assignedTo.name || issue.assignedTo.fullName;
+
+    if (typeof name === "string" && name.trim()) {
+      return name.trim();
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeIssue(issue) {
+  const coordinates = issue.location?.coordinates;
+  const assignedStaffName = resolveAssignedStaffName(issue);
+
+  return {
+    ...issue,
+    id: String(issue.id ?? issue._id ?? ""),
+    latitude: Number(issue.latitude ?? issue.lat ?? coordinates?.[1]),
+    longitude: Number(issue.longitude ?? issue.lng ?? coordinates?.[0]),
+    type: issue.type || issue.category || "Other",
+    status: String(issue.status || "submitted").toLowerCase(),
+    assignedStaffName,
+  };
+}
+
+function hasValidCoordinates(issue) {
+  return (
+    Number.isFinite(issue?.latitude) &&
+    Number.isFinite(issue?.longitude)
+  );
+}
+
+const extractRows = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.issues)) return payload.issues;
+  return [];
 };
 
 /* =====================================================
@@ -142,47 +243,48 @@ const CATEGORY_ICONS = {
 const getCategoryIcon = (category) =>
   CATEGORY_ICONS[category] || CATEGORY_ICONS.other;
 
-/* =====================================================
-   CATEGORY ICON CACHE
-===================================================== */
-
 const iconCache = new Map();
 
 const createCategoryLeafletIcon = (category) => {
-  if (iconCache.has(category)) {
-    return iconCache.get(category);
-  }
+  if (iconCache.has(category)) return iconCache.get(category);
 
   const icon = L.divIcon({
-    html: `
-      <div class="leaflet-category-icon-inner">
-        ${getCategoryIcon(category)}
-      </div>
-    `,
+    html: `<div class="leaflet-category-icon-inner">${getCategoryIcon(
+      category
+    )}</div>`,
     className: "custom-category-icon",
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
 
   iconCache.set(category, icon);
-
   return icon;
 };
 
+/* Overpass tag filters per category */
+const CATEGORY_FILTERS = {
+  shop: ['["shop"]'],
+  hospital: ['["amenity"="hospital"]', '["healthcare"="hospital"]'],
+  pharmacy: ['["amenity"="pharmacy"]', '["healthcare"="pharmacy"]'],
+  bank: ['["amenity"="bank"]', '["office"="financial"]'],
+  restaurant: [
+    '["amenity"="restaurant"]',
+    '["amenity"="fast_food"]',
+    '["amenity"="cafe"]',
+  ],
+  school: ['["amenity"="school"]', '["amenity"="college"]'],
+};
+
 /* =====================================================
-   MAIN MAP COMPONENT
+   STAFF ICON
 ===================================================== */
 
-  const getStaffIcon = (status) => {
+const getStaffIcon = (status) => {
   let icon = "👨‍🔧";
 
-  if (status === "Active") {
-    icon = "🟢👨‍🔧";
-  } else if (status === "Busy") {
-    icon = "🟠👨‍🔧";
-  } else if (status === "Offline") {
-    icon = "🔴👨‍🔧";
-  }
+  if (status === "Active") icon = "🟢👨‍🔧";
+  else if (status === "Busy") icon = "🟠👨‍🔧";
+  else if (status === "Offline") icon = "🔴👨‍🔧";
 
   return L.divIcon({
     className: "staff-location-icon",
@@ -193,249 +295,366 @@ const createCategoryLeafletIcon = (category) => {
 };
 
 /* =====================================================
-   PICK MODE CONTROLLER
+   MAP CONTROLLERS (must live inside MapContainer)
 ===================================================== */
 
 function PickModeController({ center, enabled }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!enabled || !center) {
-      return;
-    }
-
+    if (!enabled || !center) return;
     map.setView(center, 14);
   }, [map, center, enabled]);
 
   return null;
- }
+}
 
- export default function MapView({ role = "user", onReportIssue }) {
-  /* ===================================================
-                   BASIC
-  =================================================== */
+function IssueLocationController({ lat, lng }) {
+  const map = useMap();
 
-  const defaultPosition = useMemo(
-    () => DEFAULT_POSITION,
-    []
-  );
+  useEffect(() => {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    map.setView([lat, lng], 15);
+  }, [map, lat, lng]);
 
-  const MAPTILER_KEY =
-    import.meta.env.VITE_MAPTILER_KEY;
+  return null;
+}
+
+/* Moves the map whenever mapTarget changes (search, My Location, tracking) */
+function MapTargetController({ target }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!target) return;
+    map.flyTo(target, Math.max(map.getZoom(), 15), { duration: 0.8 });
+  }, [map, target]);
+
+  return null;
+}
+
+/* =====================================================
+   MAIN COMPONENT
+===================================================== */
+
+export default function MapView({ role: roleProp = "user", onReportIssue }) {
+  /* ---------- URL params ---------- */
+  const searchParams = new URLSearchParams(window.location.search);
+
+  const zone = searchParams.get("zone");
+  const pickMode = searchParams.get("pick") === "1";
+  const returnTo = searchParams.get("return");
+  const targetIssueId = searchParams.get("issueId");
+
+  const issueLatParam = searchParams.get("lat");
+  const issueLngParam = searchParams.get("lng");
+  const issueLat = issueLatParam !== null ? Number(issueLatParam) : null;
+  const issueLng = issueLngParam !== null ? Number(issueLngParam) : null;
+
+  // Prefer prop; fall back to path so /staff/map and /admin/map still work
+  const role = useMemo(() => {
+    if (roleProp && roleProp !== "user") return roleProp;
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("/staff")) return "staff";
+    if (path.includes("/admin")) return "admin";
+    return roleProp || "user";
+  }, [roleProp]);
+
+  const zoneConfig = ZONE_CONFIG[zone];
+
+  /* ---------- Basic ---------- */
+  const defaultPosition = useMemo(() => DEFAULT_POSITION, []);
+  const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+
+   /* ---------- Backend System Status ---------- */
+const [isSystemOnline, setIsSystemOnline] = useState(false);
+
+useEffect(() => {
+  let isMounted = true;
+
+  const checkSystemStatus = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/health");
+
+      if (isMounted) {
+        setIsSystemOnline(response.ok);
+      }
+    } catch {
+      if (isMounted) {
+        setIsSystemOnline(false);
+      }
+    }
+  };
+
+  checkSystemStatus();
+
+  const intervalId = setInterval(checkSystemStatus, 10000);
+
+  return () => {
+    isMounted = false;
+    clearInterval(intervalId);
+  };
+}, []);
 
   const [baseLayer, setBaseLayer] = useState({
-   id: "Streets",
-   url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-   attribution: "&copy; OpenStreetMap contributors",
-   });
+    id: "Streets",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
+  });
 
-  /* ===================================================
-     ABORT CONTROLLERS
-  =================================================== */
-
+  /* ---------- Refs ---------- */
   const nearbyAbortRef = useRef(null);
+  const issuesAbortRef = useRef(null);
   const searchAbortRef = useRef(null);
   const routeAbortRef = useRef(null);
   const trackingWatchRef = useRef(null);
+  const nearbyCacheRef = useRef(new Map());
 
-  /* ===================================================
-     CACHE
-  =================================================== */
-
-  const nearbyCacheRef = useRef(
-    new Map()
-  );
-
-  /* ===================================================
-     SEARCH STATE
-  =================================================== */
-
+  /* ---------- Search ---------- */
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
-  const [mapTarget, setMapTarget] =
-    useState(null);
+  const [mapTarget, setMapTarget] = useState(null);
 
-  /* ===================================================
-     USER LOCATION
-  =================================================== */
+  /* ---------- User location ---------- */
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationAccuracy, setLocationAccuracy] = useState(0);
+  const [locationLoading, setLocationLoading] = useState(false);
 
-  const [userLocation, setUserLocation] =
-    useState(null);
+  /* ---------- Live tracking ---------- */
+  const [isTracking, setIsTracking] = useState(false);
+  const [trackingPath, setTrackingPath] = useState([]);
+  const [trackingError, setTrackingError] = useState("");
 
-  const [locationAccuracy, setLocationAccuracy] =
-    useState(0);
-
-  const [locationLoading, setLocationLoading] =
-    useState(false);
-
-  /* ===================================================
-     LIVE TRACKING
-  =================================================== */
-
-  const [isTracking, setIsTracking] =
-    useState(false);
-
-  const [trackingPath, setTrackingPath] =
-    useState([]);
-
-  const [trackingError, setTrackingError] =
-    useState("");
-
-  /* ===================================================
-     SELECTED LOCATION
-  =================================================== */
-
-  const [selectedLocation, setSelectedLocation] =
-    useState(null);
-
-  const [clickedLocation, setClickedLocation] =
-    useState(null);
-
+  /* ---------- Selected location ---------- */
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [clickedLocation, setClickedLocation] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  /* ===================================================
-     NEARBY
-  =================================================== */
+  /* ---------- Nearby places ---------- */
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState("");
+  const [nearbyCategory, setNearbyCategory] = useState(null);
 
-  const [nearbyPlaces, setNearbyPlaces] =
-    useState([]);
+  /* ---------- Backend nearby issues (citizen map) ---------- */
+  const [backendIssues, setBackendIssues] = useState([]);
+  const [backendIssuesLoading, setBackendIssuesLoading] = useState(false);
+  const [backendIssuesError, setBackendIssuesError] = useState("");
 
-  const [nearbyLoading, setNearbyLoading] =
-    useState(false);
-
-  const [nearbyError, setNearbyError] =
-    useState("");
-
-  const [nearbyCategory, setNearbyCategory] =
-    useState(null);
-
-    /* ===================================================
-                        MAP FILTERS
-    =================================================== */
-
-  const [showFilters, setShowFilters] =
-    useState(false);
+  /* ---------- Filters ---------- */
+  const [showFilters, setShowFilters] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
 
   const [activeFilters, setActiveFilters] = useState({
     cityHub: true,
     selectedLocation: true,
     nearbyPlaces: true,
     issues: true,
-    staffLocations: true, 
+    staffLocations: true,
   });
 
-    const handleFilterClick = () => {
-    setShowFilters((previous) => !previous);
-  };
+  const handleFilterClick = () => setShowFilters((previous) => !previous);
 
-    const handleFilterChange = (filter) => {
+  const handleFilterChange = (filter) =>
     setActiveFilters((previous) => ({
       ...previous,
       [filter]: !previous[filter],
     }));
- };
-  
-  /* ===================================================
-     TRAFFIC
-  =================================================== */
 
-  const [showTraffic, setShowTraffic] =
-    useState(false);
+  /* ---------- Traffic ---------- */
+  const [showTraffic, setShowTraffic] = useState(false);
 
+  /* ---------- Routing ---------- */
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [alternativeRoutes, setAlternativeRoutes] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState("");
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [routeDestination, setRouteDestination] = useState(null);
 
-  /* ===================================================
-     ROUTING
-  =================================================== */
-
-  const [routeCoordinates, setRouteCoordinates] =
-    useState([]);
-
-  const [routeLoading, setRouteLoading] =
-    useState(false);
-  
-  const [alternativeRoutes, setAlternativeRoutes] = 
-    useState([]);
-
-  const [routeError, setRouteError] =
-    useState("");
-
-  const [routeInfo, setRouteInfo] =
-    useState(null);
-
-  const [routeDestination, setRouteDestination] =
-    useState(null);
-
-  const [showAssignedIssues, setShowAssignedIssues] = 
-    useState(true);
-
+  /* ---------- Staff / admin ---------- */
+  const [showAssignedIssues, setShowAssignedIssues] = useState(true);
   const [staffStatusFilter, setStaffStatusFilter] = useState("All");
   const [adminStatusFilter, setAdminStatusFilter] = useState("All");
   const [selectedAdminIssue, setSelectedAdminIssue] = useState(null);
-
+  const [selectedStaffIssue, setSelectedStaffIssue] = useState(null);
   const [workUpdates, setWorkUpdates] = useState({});
-
   const [evidenceFiles, setEvidenceFiles] = useState({});
-  
-  const [staffLocations] = useState([
-  {
-    id: 1,
-    name: "Demo Staff",
-    latitude: 22.5755,
-    longitude: 88.4271,
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Staff 2",
-    latitude: 22.5720,
-    longitude: 88.3650,
-    status: "Busy",
- },
-  ]);
-  
-  const [assignedIssues, setAssignedIssues] = useState([
-  {
-    id: 1,
-    title: "Broken Street Light",
-    type: "Electricity",
-    status: "Assigned",
-    latitude: 22.5729,
-    longitude: 88.3645,
-    description: "Street light is not working.",
-  },
-  {
-    id: 2,
-    title: "Road Damage",
-    type: "Road",
-    status: "In Progress",
-    latitude: 22.5685,
-    longitude: 88.3690,
-    description: "Road surface is damaged.",
-  },
-]);
 
-  const filteredAssignedIssues = assignedIssues.filter(
-  (issue) =>
-    staffStatusFilter === "All" ||
-    issue.status === staffStatusFilter
+  // Never show fabricated staff coordinates. Fill only from a real staff-location API.
+  const [staffLocations] = useState([]);
+
+  const [assignedIssues, setAssignedIssues] = useState([]);
+  const [assignedIssuesLoading, setAssignedIssuesLoading] = useState(false);
+  const [assignedIssuesError, setAssignedIssuesError] = useState("");
+
+  const matchesIssueFilter = useCallback((issue, filter) => {
+    const status = String(issue.status || "").toLowerCase();
+
+    if (filter === "All") return true;
+    if (filter === "Assigned") {
+      return Boolean(issue.assignedTo) && ASSIGNED_STATUSES.includes(status);
+    }
+    if (filter === "In Progress") return status === "in_progress";
+    if (filter === "Completed") return COMPLETED_STATUSES.includes(status);
+    return status === String(filter).toLowerCase();
+  }, []);
+
+  const filteredAssignedIssues = useMemo(
+    () =>
+      assignedIssues.filter((issue) =>
+        matchesIssueFilter(issue, staffStatusFilter)
+      ),
+    [assignedIssues, staffStatusFilter, matchesIssueFilter]
   );
 
-  const filteredAdminIssues = assignedIssues.filter(
-    (issue) =>
-      adminStatusFilter === "All" ||
-      issue.status === adminStatusFilter
+  const filteredAdminIssues = useMemo(
+    () =>
+      assignedIssues.filter((issue) =>
+        matchesIssueFilter(issue, adminStatusFilter)
+      ),
+    [assignedIssues, adminStatusFilter, matchesIssueFilter]
   );
 
-  const adminIssueStats = useMemo(() => {
-    return {
+  const adminIssueStats = useMemo(
+    () => ({
       total: assignedIssues.length,
-      assigned: assignedIssues.filter((issue) => issue.status === "Assigned").length,
-      inProgress: assignedIssues.filter((issue) => issue.status === "In Progress").length,
-      completed: assignedIssues.filter((issue) => issue.status === "Completed").length,
-    };
-  }, [assignedIssues]);
+      assigned: assignedIssues.filter(
+        (issue) =>
+          Boolean(issue.assignedTo) &&
+          ASSIGNED_STATUSES.includes(String(issue.status).toLowerCase())
+      ).length,
+      inProgress: assignedIssues.filter(
+        (issue) => String(issue.status).toLowerCase() === "in_progress"
+      ).length,
+      completed: assignedIssues.filter((issue) =>
+        COMPLETED_STATUSES.includes(String(issue.status).toLowerCase())
+      ).length,
+    }),
+    [assignedIssues]
+  );
 
+  /* ===================================================
+     OPEN ISSUE FROM URL (?issueId=...&lat=...&lng=...)
+     Works for both staff and admin.
+  =================================================== */
+
+  useEffect(() => {
+    if ((role !== "staff" && role !== "admin") || !targetIssueId) {
+      return undefined;
+    }
+
+    const openPanel = (issue) => {
+      if (role === "admin") {
+        setSelectedStaffIssue(null);
+        setSelectedAdminIssue(issue);
+        // Ensure filter does not hide the deep-linked issue
+        setAdminStatusFilter("All");
+      } else {
+        setSelectedAdminIssue(null);
+        setSelectedStaffIssue(issue);
+        setStaffStatusFilter("All");
+      }
+    };
+
+    const foundIssue = assignedIssues.find((item) =>
+      matchesIssueId(item, targetIssueId)
+    );
+
+    if (foundIssue) {
+      openPanel(foundIssue);
+      if (hasValidCoordinates(foundIssue)) {
+        setMapTarget([foundIssue.latitude, foundIssue.longitude]);
+      }
+      return undefined;
+    }
+
+    // Instant map move from URL coords while we fetch full issue data
+    if (Number.isFinite(issueLat) && Number.isFinite(issueLng)) {
+      setMapTarget([issueLat, issueLng]);
+    }
+
+    const controller = new AbortController();
+
+    let headers;
+    try {
+      headers = getActorHeaders();
+    } catch (err) {
+      console.error("Cannot load issue details (auth):", err);
+      if (Number.isFinite(issueLat) && Number.isFinite(issueLng)) {
+        openPanel({
+          id: String(targetIssueId),
+          title: `Issue ${targetIssueId}`,
+          status: "submitted",
+          type: "Unknown",
+          description: "Could not load full details (session missing).",
+          latitude: issueLat,
+          longitude: issueLng,
+        });
+      }
+      return undefined;
+    }
+
+    fetch(`${API_URL}/issues`, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((payload) => {
+        const rows = extractRows(payload);
+        const target = rows.find((item) => matchesIssueId(item, targetIssueId));
+
+        if (target) {
+          const normalized = normalizeIssue(target);
+          openPanel(normalized);
+          if (hasValidCoordinates(normalized)) {
+            setMapTarget([normalized.latitude, normalized.longitude]);
+          }
+          return;
+        }
+
+        console.warn(
+          "Issue not found in /issues response:",
+          targetIssueId,
+          "Sample ids:",
+          rows.slice(0, 5).map((i) => i.id || i._id || i.issueId || i.ticketId)
+        );
+
+        if (Number.isFinite(issueLat) && Number.isFinite(issueLng)) {
+          openPanel({
+            id: String(targetIssueId),
+            title: `Issue ${targetIssueId}`,
+            status: "submitted",
+            type: "Unknown",
+            description:
+              "Full details were not returned by the server. Coordinates are from the map link.",
+            latitude: issueLat,
+            longitude: issueLng,
+          });
+        }
+      })
+      .catch((error) => {
+        if (error.name === "AbortError") return;
+        console.error("Failed to fetch target issue:", error);
+        if (Number.isFinite(issueLat) && Number.isFinite(issueLng)) {
+          openPanel({
+            id: String(targetIssueId),
+            title: `Issue ${targetIssueId}`,
+            status: "submitted",
+            type: "Unknown",
+            description: "Could not load issue details from the server.",
+            latitude: issueLat,
+            longitude: issueLng,
+          });
+        }
+      });
+
+    return () => controller.abort();
+  }, [role, targetIssueId, assignedIssues, issueLat, issueLng]);
+
+  /* Admin: only clear panel when the issue is gone from the full list
+     (not merely filtered). Deep-links must stay open. */
   useEffect(() => {
     if (role !== "admin") {
       setSelectedAdminIssue(null);
@@ -444,13 +663,16 @@ function PickModeController({ center, enabled }) {
 
     if (
       selectedAdminIssue &&
-      !filteredAdminIssues.some(
-        (issue) => issue.id === selectedAdminIssue.id
-      )
+      assignedIssues.length > 0 &&
+      !assignedIssues.some((issue) =>
+        matchesIssueId(issue, selectedAdminIssue.id)
+      ) &&
+      // Keep deep-linked issue open even if not yet in assignedIssues
+      !matchesIssueId(selectedAdminIssue, targetIssueId)
     ) {
       setSelectedAdminIssue(null);
     }
-  }, [role, filteredAdminIssues, selectedAdminIssue]);
+  }, [role, assignedIssues, selectedAdminIssue, targetIssueId]);
 
   /* ===================================================
      CLEANUP
@@ -459,838 +681,549 @@ function PickModeController({ center, enabled }) {
   useEffect(() => {
     return () => {
       nearbyAbortRef.current?.abort();
+      issuesAbortRef.current?.abort();
       searchAbortRef.current?.abort();
       routeAbortRef.current?.abort();
 
       if (trackingWatchRef.current !== null) {
-        navigator.geolocation?.clearWatch(
-          trackingWatchRef.current
-        );
+        navigator.geolocation?.clearWatch(trackingWatchRef.current);
         trackingWatchRef.current = null;
       }
     };
   }, []);
 
   /* ===================================================
-     FORMAT DISTANCE
+     FORMATTERS
   =================================================== */
 
-  const formatDistance = useCallback(
-    (meters) => {
-      if (!meters) {
-        return "0 m";
-      }
+  const formatDistance = useCallback((meters) => {
+    if (!meters) return "0 m";
+    if (meters < 1000) return `${Math.round(meters)} m`;
+    return `${(meters / 1000).toFixed(1)} km`;
+  }, []);
 
-      if (meters < 1000) {
-        return `${Math.round(meters)} m`;
-      }
+  const formatDuration = useCallback((seconds) => {
+    if (!seconds) return "0 min";
 
-      return `${(meters / 1000).toFixed(1)} km`;
-    },
-    []
-  );
+    const totalMinutes = Math.round(seconds / 60);
+    if (totalMinutes < 60) return `${totalMinutes} min`;
 
-  /* ===================================================
-     FORMAT DURATION
-  =================================================== */
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
 
-  const formatDuration = useCallback(
-    (seconds) => {
-      if (!seconds) {
-        return "0 min";
-      }
-
-      const totalMinutes = Math.round(
-        seconds / 60
-      );
-
-      if (totalMinutes < 60) {
-        return `${totalMinutes} min`;
-      }
-
-      const hours = Math.floor(
-        totalMinutes / 60
-      );
-
-      const minutes = totalMinutes % 60;
-
-      if (minutes === 0) {
-        return `${hours} hr`;
-      }
-
-      return `${hours} hr ${minutes} min`;
-    },
-    []
-  );
+    return minutes === 0 ? `${hours} hr` : `${hours} hr ${minutes} min`;
+  }, []);
 
   /* ===================================================
      GET ROUTE
   =================================================== */
 
-    const getRoute = useCallback(
-     async (destination) => {
-      if (!destination) {
-       return;
-    }
+  const getRoute = useCallback(
+    async (destination) => {
+      if (!destination) return;
 
-    if (!userLocation) {
-      alert(
-        "Please click 'My Location' first to get your current location."
-      );
-      return;
-    }
+      if (!userLocation) {
+        alert("Please click 'My Location' first to get your current location.");
+        return;
+      }
 
-    const [
-      userLatitude,
-      userLongitude,
-    ] = userLocation;
+      const [userLatitude, userLongitude] = userLocation;
 
-    const {
-      latitude: destinationLatitude,
-      longitude: destinationLongitude,
-      name = "Destination",
-    } = destination;
+      const {
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+        name = "Destination",
+      } = destination;
 
-    if (
-      !isInsideKolkata(
-        destinationLatitude,
-        destinationLongitude
-      )
-    ) {
-      alert(
-        "Destination is outside Kolkata boundaries."
-      );
-      return;
-    }
+      if (!isInsideKolkata(destinationLatitude, destinationLongitude)) {
+        alert("Destination is outside Kolkata boundaries.");
+        return;
+      }
 
-    /* Cancel previous route request */
+      routeAbortRef.current?.abort();
+
+      const controller = new AbortController();
+      routeAbortRef.current = controller;
+
+      setRouteLoading(true);
+      setRouteError("");
+      setRouteCoordinates([]);
+      setAlternativeRoutes([]);
+      setRouteInfo(null);
+
+      setRouteDestination({
+        latitude: destinationLatitude,
+        longitude: destinationLongitude,
+        name,
+      });
+
+      try {
+        /* 1. OSRM: geometry + normal ETA */
+        const url =
+          `${OSRM_SERVER}/` +
+          `${userLongitude},${userLatitude};` +
+          `${destinationLongitude},${destinationLatitude}` +
+          `?overview=full&geometries=geojson&steps=true&alternatives=true`;
+
+        const response = await fetch(url, { signal: controller.signal });
+
+        if (!response.ok) {
+          throw new Error(`Routing server error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+          throw new Error("No route found.");
+        }
+
+        const route = data.routes[0];
+
+        // OSRM: [lng, lat]  ->  Leaflet: [lat, lng]
+        const toLatLng = (osrmRoute) =>
+          osrmRoute.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+        const coordinates = toLatLng(route);
+        const altRouteCoordinates = data.routes.slice(1).map(toLatLng);
+
+        /* 2. TomTom: traffic ETA (optional - route still shows if this fails) */
+        let trafficDuration;
+        let trafficDelay;
+
+        try {
+          const tomTomUrl =
+            `https://api.tomtom.com/routing/1/calculateRoute/` +
+            `${userLatitude},${userLongitude}:` +
+            `${destinationLatitude},${destinationLongitude}/json` +
+            `?traffic=true&computeTravelTimeFor=all` +
+            `&key=${import.meta.env.VITE_TOMTOM_API_KEY}`;
+
+          const trafficResponse = await fetch(tomTomUrl, {
+            signal: controller.signal,
+          });
+
+          if (!trafficResponse.ok) {
+            throw new Error(`TomTom traffic error: ${trafficResponse.status}`);
+          }
+
+          const trafficData = await trafficResponse.json();
+          const summary = trafficData.routes?.[0]?.summary;
+
+          trafficDuration = summary?.travelTimeInSeconds;
+          trafficDelay = summary?.trafficDelayInSeconds;
+        } catch (trafficError) {
+          if (trafficError.name === "AbortError") throw trafficError;
+          console.warn("Traffic ETA unavailable:", trafficError);
+        }
+
+        if (controller.signal.aborted) return;
+
+        /* 3. Save */
+        setRouteCoordinates(coordinates);
+        setAlternativeRoutes(altRouteCoordinates);
+        setRouteInfo({
+          distance: route.distance,
+          duration: route.duration,
+          trafficDuration,
+          trafficDelay,
+        });
+      } catch (error) {
+        if (error.name === "AbortError") return;
+
+        console.error("Routing error:", error);
+
+        setRouteCoordinates([]);
+        setAlternativeRoutes([]);
+        setRouteInfo(null);
+        setRouteError("Unable to find a route. Please try again.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setRouteLoading(false);
+        }
+      }
+    },
+    [userLocation]
+  );
+
+  /* Re-route when the user's location changes */
+  useEffect(() => {
+    if (!userLocation || !routeDestination) return;
+
+    getRoute(routeDestination);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLocation]);
+
+  const clearRoute = useCallback(() => {
     routeAbortRef.current?.abort();
 
-    const controller =
-      new AbortController();
-
-    routeAbortRef.current = controller;
-
-    setRouteLoading(true);
-    setRouteError("");
     setRouteCoordinates([]);
+    setAlternativeRoutes([]);
     setRouteInfo(null);
+    setRouteError("");
+    setRouteDestination(null);
+    setRouteLoading(false);
+  }, []);
 
-    setRouteDestination({
-      latitude: destinationLatitude,
-      longitude: destinationLongitude,
-      name,
-    });
+  /* ===================================================
+     BACKEND NEARBY ISSUES (citizen map only)
+  =================================================== */
+
+  const getNearbyIssues = useCallback(async (latitude, longitude) => {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+    if (!isInsideKolkata(latitude, longitude)) {
+      setBackendIssues([]);
+      setBackendIssuesError("Selected location is outside Kolkata.");
+      return;
+    }
+
+    issuesAbortRef.current?.abort();
+    const controller = new AbortController();
+    issuesAbortRef.current = controller;
+
+    setBackendIssuesLoading(true);
+    setBackendIssuesError("");
 
     try {
-      /* ==========================================
-         1. OSRM
-         Route geometry + normal ETA
-      ========================================== */
+      const params = new URLSearchParams({
+        latitude: String(latitude),
+        longitude: String(longitude),
+        radius: "2000",
+      });
 
-      const url =
-        `${OSRM_SERVER}/` +
-        `${userLongitude},${userLatitude};` +
-        `${destinationLongitude},${destinationLatitude}` +
-        `?overview=full` +
-        `&geometries=geojson` +
-        `&steps=true` +
-        `&alternatives=true`;
-
-      const response = await fetch(url, {
+      const response = await fetch(`${API_URL}/issues/nearby?${params}`, {
+        method: "GET",
+        headers: getActorHeaders(),
         signal: controller.signal,
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error(
-          `Routing server error: ${response.status}`
-        );
+        throw new Error(data.message || `Issue API error (${response.status})`);
       }
 
-      const data = await response.json();
-
-      if (
-        data.code !== "Ok" ||
-        !data.routes ||
-        data.routes.length === 0
-      ) {
-        throw new Error("No route found.");
-      }
-      
-      console.log("OSRM routes:", data.routes.length, data.routes);
-      const route = data.routes[0];
-      const alternativeRoutes = data.routes.slice(1);
-
-      /*
-        OSRM:
-        [longitude, latitude]
-
-        Leaflet:
-        [latitude, longitude]
-      */
-
-      const coordinates =
-        route.geometry.coordinates.map(
-          ([longitude, latitude]) => [
-            latitude,
-            longitude,
-          ]
-        );
-
-      const alternativeRouteCoordinates = alternativeRoutes.map(
-         (alternativeRoute) =>
-         alternativeRoute.geometry.coordinates.map(
-         ([longitude, latitude]) => [latitude, longitude]
-        )
-      );
-
-      /* ==========================================
-         2. TOMTOM
-         Traffic ETA
-      ========================================== */
-
-      const tomTomUrl =
-        `https://api.tomtom.com/routing/1/calculateRoute/` +
-        `${userLatitude},${userLongitude}:` +
-        `${destinationLatitude},${destinationLongitude}/json` +
-        `?traffic=true` +
-        `&computeTravelTimeFor=all` +
-        `&key=${import.meta.env.VITE_TOMTOM_API_KEY}`;
-
-      const trafficResponse =
-        await fetch(tomTomUrl, {
-          signal: controller.signal,
-        });
-
-      if (!trafficResponse.ok) {
-        throw new Error(
-          `TomTom traffic error: ${trafficResponse.status}`
-        );
-      }
-
-      const trafficData =
-        await trafficResponse.json();
-
-      const trafficRoute =
-        trafficData.routes?.[0];
-
-      if (!trafficRoute) {
-        throw new Error(
-          "No traffic route found."
-        );
-      }
-
-      const trafficSummary =
-        trafficRoute.summary;
-
-      const trafficDuration =
-        trafficSummary?.travelTimeInSeconds;
-
-      const trafficDelay =
-        trafficSummary?.trafficDelayInSeconds;
-
-      console.log(
-        "TomTom Summary:",
-        trafficSummary
-      );
-
-      console.log(
-        "trafficDuration:",
-        trafficDuration
-      );
-
-      console.log(
-        "trafficDelay:",
-        trafficDelay
-      );
-
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      /* ==========================================
-         3. SAVE ROUTE DATA
-      ========================================== */
-
-      setRouteCoordinates(coordinates);
-
-      setAlternativeRoutes(alternativeRouteCoordinates);
-
-      setRouteInfo({
-        distance: route.distance,
-        duration: route.duration,
-        trafficDuration,
-        trafficDelay,
-      });
-
+      setBackendIssues(extractRows(data));
     } catch (error) {
-      if (
-        error.name === "AbortError"
-      ) {
-        return;
-      }
+      if (error.name === "AbortError") return;
 
-      console.error(
-        "Routing error:",
-        error
-      );
-
-      setRouteCoordinates([]);
-      setRouteInfo(null);
-
-      setRouteError(
-        "Unable to find a route. Please try again."
-      );
-
+      console.error("Failed to load nearby issues:", error);
+      setBackendIssues([]);
+      setBackendIssuesError(error.message || "Unable to load nearby issues.");
     } finally {
-      if (!controller.signal.aborted) {
-        setRouteLoading(false);
+      if (issuesAbortRef.current === controller) {
+        setBackendIssuesLoading(false);
       }
     }
-  },
-  [userLocation]
-);
+  }, []);
+
+  useEffect(() => {
+    // Staff / admin already get every issue from /issues, so skip this for them.
+    if (role !== "user" || !userLocation) return;
+
+    getNearbyIssues(userLocation[0], userLocation[1]);
+  }, [role, userLocation, getNearbyIssues]);
+
   /* ===================================================
-     CLEAR ROUTE
+     ASSIGNED ISSUES (STAFF / ADMIN)
   =================================================== */
 
-   useEffect(() => {
-   if (!userLocation || !routeDestination) return;
-
-   getRoute(routeDestination);
-
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [userLocation]);
   
-  const clearRoute = useCallback(() => {
-  routeAbortRef.current?.abort();
+useEffect(() => {
+  if (role !== "staff" && role !== "admin") {
+    setAssignedIssues([]);
+    setAssignedIssuesError("");
+    setAssignedIssuesLoading(false);
+    return undefined;
+  }
 
-  setRouteCoordinates([]);
-  setAlternativeRoutes([]);
-  setRouteInfo(null);
-  setRouteError("");
-  setRouteDestination(null);
-  setRouteLoading(false);
-  }, []);
+  const controller = new AbortController();
+
+  async function loadAssignedIssues() {
+    setAssignedIssuesLoading(true);
+    setAssignedIssuesError("");
+
+    try {
+      const payload = await fetchIssues({
+        signal: controller.signal,
+      });
+
+      const normalized = extractRows(payload)
+        .map(normalizeIssue)
+        .filter((issue) => Boolean(issue.id));
+
+      if (!controller.signal.aborted) {
+        setAssignedIssues(normalized);
+      }
+    } catch (error) {
+      if (error.name === "AbortError") return;
+
+      console.error("Failed to load assigned issues:", error);
+
+      if (!controller.signal.aborted) {
+        setAssignedIssuesError(
+          error.message || "Unable to load assigned issues."
+        );
+        setAssignedIssues([]);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setAssignedIssuesLoading(false);
+      }
+    }
+  }
+
+  loadAssignedIssues();
+
+  return () => controller.abort();
+}, [role]);
+
 
   /* ===================================================
      COPY COORDINATES
   =================================================== */
 
   const copyCoordinates = async () => {
-    if (!clickedLocation) {
-      return;
-    }
+    if (!clickedLocation) return;
 
     const coordinates =
       `${clickedLocation.latitude.toFixed(6)}, ` +
       `${clickedLocation.longitude.toFixed(6)}`;
 
     try {
-      if (
-        navigator.clipboard &&
-        window.isSecureContext
-      ) {
-        await navigator.clipboard.writeText(
-          coordinates
-        );
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(coordinates);
       } else {
-        const textarea =
-          document.createElement(
-            "textarea"
-          );
-
+        const textarea = document.createElement("textarea");
         textarea.value = coordinates;
-
-        document.body.appendChild(
-          textarea
-        );
+        document.body.appendChild(textarea);
 
         try {
           textarea.select();
-
-          document.execCommand(
-            "copy"
-          );
+          document.execCommand("copy");
         } finally {
-          document.body.removeChild(
-            textarea
-          );
+          document.body.removeChild(textarea);
         }
       }
 
       setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert(
-        "Failed to copy coordinates."
-      );
+      alert("Failed to copy coordinates.");
     }
   };
 
   /* ===================================================
-     BUILD OVERPASS QUERY
+     OVERPASS / NEARBY PLACES
   =================================================== */
 
-  const buildCategoryQuery =
-    useCallback(
+  const buildCategoryQuery = useCallback((latitude, longitude, category) => {
+    const filters = CATEGORY_FILTERS[category] || [];
+
+    const queryParts = filters
+      .map(
+        (filter) =>
+          `nwr${filter}(around:${NEARBY_RADIUS},${latitude},${longitude});`
+      )
+      .join("\n");
+
+    return `
+      [out:json][timeout:10];
       (
-        latitude,
-        longitude,
-        category
-      ) => {
-        let queryParts = "";
-
-        switch (category) {
-          case "shop":
-            queryParts = `
-              nwr["shop"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          case "hospital":
-            queryParts = `
-              nwr["amenity"="hospital"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["healthcare"="hospital"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          case "pharmacy":
-            queryParts = `
-              nwr["amenity"="pharmacy"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["healthcare"="pharmacy"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          case "bank":
-            queryParts = `
-              nwr["amenity"="bank"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["office"="financial"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          case "restaurant":
-            queryParts = `
-              nwr["amenity"="restaurant"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["amenity"="fast_food"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["amenity"="cafe"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          case "school":
-            queryParts = `
-              nwr["amenity"="school"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-
-              nwr["amenity"="college"](
-                around:${NEARBY_RADIUS},
-                ${latitude},
-                ${longitude}
-              );
-            `;
-            break;
-
-          default:
-            break;
-        }
-
-        return `
-          [out:json][timeout:10];
-          (
-            ${queryParts}
-          );
-          out center tags;
-        `;
-      },
-      []
-    );
-
-  /* ===================================================
-     CONVERT OSM ELEMENT
-  =================================================== */
-
-  const convertOSMElement =
-    useCallback((element) => {
-      const tags = element.tags || {};
-
-      const latitude =
-        typeof element.lat === "number"
-          ? element.lat
-          : element.center?.lat;
-
-      const longitude =
-        typeof element.lon === "number"
-          ? element.lon
-          : element.center?.lon;
-
-      if (
-        typeof latitude !== "number" ||
-        typeof longitude !== "number"
-      ) {
-        return null;
-      }
-
-      if (
-        !isInsideKolkata(
-          latitude,
-          longitude
-        )
-      ) {
-        return null;
-      }
-
-      let category = "other";
-
-      if (tags.shop) {
-        category = "shop";
-      }
-
-      if (
-        tags.amenity === "hospital" ||
-        tags.healthcare === "hospital"
-      ) {
-        category = "hospital";
-      }
-
-      if (
-        tags.amenity === "pharmacy" ||
-        tags.healthcare === "pharmacy"
-      ) {
-        category = "pharmacy";
-      }
-
-      if (
-        tags.amenity === "bank" ||
-        tags.office === "financial"
-      ) {
-        category = "bank";
-      }
-
-      if (
-        [
-          "restaurant",
-          "fast_food",
-          "cafe",
-        ].includes(tags.amenity)
-      ) {
-        category = "restaurant";
-      }
-
-      if (
-        ["school", "college"].includes(
-          tags.amenity
-        )
-      ) {
-        category = "school";
-      }
-
-      const name =
-        tags.name?.trim() ||
-        tags["name:en"]?.trim() ||
-        tags["name:bn"]?.trim() ||
-        tags.brand?.trim() ||
-        tags.operator?.trim();
-
-      if (!name) {
-        return null;
-      }
-
-      return {
-        id: `${element.type}-${element.id}`,
-        name,
-        category,
-        latitude,
-        longitude,
-
-        address:
-          tags["addr:full"] ||
-          [
-            tags["addr:housenumber"],
-            tags["addr:street"],
-            tags["addr:suburb"],
-            tags["addr:city"],
-          ]
-            .filter(Boolean)
-            .join(", "),
-
-        phone:
-          tags.phone ||
-          tags["contact:phone"] ||
-          "",
-
-        website:
-          tags.website ||
-          tags["contact:website"] ||
-          "",
-      };
-    }, []);
-
-  /* ===================================================
-     REMOVE DUPLICATES
-  =================================================== */
-
-  const removeDuplicates =
-    useCallback((places) => {
-      const unique = new Map();
-
-      places.forEach((place) => {
-        const key =
-          `${place.latitude.toFixed(5)}-` +
-          `${place.longitude.toFixed(5)}-` +
-          `${place.name.toLowerCase()}-` +
-          `${place.category}`;
-
-        if (!unique.has(key)) {
-          unique.set(key, place);
-        }
-      });
-
-      return Array.from(
-        unique.values()
+        ${queryParts}
       );
-    }, []);
+      out center tags;
+    `;
+  }, []);
 
-  /* ===================================================
-     GET NEARBY PLACES
-  =================================================== */
+  const convertOSMElement = useCallback((element) => {
+    const tags = element.tags || {};
 
-  const getNearbyPlaces =
-    useCallback(
-      async (
-        latitude,
-        longitude,
-        category
-      ) => {
-        if (!category) {
-          setNearbyPlaces([]);
-          setNearbyLoading(false);
-          return;
-        }
+    const latitude =
+      typeof element.lat === "number" ? element.lat : element.center?.lat;
 
-        if (
-          !isInsideKolkata(
-            latitude,
-            longitude
-          )
-        ) {
-          setNearbyPlaces([]);
-          setNearbyError(
-            "Selected location is outside Kolkata region."
-          );
-          return;
-        }
+    const longitude =
+      typeof element.lon === "number" ? element.lon : element.center?.lon;
 
-        const cacheKey =
-          `${latitude.toFixed(4)}_` +
-          `${longitude.toFixed(4)}_` +
-          `${category}`;
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+      return null;
+    }
 
-        if (
-          nearbyCacheRef.current.has(
-            cacheKey
-          )
-        ) {
-          setNearbyPlaces(
-            nearbyCacheRef.current.get(
-              cacheKey
-            )
-          );
+    if (!isInsideKolkata(latitude, longitude)) return null;
 
-          setNearbyError("");
-          setNearbyLoading(false);
+    let category = "other";
 
-          return;
-        }
+    if (tags.shop) category = "shop";
+    if (tags.amenity === "hospital" || tags.healthcare === "hospital") {
+      category = "hospital";
+    }
+    if (tags.amenity === "pharmacy" || tags.healthcare === "pharmacy") {
+      category = "pharmacy";
+    }
+    if (tags.amenity === "bank" || tags.office === "financial") {
+      category = "bank";
+    }
+    if (["restaurant", "fast_food", "cafe"].includes(tags.amenity)) {
+      category = "restaurant";
+    }
+    if (["school", "college"].includes(tags.amenity)) {
+      category = "school";
+    }
 
-        nearbyAbortRef.current?.abort();
+    const name =
+      tags.name?.trim() ||
+      tags["name:en"]?.trim() ||
+      tags["name:bn"]?.trim() ||
+      tags.brand?.trim() ||
+      tags.operator?.trim();
 
-        const controller =
-          new AbortController();
+    if (!name) return null;
 
-        nearbyAbortRef.current =
-          controller;
+    return {
+      id: `${element.type}-${element.id}`,
+      name,
+      category,
+      latitude,
+      longitude,
+      address:
+        tags["addr:full"] ||
+        [
+          tags["addr:housenumber"],
+          tags["addr:street"],
+          tags["addr:suburb"],
+          tags["addr:city"],
+        ]
+          .filter(Boolean)
+          .join(", "),
+      phone: tags.phone || tags["contact:phone"] || "",
+      website: tags.website || tags["contact:website"] || "",
+    };
+  }, []);
 
-        setNearbyLoading(true);
-        setNearbyError("");
+  const removeDuplicates = useCallback((places) => {
+    const unique = new Map();
+
+    places.forEach((place) => {
+      const key =
+        `${place.latitude.toFixed(5)}-${place.longitude.toFixed(5)}-` +
+        `${place.name.toLowerCase()}-${place.category}`;
+
+      if (!unique.has(key)) unique.set(key, place);
+    });
+
+    return Array.from(unique.values());
+  }, []);
+
+  const getNearbyPlaces = useCallback(
+    async (latitude, longitude, category) => {
+      if (!category) {
         setNearbyPlaces([]);
-
-        const overpassQuery =
-          buildCategoryQuery(
-            latitude,
-            longitude,
-            category
-          );
-
-        let successful = false;
-
-        for (const server of OVERPASS_SERVERS) {
-          try {
-            const response =
-              await fetch(server, {
-                method: "POST",
-                headers: {
-                  "Content-Type":
-                    "application/x-www-form-urlencoded",
-                },
-                body:
-                  `data=${encodeURIComponent(
-                    overpassQuery
-                  )}`,
-                signal:
-                  controller.signal,
-              });
-
-            if (!response.ok) {
-              throw new Error(
-                `Server status ${response.status}`
-              );
-            }
-
-            const data =
-              await response.json();
-
-            const places =
-              (data.elements || [])
-                .map(
-                  convertOSMElement
-                )
-                .filter(Boolean);
-
-            const uniquePlaces =
-              removeDuplicates(
-                places
-              );
-
-            if (
-              controller.signal.aborted
-            ) {
-              return;
-            }
-
-            nearbyCacheRef.current.set(
-              cacheKey,
-              uniquePlaces
-            );
-
-            setNearbyPlaces(
-              uniquePlaces
-            );
-
-            setNearbyError("");
-
-            successful = true;
-
-            break;
-          } catch (error) {
-            if (
-              error.name ===
-              "AbortError"
-            ) {
-              return;
-            }
-          }
-        }
-
-        if (
-          controller.signal.aborted
-        ) {
-          return;
-        }
-
-        if (!successful) {
-          setNearbyPlaces([]);
-
-          setNearbyError(
-            "Nearby services timeout. Try choosing a specific category."
-          );
-        }
-
         setNearbyLoading(false);
-      },
-      [
-        buildCategoryQuery,
-        convertOSMElement,
-        removeDuplicates,
-      ]
-    );
+        return;
+      }
+
+      if (!isInsideKolkata(latitude, longitude)) {
+        setNearbyPlaces([]);
+        setNearbyError("Selected location is outside Kolkata region.");
+        return;
+      }
+
+      const cacheKey =
+        `${latitude.toFixed(4)}_${longitude.toFixed(4)}_${category}`;
+
+      if (nearbyCacheRef.current.has(cacheKey)) {
+        setNearbyPlaces(nearbyCacheRef.current.get(cacheKey));
+        setNearbyError("");
+        setNearbyLoading(false);
+        return;
+      }
+
+      nearbyAbortRef.current?.abort();
+
+      const controller = new AbortController();
+      nearbyAbortRef.current = controller;
+
+      setNearbyLoading(true);
+      setNearbyError("");
+      setNearbyPlaces([]);
+
+      const overpassQuery = buildCategoryQuery(latitude, longitude, category);
+
+      let successful = false;
+
+      for (const server of OVERPASS_SERVERS) {
+        try {
+          const response = await fetch(server, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `data=${encodeURIComponent(overpassQuery)}`,
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server status ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          const uniquePlaces = removeDuplicates(
+            (data.elements || []).map(convertOSMElement).filter(Boolean)
+          );
+
+          if (controller.signal.aborted) return;
+
+          nearbyCacheRef.current.set(cacheKey, uniquePlaces);
+          setNearbyPlaces(uniquePlaces);
+          setNearbyError("");
+
+          successful = true;
+          break;
+        } catch (error) {
+          if (error.name === "AbortError") return;
+        }
+      }
+
+      if (controller.signal.aborted) return;
+
+      if (!successful) {
+        setNearbyPlaces([]);
+        setNearbyError(
+          "Nearby services timeout. Try choosing a specific category."
+        );
+      }
+
+      setNearbyLoading(false);
+    },
+    [buildCategoryQuery, convertOSMElement, removeDuplicates]
+  );
 
   /* ===================================================
      SEARCH
   =================================================== */
 
-   const handleSearch = async (event) => {
+  const resetSearchState = () => {
+    setLoading(true);
+    setResults([]);
+    setNearbyPlaces([]);
+    setNearbyError("");
+    setNearbyCategory(null);
+  };
+
+  const handleSearch = async (event) => {
     event.preventDefault();
 
     const searchText = query.trim();
-
-    if (!searchText) {
-      return;
-    }
+    if (!searchText) return;
 
     if (!MAPTILER_KEY) {
       alert("MapTiler API Key is missing. Check your .env file.");
       return;
     }
 
-    /* ===================================================
-       COORDINATE SEARCH
-       Supported:
+    /* Coordinate search. Supported:
        22.5726, 88.3639
-       22.5448° N, 88.3426° E
-       22.5448 N, 88.3426 E
-       22.5448°N, 88.3426°E
-    =================================================== */
+       22.5448° N, 88.3426° E  /  22.5448 N, 88.3426 E  /  22.5448°N, 88.3426°E */
 
     let latitude = null;
     let longitude = null;
@@ -1308,17 +1241,11 @@ function PickModeController({ center, enabled }) {
       longitude = Number(decimalMatch[2]);
     } else if (directionMatch) {
       const latValue = Number(directionMatch[1]);
-      const latDirection = directionMatch[2].toUpperCase();
       const lonValue = Number(directionMatch[3]);
-      const lonDirection = directionMatch[4].toUpperCase();
 
-      latitude = latDirection === "S" ? -latValue : latValue;
-      longitude = lonDirection === "W" ? -lonValue : lonValue;
+      latitude = directionMatch[2].toUpperCase() === "S" ? -latValue : latValue;
+      longitude = directionMatch[4].toUpperCase() === "W" ? -lonValue : lonValue;
     }
-
-    /* ===================================================
-       COORDINATE RESULT
-    =================================================== */
 
     if (latitude !== null && longitude !== null) {
       if (
@@ -1339,29 +1266,34 @@ function PickModeController({ center, enabled }) {
       }
 
       searchAbortRef.current?.abort();
-
       const controller = new AbortController();
       searchAbortRef.current = controller;
 
-      setLoading(true);
-      setResults([]);
-      setNearbyPlaces([]);
-      setNearbyError("");
-      setNearbyCategory(null);
+      resetSearchState();
 
       const location = [latitude, longitude];
 
+      const applyCoordinateResult = (name, address) => {
+        setSelectedLocation({
+          position: location,
+          latitude,
+          longitude,
+          name,
+          address,
+        });
+        setClickedLocation(null);
+        setCopied(false);
+        setMapTarget(location);
+        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        setResults([]);
+      };
+
       try {
         const reverseUrl =
-          `https://api.maptiler.com/geocoding/` +
-          `${longitude},${latitude}.json` +
-          `?key=${MAPTILER_KEY}` +
-          `&language=bn,en` +
-          `&limit=1`;
+          `https://api.maptiler.com/geocoding/${longitude},${latitude}.json` +
+          `?key=${MAPTILER_KEY}&language=bn,en&limit=1`;
 
-        const response = await fetch(reverseUrl, {
-          signal: controller.signal,
-        });
+        const response = await fetch(reverseUrl, { signal: controller.signal });
 
         if (!response.ok) {
           throw new Error(`MapTiler reverse geocoding error: ${response.status}`);
@@ -1369,101 +1301,51 @@ function PickModeController({ center, enabled }) {
 
         const data = await response.json();
 
-        if (controller.signal.aborted) {
-          return;
-        }
+        if (controller.signal.aborted) return;
 
         const feature = data.features?.[0];
 
-        const placeName =
+        applyCoordinateResult(
           feature?.place_name_bn ||
-          feature?.text_bn ||
-          feature?.place_name ||
-          feature?.text ||
-          "নির্বাচিত স্থান";
-
-        const address =
-          feature?.place_name ||
-          "স্থানটির ঠিকানা পাওয়া যায়নি";
-
-        setSelectedLocation({
-          position: location,
-          latitude,
-          longitude,
-          name: placeName,
-          address,
-        });
-
-        setClickedLocation(null);
-        setCopied(false);
-        setMapTarget(location);
-        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        setResults([]);
+            feature?.text_bn ||
+            feature?.place_name ||
+            feature?.text ||
+            "নির্বাচিত স্থান",
+          feature?.place_name || "স্থানটির ঠিকানা পাওয়া যায়নি"
+        );
       } catch (error) {
-        if (error.name === "AbortError") {
-          return;
-        }
+        if (error.name === "AbortError") return;
 
         console.error("Reverse geocoding failed:", error);
-
-        setSelectedLocation({
-          position: location,
-          latitude,
-          longitude,
-          name: "নির্বাচিত স্থান",
-          address: "স্থানটির নাম পাওয়া যায়নি",
-        });
-
-        setClickedLocation(null);
-        setCopied(false);
-        setMapTarget(location);
-        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-        setResults([]);
+        applyCoordinateResult("নির্বাচিত স্থান", "স্থানটির নাম পাওয়া যায়নি");
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
+        if (!controller.signal.aborted) setLoading(false);
       }
 
       return;
     }
 
-    /* ===================================================
-       NORMAL PLACE SEARCH
-    =================================================== */
+    /* Normal place search */
 
     searchAbortRef.current?.abort();
-
     const controller = new AbortController();
     searchAbortRef.current = controller;
 
-    setLoading(true);
-    setResults([]);
-    setNearbyPlaces([]);
-    setNearbyError("");
-    setNearbyCategory(null);
+    resetSearchState();
 
     try {
       const center = mapTarget || defaultPosition;
 
       const url =
-        `https://api.maptiler.com/geocoding/` +
-        `${encodeURIComponent(searchText)}.json` +
+        `https://api.maptiler.com/geocoding/${encodeURIComponent(searchText)}.json` +
         `?key=${MAPTILER_KEY}` +
-        `&country=in` +
-        `&autocomplete=true` +
-        `&fuzzyMatch=true` +
+        `&country=in&autocomplete=true&fuzzyMatch=true` +
         `&proximity=${center[1]},${center[0]}` +
         `&limit=10` +
-        `&bbox=` +
-        `${KOLKATA_BOUNDS.west},` +
-        `${KOLKATA_BOUNDS.south},` +
-        `${KOLKATA_BOUNDS.east},` +
-        `${KOLKATA_BOUNDS.north}`;
+        `&bbox=${KOLKATA_BOUNDS.west},${KOLKATA_BOUNDS.south},` +
+        `${KOLKATA_BOUNDS.east},${KOLKATA_BOUNDS.north}`;
 
-      const response = await fetch(url, {
-        signal: controller.signal,
-      });
+      const response = await fetch(url, { signal: controller.signal });
 
       if (!response.ok) {
         throw new Error(`MapTiler error: ${response.status}`);
@@ -1471,20 +1353,14 @@ function PickModeController({ center, enabled }) {
 
       const data = await response.json();
 
-      if (controller.signal.aborted) {
-        return;
-      }
+      if (controller.signal.aborted) return;
 
-      const kolkataResults = (data.features || []).filter((feature) => {
-        if (!feature.center || feature.center.length < 2) {
-          return false;
-        }
-
-        return isInsideKolkata(
-          feature.center[1],
-          feature.center[0]
-        );
-      });
+      const kolkataResults = (data.features || []).filter(
+        (feature) =>
+          feature.center &&
+          feature.center.length >= 2 &&
+          isInsideKolkata(feature.center[1], feature.center[0])
+      );
 
       if (kolkataResults.length === 0) {
         alert("No results found within Kolkata boundaries.");
@@ -1498,149 +1374,114 @@ function PickModeController({ center, enabled }) {
         alert("Location search failed. Please try again.");
       }
     } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
   /* ===================================================
-     GET USER LOCATION
+     USER LOCATION
   =================================================== */
 
   const getUserLocation = () => {
-  if (!navigator.geolocation) {
-    alert("Geolocation is not supported by your browser.");
-    return;
-  }
-
-  setLocationLoading(true);
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const {
-        latitude,
-        longitude,
-        accuracy,
-      } = position.coords;
-
-      // My Location-এর জন্য কোনো Kolkata boundary check নেই
-      const location = [latitude, longitude];
-
-      setUserLocation(location);
-      setLocationAccuracy(accuracy);
-
-      // আগের selected/clicked location clear
-      setClickedLocation(null);
-      setSelectedLocation(null);
-
-      // Nearby data clear
-      setNearbyPlaces([]);
-      setNearbyCategory(null);
-      setNearbyError("");
-
-      // Map current location-এ যাবে
-      setMapTarget(location);
-
-      setLocationLoading(false);
-    },
-    () => {
-      alert("Location access denied or timed out.");
-      setLocationLoading(false);
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 60000,
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
     }
-  );
-};
+
+    setLocationLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+
+        // My Location-এর জন্য কোনো Kolkata boundary check নেই
+        const location = [latitude, longitude];
+
+        setUserLocation(location);
+        setLocationAccuracy(accuracy);
+
+        setClickedLocation(null);
+        setSelectedLocation(null);
+
+        setNearbyPlaces([]);
+        setNearbyCategory(null);
+        setNearbyError("");
+
+        setMapTarget(location);
+        setLocationLoading(false);
+      },
+      () => {
+        alert("Location access denied or timed out.");
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      }
+    );
+  };
+
   /* ===================================================
-     START LIVE TRACKING
+     LIVE TRACKING
   =================================================== */
 
   const startLiveTracking = () => {
     if (!navigator.geolocation) {
-      setTrackingError(
-        "Geolocation is not supported by your browser."
-      );
+      setTrackingError("Geolocation is not supported by your browser.");
       return;
     }
 
-    if (trackingWatchRef.current !== null) {
-      return;
-    }
+    if (trackingWatchRef.current !== null) return;
 
     setTrackingError("");
     setIsTracking(true);
     setTrackingPath([]);
 
-    trackingWatchRef.current =
-      navigator.geolocation.watchPosition(
-        (position) => {
-          const {
-            latitude,
-            longitude,
-            accuracy,
-          } = position.coords;
+    trackingWatchRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        const location = [latitude, longitude];
 
-          const location = [latitude, longitude];
+        setUserLocation(location);
+        setLocationAccuracy(accuracy);
+        setMapTarget(location);
+        setTrackingError("");
 
-          setUserLocation(location);
-          setLocationAccuracy(accuracy);
-          setMapTarget(location);
-          setTrackingError("");
+        setTrackingPath((previousPath) => {
+          const lastPoint = previousPath[previousPath.length - 1];
 
-          setTrackingPath((previousPath) => {
-            const lastPoint =
-              previousPath[previousPath.length - 1];
-
-            if (
-              lastPoint &&
-              lastPoint[0] === latitude &&
-              lastPoint[1] === longitude
-            ) {
-              return previousPath;
-            }
-
-            return [...previousPath, location];
-          });
-        },
-        (error) => {
-          let message =
-            "Unable to track your live location.";
-
-          if (error.code === 1) {
-            message =
-              "Location permission was denied.";
-          } else if (error.code === 2) {
-            message =
-              "Your current location is unavailable.";
-          } else if (error.code === 3) {
-            message =
-              "Live location request timed out.";
+          if (
+            lastPoint &&
+            lastPoint[0] === latitude &&
+            lastPoint[1] === longitude
+          ) {
+            return previousPath;
           }
 
-          setTrackingError(message);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 5000,
-        }
-      );
-  };
+          return [...previousPath, location];
+        });
+      },
+      (error) => {
+        let message = "Unable to track your live location.";
 
-  /* ===================================================
-     STOP LIVE TRACKING
-  =================================================== */
+        if (error.code === 1) message = "Location permission was denied.";
+        else if (error.code === 2) message = "Your current location is unavailable.";
+        else if (error.code === 3) message = "Live location request timed out.";
+
+        setTrackingError(message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 5000,
+      }
+    );
+  };
 
   const stopLiveTracking = () => {
     if (trackingWatchRef.current !== null) {
-      navigator.geolocation.clearWatch(
-        trackingWatchRef.current
-      );
-
+      navigator.geolocation.clearWatch(trackingWatchRef.current);
       trackingWatchRef.current = null;
     }
 
@@ -1652,29 +1493,17 @@ function PickModeController({ center, enabled }) {
      SELECT SEARCH RESULT
   =================================================== */
 
-  const selectLocation = (
-    feature
-  ) => {
-    if (!feature.center) {
-      return;
-    }
+  const selectLocation = (feature) => {
+    if (!feature.center) return;
 
-    const [
-      longitude,
-      latitude,
-    ] = feature.center;
+    const [longitude, latitude] = feature.center;
 
     if (!isInsideKolkata(latitude, longitude)) {
-      alert(
-        "Selected location is outside the map region."
-      );
+      alert("Selected location is outside the map region.");
       return;
     }
 
-    const location = [
-      latitude,
-      longitude,
-    ];
+    const location = [latitude, longitude];
 
     if (pickMode) {
       const bounds = ZONE_BOUNDARIES[zone];
@@ -1702,11 +1531,8 @@ function PickModeController({ center, enabled }) {
       position: location,
       latitude,
       longitude,
-      name:
-        feature.text ||
-        "Selected Location",
-      address:
-        feature.place_name || "",
+      name: feature.text || "Selected Location",
+      address: feature.place_name || "",
     });
 
     setClickedLocation(null);
@@ -1717,63 +1543,105 @@ function PickModeController({ center, enabled }) {
     setNearbyCategory(null);
 
     setMapTarget(location);
-
-    setQuery(
-      feature.text ||
-        feature.place_name ||
-        ""
-    );
-
+    setQuery(feature.text || feature.place_name || "");
     setResults([]);
   };
 
   /* ===================================================
-     MAP CLICK
-  =================================================== */
-  
-  const searchParams = new URLSearchParams(window.location.search);
+   MAP CLICK
+=================================================== */
 
-  const zone = searchParams.get("zone");
-  const pickMode = searchParams.get("pick") === "1";
-  const returnTo = searchParams.get("return");
+const reverseGeocodeName = useCallback(
+  async (latitude, longitude) => {
+    if (!MAPTILER_KEY) {
+      return {
+        name: "Dropped pin",
+        address: "",
+      };
+    }
 
-  const zoneConfig = ZONE_CONFIG[zone];
-  
-  const handleMapClick = (location) => {
+    try {
+      const reverseUrl =
+        `https://api.maptiler.com/geocoding/${longitude},${latitude}.json` +
+        `?key=${MAPTILER_KEY}&language=bn,en&limit=1`;
 
+      const response = await fetch(reverseUrl);
+
+      if (!response.ok) {
+        throw new Error(`Reverse geocoding failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const feature = data.features?.[0];
+
+      return {
+        name:
+          feature?.text ||
+          feature?.place_name ||
+          feature?.text_bn ||
+          feature?.place_name_bn ||
+          "Dropped pin",
+        address: feature?.place_name || feature?.place_name_bn || "",
+      };
+    } catch (error) {
+      console.warn("Reverse geocoding unavailable:", error);
+      return {
+        name: "Dropped pin",
+        address: "",
+      };
+    }
+  },
+  [MAPTILER_KEY]
+);
+
+const handleMapClick = async (location) => {
   if (pickMode) {
-
     const bounds = ZONE_BOUNDARIES[zone];
 
-    const insideZone = isInsideZone(
-      location.latitude,
-      location.longitude,
-      bounds
-    );
-
-    if (!insideZone) {
+    if (!isInsideZone(location.latitude, location.longitude, bounds)) {
       alert(`Pin must stay inside ${zone}`);
       return;
     }
 
-    setClickedLocation(location);
+    // Place pin immediately, then resolve a human-readable name
+    setClickedLocation({
+      ...location,
+      name: location.name || "Resolving location…",
+      address: location.address || "",
+    });
+
+    const geo = await reverseGeocodeName(
+      location.latitude,
+      location.longitude
+    );
+
+    setClickedLocation((previous) => {
+      if (
+        !previous ||
+        previous.latitude !== location.latitude ||
+        previous.longitude !== location.longitude
+      ) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        name: geo.name,
+        address: geo.address,
+      };
+    });
 
     return;
   }
 
   setClickedLocation(location);
-
   setSelectedLocation(null);
   setCopied(false);
 
   setNearbyPlaces([]);
   setNearbyError("");
   setNearbyCategory(null);
-  };
-
-  /* ===================================================
-     CLEAR SEARCH
-  =================================================== */
+};
 
   const clearSearch = () => {
     setQuery("");
@@ -1790,89 +1658,153 @@ function PickModeController({ center, enabled }) {
   };
 
   /* ===================================================
-     CURRENT SELECTED POSITION
+     CURRENT POSITION + CATEGORY
   =================================================== */
 
-  const getCurrentSelectedPosition =
-    useCallback(() => {
-      if (selectedLocation) {
-        return {
-          latitude:
-            selectedLocation.latitude,
-          longitude:
-            selectedLocation.longitude,
-        };
-      }
+  const getCurrentSelectedPosition = useCallback(() => {
+    if (selectedLocation) {
+      return {
+        latitude: selectedLocation.latitude,
+        longitude: selectedLocation.longitude,
+      };
+    }
 
-      if (clickedLocation) {
-        return {
-          latitude:
-            clickedLocation.latitude,
-          longitude:
-            clickedLocation.longitude,
-        };
-      }
+    if (clickedLocation) {
+      return {
+        latitude: clickedLocation.latitude,
+        longitude: clickedLocation.longitude,
+      };
+    }
 
-      if (userLocation) {
-        return {
-          latitude:
-            userLocation[0],
-          longitude:
-            userLocation[1],
-        };
-      }
+    if (userLocation) {
+      return { latitude: userLocation[0], longitude: userLocation[1] };
+    }
 
-      return null;
-    }, [
-      selectedLocation,
-      clickedLocation,
-      userLocation,
-    ]);
+    return null;
+  }, [selectedLocation, clickedLocation, userLocation]);
+
+  const handleCategoryChange = (category) => {
+    const location = getCurrentSelectedPosition();
+
+    if (!location) {
+      setNearbyError("Please select a location first.");
+      return;
+    }
+
+    setNearbyCategory(category);
+    getNearbyPlaces(location.latitude, location.longitude, category);
+  };
+
+  const filteredNearbyPlaces = useMemo(() => {
+    if (!nearbyCategory) return [];
+
+    return nearbyPlaces.filter((place) => place.category === nearbyCategory);
+  }, [nearbyCategory, nearbyPlaces]);
 
   /* ===================================================
-     CATEGORY CHANGE
+     STAFF ACTIONS
   =================================================== */
 
-  const handleCategoryChange =
-    (category) => {
-      const location =
-        getCurrentSelectedPosition();
+  const saveWorkUpdate = async (issue) => {
+    const update = workUpdates[issue.id]?.trim();
 
-      if (!location) {
-        setNearbyError(
-          "Please select a location first."
-        );
-        return;
+    if (!update) {
+      alert("Please write your work update first.");
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/issues/${issue._id || issue.id}/comments`,
+        {
+          method: "POST",
+          headers: getActorHeaders({ json: true }),
+          body: JSON.stringify({ body: update }),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to save work update");
       }
 
-      setNearbyCategory(category);
+      alert("Work update saved successfully!");
 
-      getNearbyPlaces(
-        location.latitude,
-        location.longitude,
-        category
+      setWorkUpdates((previous) => ({ ...previous, [issue.id]: "" }));
+    } catch (error) {
+      console.error("Save work update error:", error);
+      alert(error.message || "Could not save work update.");
+    }
+  };
+
+  const markIssueCompleted = async (issue) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/issues/${issue._id || issue.id}/status`,
+        {
+          method: "POST",
+          headers: getActorHeaders({ json: true }),
+          body: JSON.stringify({ status: "pending_review" }),
+        }
       );
-    };
 
-  /* ===================================================
-     FILTER NEARBY
-  =================================================== */
+      const result = await response.json().catch(() => ({}));
 
-  const filteredNearbyPlaces =
-    useMemo(() => {
-      if (!nearbyCategory) {
-        return [];
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to update issue status");
       }
 
-      return nearbyPlaces.filter(
-        (place) =>
-          place.category ===
-          nearbyCategory
+      const updatedIssue = result.data || result;
+
+      // Keep the status lowercase so filters and button state stay consistent
+      const patch = {
+        ...updatedIssue,
+        status: String(updatedIssue.status || "pending_review").toLowerCase(),
+      };
+
+      setAssignedIssues((previous) =>
+        previous.map((item) =>
+          matchesIssueId(item, issue.id) ? { ...item, ...patch } : item
+        )
       );
-    }, [
-      nearbyCategory,
-      nearbyPlaces,
-    ]);
+
+      // Refresh the open panel too, otherwise it keeps showing the old status
+      setSelectedStaffIssue((previous) =>
+        previous && matchesIssueId(previous, issue.id)
+          ? { ...previous, ...patch }
+          : previous
+      );
+
+      alert("Issue sent for admin review!");
+    } catch (error) {
+      console.error("Mark completed error:", error);
+      alert(error.message || "Could not update issue status.");
+    }
+  };
+
+  /* Shared marker click handler for staff / admin */
+  const openIssuePanel = useCallback(
+    (issue) => {
+      if (role === "admin") {
+        setSelectedStaffIssue(null);
+        setSelectedAdminIssue(issue);
+      } else if (role === "staff") {
+        setSelectedAdminIssue(null);
+        setSelectedStaffIssue(issue);
+      }
+    },
+    [role]
+  );
+
+  const issuesWithCoordinates = (issues) => issues.filter(hasValidCoordinates);
+
+  // The URL pin is only a fallback: hide it when the same issue already has its own marker
+  const urlIssueAlreadyHasMarker =
+    (role === "staff" || role === "admin") &&
+    assignedIssues.some(
+      (item) => matchesIssueId(item, targetIssueId) && hasValidCoordinates(item)
+    );
 
   /* ===================================================
      JSX
@@ -1880,105 +1812,163 @@ function PickModeController({ center, enabled }) {
 
   return (
     <div className="map-view-container">
+      <MapContainer
+        center={defaultPosition}
+        zoom={12}
+        zoomControl={false}
+        minZoom={11}
+        maxZoom={18}
+        maxBounds={[
+          [22.35, 88.15],
+          [22.8, 88.6],
+        ]}
+        maxBoundsViscosity={1.0}
+        scrollWheelZoom={true}
+        className="leaflet-full-height"
+      >
+        <PickModeController center={zoneConfig?.center} enabled={pickMode} />
 
-      {/* =================================================
-          MAP
-      ================================================= */}
+        <IssueLocationController lat={issueLat} lng={issueLng} />
 
-     <MapContainer
-  center={defaultPosition}
-  zoom={12}
-  zoomControl={false}
-  minZoom={11}
-  maxZoom={18}
-  maxBounds={[
-    [22.35, 88.15],
-    [22.80, 88.60],
-  ]}
-  maxBoundsViscosity={1.0}
-  scrollWheelZoom={true}
-  className="leaflet-full-height"
->
-  <PickModeController
-    center={zoneConfig?.center}
-    enabled={pickMode}
-  />
+        <MapTargetController target={mapTarget} />
 
-  {pickMode && (
-    <div className="pick-mode-bar">
-      📍 {zone || "Selected Zone"} — Drop a pin inside this zone
-    </div>
-  )}
+        {/* Fallback pin from URL (?lat=&lng=&issueId=) */}
+        {Number.isFinite(issueLat) &&
+          Number.isFinite(issueLng) &&
+          !urlIssueAlreadyHasMarker && (
+            <Marker
+              position={[issueLat, issueLng]}
+              eventHandlers={{
+                click: () => {
+                  const targetIssue = assignedIssues.find((item) =>
+                    matchesIssueId(item, targetIssueId)
+                  );
 
-  <MapControls
-  onMapClick={handleMapClick}
-  getUserLocation={getUserLocation}
-  locationLoading={locationLoading}
-  role={role}
-  showAssignedIssues={showAssignedIssues}
-  setShowAssignedIssues={setShowAssignedIssues}
-  pickMode={pickMode}
-/>
+                  if (targetIssue) {
+                    openIssuePanel(targetIssue);
+                    return;
+                  }
 
-  {role !== "admin" && (
-  <LocationPlaylist
-    userLocation={userLocation}
-  />
-)}
+                  if (!targetIssueId) return;
 
-  {showTraffic && <TrafficLayer />}
+                  openIssuePanel({
+                    id: String(targetIssueId),
+                    title: `Issue ${targetIssueId}`,
+                    status: "submitted",
+                    type: "Unknown",
+                    description: "Loading full details…",
+                    latitude: issueLat,
+                    longitude: issueLng,
+                  });
 
-  {/* Route */}
-  {!pickMode && (
-    <RouteLayer
-      routeCoordinates={routeCoordinates}
-      alternativeRoutes={alternativeRoutes}
-      routeDestination={routeDestination}
-      routeInfo={routeInfo}
-      formatDistance={formatDistance}
-      formatDuration={formatDuration}
-    />
-  )}
+                  try {
+                    fetch(`${API_URL}/issues`, {
+                      method: "GET",
+                      headers: getActorHeaders(),
+                    })
+                      .then((res) => res.json())
+                      .then((payload) => {
+                        const found = extractRows(payload).find((item) =>
+                          matchesIssueId(item, targetIssueId)
+                        );
+                        if (found) openIssuePanel(normalizeIssue(found));
+                      })
+                      .catch((err) =>
+                        console.error("Failed to load issue for panel:", err)
+                      );
+                  } catch (err) {
+                    console.error("Auth/session error:", err);
+                  }
+                },
+              }}
+            />
+          )}
 
-  {/* Pick Mode Selected Marker */}
-  {pickMode && clickedLocation && (
-   <Marker position={clickedLocation.position}>
-     <Popup>
-       <strong>Selected Location</strong>
-       <br />
-        {clickedLocation.latitude.toFixed(6)},{" "}
-        {clickedLocation.longitude.toFixed(6)}
-     </Popup>
-   </Marker>
-  )}
+        {pickMode && (
+          <div className="pick-mode-bar">
+            📍 {zone || "Selected Zone"} — Drop a pin inside this zone
+          </div>
+        )}
 
-   {/* Confirm selected location */}
-   {pickMode && clickedLocation && (
-   <button
-      className="pick-confirm-button"
-      onClick={() => {
-        if (!returnTo) {
-         return;
-       }
+        <MapControls
+          onMapClick={handleMapClick}
+          getUserLocation={getUserLocation}
+          locationLoading={locationLoading}
+          role={role}
+          showAssignedIssues={showAssignedIssues}
+          setShowAssignedIssues={setShowAssignedIssues}
+          pickMode={pickMode}
+        />
+
+        {role !== "admin" && <LocationPlaylist userLocation={userLocation} />}
+
+        {showTraffic && <TrafficLayer />}
+
+        {/* Route */}
+        {!pickMode && (
+          <RouteLayer
+            routeCoordinates={routeCoordinates}
+            alternativeRoutes={alternativeRoutes}
+            routeDestination={routeDestination}
+            routeInfo={routeInfo}
+            formatDistance={formatDistance}
+            formatDuration={formatDuration}
+          />
+        )}
+
+       {/* Pick mode: selected marker */}
+       {pickMode && clickedLocation && (
+       <Marker position={clickedLocation.position}>
+       <Popup>
+         <strong>
+           {clickedLocation.name || "Selected Location"}
+         </strong>
+          {clickedLocation.address ? (
+          <>
+          <br />
+             <small>{clickedLocation.address}</small>
+           </>
+         ) : null}
+        <br />
+         {clickedLocation.latitude.toFixed(6)},{" "}
+         {clickedLocation.longitude.toFixed(6)}
+         </Popup>
+      </Marker>
+     )}
+
+        {/* Pick mode: confirm button */}
+{pickMode && clickedLocation && (
+  <button
+    className="pick-confirm-button"
+    onClick={() => {
+      if (!returnTo) return;
+
+      const placeName =
+        clickedLocation.name &&
+        clickedLocation.name !== "Resolving location…"
+          ? clickedLocation.name
+          : clickedLocation.address ||
+            `${zone || "Selected"} pin`;
 
       const params = new URLSearchParams({
         zone: zone || "",
         lat: clickedLocation.latitude.toFixed(6),
         lng: clickedLocation.longitude.toFixed(6),
-        label: clickedLocation.name || "Dropped pin",
+        label: placeName,
       });
 
-      window.location.href = `${returnTo}?${params.toString()}`;
-    }}
-   >
-    Confirm Location
-  </button>
-  )}
+       window.location.href = `${returnTo}?${params.toString()}`;
+      }}
+     >
+    Confirm{" "}
+    {clickedLocation.name &&
+    clickedLocation.name !== "Resolving location…"
+      ? `"${clickedLocation.name}"`
+      : "Location"}
+      </button>
+     )}
 
-        {/* =================================================
-            LIVE TRACKING PATH
-        ================================================= */}
-
+        {/* Live tracking path */}
         {trackingPath.length > 1 && (
           <Polyline
             positions={trackingPath}
@@ -1993,374 +1983,310 @@ function PickModeController({ center, enabled }) {
           />
         )}
 
-        {/* =================================================
-            MAP LAYERS
-        ================================================= */}
+        {/* Base layer */}
+        <TileLayer
+          key={baseLayer.id}
+          url={baseLayer.url}
+          attribution={baseLayer.attribution}
+          keepBuffer={4}
+        />
 
-        {/* 🗺️ Dynamic Base Layer */}
-      <TileLayer
-        key={baseLayer.id}
-        url={baseLayer.url}
-        attribution={baseLayer.attribution}
-        keepBuffer={4}
-      />
+        {/* Layer selector */}
+        {role === "admin" ? (
+          <AdminLayerManager
+            activeFilters={activeFilters}
+            onFilterChange={handleFilterChange}
+            showTraffic={showTraffic}
+            onTrafficToggle={setShowTraffic}
+          />
+        ) : (
+          <LayerSelector
+            activeBaseLayer={baseLayer.id}
+            onBaseLayerChange={(selectedLayer) => setBaseLayer(selectedLayer)}
+            activeFilters={activeFilters}
+            onFilterChange={handleFilterChange}
+            showTraffic={showTraffic}
+            onTrafficToggle={setShowTraffic}
+          />
+        )}
 
-     {/* 🎛️ Custom Layer Selector */}
-     {role === "admin" ? (
-       <AdminLayerManager
-         activeFilters={activeFilters}
-         onFilterChange={handleFilterChange}
-         showTraffic={showTraffic}
-         onTrafficToggle={setShowTraffic}
-       />
-     ) : (
-       <LayerSelector
-         activeBaseLayer={baseLayer.id}
-         onBaseLayerChange={(selectedLayer) =>
-           setBaseLayer(selectedLayer)
-         }
-         activeFilters={activeFilters}
-         onFilterChange={handleFilterChange}
-         showTraffic={showTraffic}
-         onTrafficToggle={setShowTraffic}
-       />
-     )}
+        {/* City hub */}
+        {activeFilters.cityHub && (
+          <LayerGroup>
+            <Marker position={[22.5726, 88.3639]}>
+              <Popup>📍 Central Kolkata Command Hub</Popup>
+            </Marker>
+          </LayerGroup>
+        )}
 
-    {/* 📍 CITY HUB */}
-    {activeFilters.cityHub && (
-     <LayerGroup>
-       <Marker position={[22.5726, 88.3639]}>
-          <Popup>
-           📍 Central Kolkata Command Hub
-          </Popup>
-       </Marker>
-     </LayerGroup>
-    )}
+        {/* Staff locations (admin only) */}
+        {role === "admin" && activeFilters.staffLocations && (
+          <LayerGroup>
+            {staffLocations.map((staff) => (
+              <Marker
+                key={staff.id}
+                position={[staff.latitude, staff.longitude]}
+                icon={getStaffIcon(staff.status)}
+              >
+                <Popup>
+                  <strong>👨‍🔧 Staff Location</strong>
+                  <br />
+                  Staff: {staff.name}
+                  <br />
+                  Status: 🟢 {staff.status}
+                </Popup>
+              </Marker>
+            ))}
+          </LayerGroup>
+        )}
 
-     {/* 👨‍🔧 STAFF LOCATIONS */}
-    {role === "admin" && activeFilters.staffLocations && (
-    <LayerGroup>
-    {staffLocations.map((staff) => (
-      <Marker
-        key={staff.id}
-        position={[staff.latitude, staff.longitude]}
-        icon={getStaffIcon(staff.status)}
-      >
-           <Popup>
-            <strong>👨‍🔧 Staff Location</strong>
-           <br />
-           Staff: {staff.name}
-           <br />
-           Status: 🟢 {staff.status}
-         </Popup>
-       </Marker>
-     ))}
-   </LayerGroup>
-   )}
-
-        {/* =================================================
-            USER LOCATION
-        ================================================= */}
-
+        {/* User location */}
         <MyLocation
           userLocation={userLocation}
           locationAccuracy={locationAccuracy}
         />
 
-        {/* =================================================
-            SELECTED SEARCH LOCATION
-        ================================================= */}
-
+        {/* Selected search location */}
         {activeFilters.selectedLocation && selectedLocation && (
-          <Marker
-            position={
-              selectedLocation.position
-            }
-          >
+          <Marker position={selectedLocation.position}>
             <Popup>
-
-              <strong>
-                🎯{" "}
-                {selectedLocation.name}
-              </strong>
-
+              <strong>🎯 {selectedLocation.name}</strong>
               <br />
-
-              <small>
-                {selectedLocation.address}
-              </small>
-
+              <small>{selectedLocation.address}</small>
               <br />
-
-              <small>
-                Lat:{" "}
-                {selectedLocation.latitude.toFixed(
-                  6
-                )}
-              </small>
-
+              <small>Lat: {selectedLocation.latitude.toFixed(6)}</small>
               <br />
-
-              <small>
-                Lng:{" "}
-                {selectedLocation.longitude.toFixed(
-                  6
-                )}
-              </small>
-
+              <small>Lng: {selectedLocation.longitude.toFixed(6)}</small>
               <br />
               <br />
-
               <button
                 type="button"
                 className="route-btn"
                 onClick={() =>
                   getRoute({
-                    latitude:
-                      selectedLocation.latitude,
-                    longitude:
-                      selectedLocation.longitude,
-                    name:
-                      selectedLocation.name,
+                    latitude: selectedLocation.latitude,
+                    longitude: selectedLocation.longitude,
+                    name: selectedLocation.name,
                   })
                 }
               >
                 🚗 Get Route
               </button>
-
             </Popup>
           </Marker>
         )}
 
-        {/* =================================================
-    CLICKED LOCATION
-================================================= */}
+        {/* Clicked location */}
+        {clickedLocation && (
+          <Marker position={clickedLocation.position}>
+            <Popup>
+              <div className="clicked-popup-wrapper">
+                <strong>📍 Selected Coordinates</strong>
 
-{clickedLocation && (
-  <Marker
-    position={clickedLocation.position}
-  >
-    <Popup>
+                <hr className="popup-divider" />
 
-      <div className="clicked-popup-wrapper">
+                <div className="popup-coordinates">
+                  <div>
+                    <strong>Latitude:</strong>{" "}
+                    {clickedLocation.latitude.toFixed(6)}
+                  </div>
+                  <div>
+                    <strong>Longitude:</strong>{" "}
+                    {clickedLocation.longitude.toFixed(6)}
+                  </div>
+                </div>
 
-        <strong>
-          📍 Selected Coordinates
-        </strong>
+                <button
+                  type="button"
+                  className={`copy-btn ${copied ? "copied" : ""}`}
+                  onClick={copyCoordinates}
+                >
+                  {copied ? "✓ Copied!" : "📋 Copy Coordinates"}
+                </button>
 
-        <hr className="popup-divider" />
-
-        <div className="popup-coordinates">
-
-          <div>
-            <strong>Latitude:</strong>{" "}
-            {clickedLocation.latitude.toFixed(6)}
-          </div>
-
-          <div>
-            <strong>Longitude:</strong>{" "}
-            {clickedLocation.longitude.toFixed(6)}
-          </div>
-
-        </div>
-
-        <button
-          type="button"
-          className={`copy-btn ${
-            copied ? "copied" : ""
-          }`}
-          onClick={copyCoordinates}
-        >
-          {copied
-            ? "✓ Copied!"
-            : "📋 Copy Coordinates"}
-        </button>
-
-        <button
-          type="button"
-          className="route-btn"
-          onClick={() =>
-            getRoute({
-              latitude: clickedLocation.latitude,
-              longitude: clickedLocation.longitude,
-              name: "Selected Location",
-            })
-          }
-        >
-          🚗 Get Route
-        </button>
-
-        {/* REPORT ISSUE */}
-        {role === "user" && (
-          <button
-            type="button"
-            className="report-issue-btn"
-            onClick={() => {
-              if (onReportIssue) {
-                onReportIssue({
-                  latitude: clickedLocation.latitude,
-                  longitude: clickedLocation.longitude,
-                });
-              } else {
-                alert(
-                  "Report Issue feature is not connected yet."
-                );
-              }
-            }}
-          >
-            📝 Report Issue Here
-          </button>
+                <button
+                  type="button"
+                  className="route-btn"
+                  onClick={() =>
+                    getRoute({
+                      latitude: clickedLocation.latitude,
+                      longitude: clickedLocation.longitude,
+                      name: "Selected Location",
+                    })
+                  }
+                >
+                  🚗 Get Route
+                </button>
+              </div>
+            </Popup>
+          </Marker>
         )}
 
-      </div>
+        {/* ADMIN ISSUE MARKERS */}
+        {role === "admin" &&
+          activeFilters.issues &&
+          issuesWithCoordinates(filteredAdminIssues).map((issue) => (
+            <Marker
+              key={`admin-issue-${issue.id}`}
+              position={[issue.latitude, issue.longitude]}
+              eventHandlers={{ click: () => openIssuePanel(issue) }}
+            />
+          ))}
 
-    </Popup>
-  </Marker>
-)}
-         {/* =================================================
-    ADMIN ISSUES
-================================================= */}
+        {/* STAFF ASSIGNED ISSUE MARKERS */}
+        {role === "staff" &&
+          showAssignedIssues &&
+          issuesWithCoordinates(filteredAssignedIssues).map((issue) => (
+            <Marker
+              key={`staff-issue-${issue.id}`}
+              position={[issue.latitude, issue.longitude]}
+              eventHandlers={{ click: () => openIssuePanel(issue) }}
+            />
+          ))}
 
-{role === "admin" &&
-  activeFilters.issues &&
-  filteredAdminIssues.map((issue) => (
-    <Marker
-      key={`admin-${issue.id}`}
-      position={[issue.latitude, issue.longitude]}
-      eventHandlers={{
-        click: () => setSelectedAdminIssue(issue),
-      }}
-    >
-      <Popup>
-        <div className="admin-issue-popup">
-          <strong>{issue.title}</strong>
-          <span>{issue.type} • {issue.status}</span>
-          <button
-            type="button"
-            className="admin-popup-details-btn"
-            onClick={() => setSelectedAdminIssue(issue)}
-          >
-            View Details →
-          </button>
-        </div>
-      </Popup>
-    </Marker>
-  ))}
+        {/* CITIZEN NEARBY ISSUE MARKERS (backend) - citizen only, so staff/admin never see duplicates */}
+        {role === "user" && activeFilters.issues && (
+          <LayerGroup>
+            {backendIssues.map((raw) => {
+              const issue = normalizeIssue(raw);
 
-         {/* =================================================
-    STAFF ASSIGNED ISSUES
-================================================= */}
+              if (!hasValidCoordinates(issue)) return null;
 
-{role === "staff" &&
-  showAssignedIssues &&
-  filteredAssignedIssues.map((issue) => (
-    <Marker
-      key={issue.id}
-      position={[issue.latitude, issue.longitude]}
-    >
-      <Popup>
-        <div className="issue-card">
-          <h4>{issue.title}</h4>
-
-          <p>📂 Type: {issue.type}</p>
-
-          <p>
-            🔄 Status: <strong>{issue.status}</strong>
-          </p>
-
-          <p>{issue.description}</p>
-
-          <textarea
-            value={workUpdates[issue.id] || ""}
-            onChange={(event) =>
-              setWorkUpdates((previous) => ({
-                ...previous,
-                [issue.id]: event.target.value,
-              }))
-            }
-            placeholder="Write your work update..."
-            rows="3"
-          />
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-
-              if (!file) {
-                return;
-              }
-
-              setEvidenceFiles((previous) => ({
-                ...previous,
-                [issue.id]: file,
-              }));
-            }}
-          />
-
-          {evidenceFiles[issue.id] && (
-            <p>
-              📎 {evidenceFiles[issue.id].name}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setAssignedIssues((previous) =>
-                previous.map((item) =>
-                  item.id === issue.id
-                    ? {
-                        ...item,
-                        status: "In Progress",
-                      }
-                    : item
-                )
+              return (
+                <Marker
+                  key={`backend-issue-${issue.id || raw._id}`}
+                  position={[issue.latitude, issue.longitude]}
+                />
               );
+            })}
+          </LayerGroup>
+        )}
 
-              alert("Work update saved successfully!");
-            }}
-          >
-            💾 Save Work Update
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setAssignedIssues((previous) =>
-                previous.map((item) =>
-                  item.id === issue.id
-                    ? {
-                        ...item,
-                        status: "Completed",
-                      }
-                    : item
-                )
-              );
-
-              alert("Issue marked as completed!");
-            }}
-          >
-            ✅ Mark Completed
-          </button>
-        </div>
-      </Popup>
-    </Marker>
-  ))}
-        {/* =================================================
-            NEARBY PLACES
-        ================================================= */}
-
+        {/* NEARBY PLACES */}
         {activeFilters.nearbyPlaces && (
           <NearbyPlaces
-             places={filteredNearbyPlaces}
-             createCategoryLeafletIcon={createCategoryLeafletIcon}
-             getRoute={getRoute}
+            places={filteredNearbyPlaces}
+            createCategoryLeafletIcon={createCategoryLeafletIcon}
+            getRoute={getRoute}
           />
         )}
-
       </MapContainer>
+
+      {/* =================================================
+          STAFF ISSUE PANEL
+      ================================================= */}
+
+      {role === "staff" && selectedStaffIssue && (
+        <aside className="admin-issue-details-panel staff-issue-details-panel">
+          <div className="admin-issue-panel-header">
+            <div>
+              <span className="admin-panel-eyebrow">ISSUE DETAILS</span>
+              <h3>{selectedStaffIssue.title}</h3>
+            </div>
+
+            <button
+              type="button"
+              className="admin-panel-close"
+              onClick={() => setSelectedStaffIssue(null)}
+              aria-label="Close issue details"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="admin-issue-panel-body">
+            <div className="admin-detail-section">
+              <span className="admin-detail-label">Status</span>
+              <strong>{formatIssueStatus(selectedStaffIssue.status)}</strong>
+            </div>
+
+            <div className="admin-detail-section">
+              <span className="admin-detail-label">Category</span>
+              <p>{selectedStaffIssue.type || "Not specified"}</p>
+            </div>
+
+            <div className="admin-detail-section">
+              <span className="admin-detail-label">Description</span>
+              <p>
+                {selectedStaffIssue.description || "No description provided."}
+              </p>
+            </div>
+
+            <div className="admin-detail-section">
+              <label
+                className="admin-detail-label"
+                htmlFor="staff-work-update"
+              >
+                Work Update
+              </label>
+
+              <textarea
+                id="staff-work-update"
+                value={workUpdates[selectedStaffIssue.id] || ""}
+                onChange={(event) =>
+                  setWorkUpdates((previous) => ({
+                    ...previous,
+                    [selectedStaffIssue.id]: event.target.value,
+                  }))
+                }
+                placeholder="Write your work update..."
+                rows={4}
+              />
+            </div>
+
+            <div className="admin-detail-section">
+              <label className="admin-detail-label" htmlFor="staff-evidence">
+                Upload Evidence
+              </label>
+
+              <input
+                id="staff-evidence"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+
+                  setEvidenceFiles((previous) => ({
+                    ...previous,
+                    [selectedStaffIssue.id]: file,
+                  }));
+                }}
+              />
+
+              {evidenceFiles[selectedStaffIssue.id] && (
+                <p>📎 {evidenceFiles[selectedStaffIssue.id].name}</p>
+              )}
+            </div>
+
+            <div className="admin-issue-panel-actions">
+              <button
+                type="button"
+                className="admin-route-btn"
+                onClick={() => saveWorkUpdate(selectedStaffIssue)}
+              >
+                💾 Save Work Update
+              </button>
+
+              <button
+                type="button"
+                className="admin-copy-location-btn"
+                disabled={
+                  String(selectedStaffIssue.status).toLowerCase() !==
+                  "in_progress"
+                }
+                onClick={() => markIssueCompleted(selectedStaffIssue)}
+              >
+                ✅ Mark Completed
+              </button>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* =================================================
+          ADMIN ISSUE PANEL
+      ================================================= */}
 
       {role === "admin" && selectedAdminIssue && (
         <aside className="admin-issue-details-panel" aria-label="Issue details">
@@ -2381,15 +2307,20 @@ function PickModeController({ center, enabled }) {
           </div>
 
           <div className="admin-issue-panel-body">
-            <div className={`admin-issue-status-badge ${
-              selectedAdminIssue.status === "Completed"
-                ? "resolved"
-                : selectedAdminIssue.status === "In Progress"
+            <div
+              className={`admin-issue-status-badge ${
+                COMPLETED_STATUSES.includes(
+                  String(selectedAdminIssue.status || "").toLowerCase()
+                )
+                  ? "resolved"
+                  : String(selectedAdminIssue.status || "").toLowerCase() ===
+                    "in_progress"
                   ? "progress"
                   : "assigned"
-            }`}>
+              }`}
+            >
               <span className="admin-status-badge-dot"></span>
-              {selectedAdminIssue.status}
+              {formatIssueStatus(selectedAdminIssue.status)}
             </div>
 
             <div className="admin-issue-detail-grid">
@@ -2406,7 +2337,9 @@ function PickModeController({ center, enabled }) {
 
             <div className="admin-detail-section">
               <span className="admin-detail-label">Description</span>
-              <p>{selectedAdminIssue.description || "No description provided."}</p>
+              <p>
+                {selectedAdminIssue.description || "No description provided."}
+              </p>
             </div>
 
             <div className="admin-detail-section">
@@ -2414,11 +2347,15 @@ function PickModeController({ center, enabled }) {
               <div className="admin-coordinate-box">
                 <div>
                   <span>Latitude</span>
-                  <strong>{Number(selectedAdminIssue.latitude).toFixed(6)}</strong>
+                  <strong>
+                    {Number(selectedAdminIssue.latitude).toFixed(6)}
+                  </strong>
                 </div>
                 <div>
                   <span>Longitude</span>
-                  <strong>{Number(selectedAdminIssue.longitude).toFixed(6)}</strong>
+                  <strong>
+                    {Number(selectedAdminIssue.longitude).toFixed(6)}
+                  </strong>
                 </div>
               </div>
             </div>
@@ -2427,15 +2364,18 @@ function PickModeController({ center, enabled }) {
               <div>
                 <span>👨‍🔧 Assigned Staff</span>
                 <strong>
-                  {selectedAdminIssue.assignedStaffName ||
-                    selectedAdminIssue.assignedTo?.name ||
+                  {resolveAssignedStaffName(selectedAdminIssue) ||
                     "Not assigned"}
                 </strong>
               </div>
 
               <div>
                 <span>🏙️ Ward / Zone</span>
-                <strong>{selectedAdminIssue.ward || selectedAdminIssue.zone || "Not available"}</strong>
+                <strong>
+                  {selectedAdminIssue.ward ||
+                    selectedAdminIssue.zone ||
+                    "Not available"}
+                </strong>
               </div>
 
               <div>
@@ -2478,7 +2418,8 @@ function PickModeController({ center, enabled }) {
                 className="admin-copy-location-btn"
                 onClick={async () => {
                   const coordinates =
-                    `${Number(selectedAdminIssue.latitude).toFixed(6)}, ${Number(selectedAdminIssue.longitude).toFixed(6)}`;
+                    `${Number(selectedAdminIssue.latitude).toFixed(6)}, ` +
+                    `${Number(selectedAdminIssue.longitude).toFixed(6)}`;
 
                   try {
                     await navigator.clipboard.writeText(coordinates);
@@ -2494,7 +2435,11 @@ function PickModeController({ center, enabled }) {
           </div>
         </aside>
       )}
-      
+
+      {/* =================================================
+          STATUS FILTERS / ADMIN BARS
+      ================================================= */}
+
       {role === "staff" && (
         <div className="staff-status-filter">
           <label htmlFor="issue-status">🔄 Status</label>
@@ -2512,53 +2457,42 @@ function PickModeController({ center, enabled }) {
       )}
 
       {role === "admin" && (
-        <div className="admin-city-status-bar">
-          <div className="admin-status-title">
-            <span className="status-dot"></span>
-            <div>
-              <strong>City Operations</strong>
-              <small>Live Command Center</small>
-            </div>
-          </div>
+  <div className="admin-city-status-bar">
+    <div className="admin-status-title">
+      <span className="status-dot"></span>
+      <div>
+        <strong>City Operations</strong>
+        <small>Live Command Center</small>
+      </div>
+    </div>
 
-          <div className="admin-status-item">
-            <span>📍</span>
-            <div>
-              <strong>{adminIssueStats.total}</strong>
-              <small>Total Issues</small>
-            </div>
-          </div>
-
-          <div className="admin-status-item">
-            <span>🟡</span>
-            <div>
-              <strong>{adminIssueStats.assigned}</strong>
-              <small>Pending</small>
-            </div>
-          </div>
-
-          <div className="admin-status-item">
-            <span>🔵</span>
-            <div>
-              <strong>{adminIssueStats.inProgress}</strong>
-              <small>In Progress</small>
-            </div>
-          </div>
-
-          <div className="admin-status-item">
-            <span>✅</span>
-            <div>
-              <strong>{adminIssueStats.completed}</strong>
-              <small>Resolved</small>
-            </div>
-          </div>
-
-          <div className="admin-system-status">
-            <span className="status-dot"></span>
-            System Operational
-          </div>
+    {/* Dynamic Stats Rendering */}
+    {[
+      { icon: "📍", value: adminIssueStats?.total, label: "Total Issues" },
+      { icon: "🟡", value: adminIssueStats?.assigned, label: "Pending" },
+      { icon: "🔵", value: adminIssueStats?.inProgress, label: "In Progress" },
+      { icon: "✅", value: adminIssueStats?.completed, label: "Resolved" }
+    ].map((stat, index) => (
+      <div key={index} className="admin-status-item">
+        <span>{stat.icon}</span>
+        <div>
+          <strong>{stat.value ?? 0}</strong>
+          <small>{stat.label}</small>
         </div>
-      )}
+      </div>
+    ))}
+
+    {/* System Status (Fixed without isSystemOnline error) */}
+    <div
+      className={`admin-system-status ${
+          isSystemOnline ? "online" : "offline"
+      }`}
+     >
+       <span className="status-dot"></span>
+       {isSystemOnline ? "System Operational" : "System Offline"}
+      </div>
+  </div>
+)}
 
       {role === "admin" && (
         <div className="admin-issue-filter">
@@ -2573,6 +2507,30 @@ function PickModeController({ center, enabled }) {
             <option value="In Progress">In Progress</option>
             <option value="Completed">Completed</option>
           </select>
+        </div>
+      )}
+
+      {(role === "staff" || role === "admin") && assignedIssuesLoading && (
+        <div className="map-api-feedback" role="status">
+          Loading issues from the backend…
+        </div>
+      )}
+
+      {(role === "staff" || role === "admin") && assignedIssuesError && (
+        <div className="map-api-feedback map-api-feedback-error" role="alert">
+          Could not load assigned issues: {assignedIssuesError}
+        </div>
+      )}
+
+      {backendIssuesLoading && (
+        <div className="map-api-feedback" role="status">
+          Loading nearby issues…
+        </div>
+      )}
+
+      {backendIssuesError && (
+        <div className="map-api-feedback map-api-feedback-error" role="alert">
+          Could not load nearby issues: {backendIssuesError}
         </div>
       )}
 
@@ -2612,6 +2570,13 @@ function PickModeController({ center, enabled }) {
         getNearbyPlaces={getNearbyPlaces}
         NEARBY_RADIUS={NEARBY_RADIUS}
         onReportIssue={onReportIssue}
+        showProfile={showProfile}
+        setShowProfile={setShowProfile}
+        currentUser={getUser()}
+        onLogout={() => {
+          logout();
+          window.location.assign("/");
+        }}
         showTraffic={showTraffic}
         setShowTraffic={setShowTraffic}
         showFilters={showFilters}

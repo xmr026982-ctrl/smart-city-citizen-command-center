@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { getProfileIcon } from "../../store/authStore";
+
 
 function MapSearch({
   role,
@@ -49,6 +51,12 @@ function MapSearch({
   // Optional
   onReportIssue,
 
+  // Profile / Session
+  showProfile,
+  setShowProfile,
+  currentUser,
+  onLogout,
+
   // Traffic
   showTraffic,
   setShowTraffic,
@@ -62,6 +70,8 @@ function MapSearch({
 }) {
   const [showNearby, setShowNearby] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
+
+  const profileIcon = getProfileIcon(currentUser);
 
   const nearbyAvailable =
     selectedLocation ||
@@ -161,30 +171,64 @@ function MapSearch({
 
         {/* REPORT ISSUE - USER ONLY */}
 
-        {role === "user" && (
-          <button
-            type="button"
-            className="map-tool-btn"
-            onClick={() => {
-              if (onReportIssue) {
-                onReportIssue();
-              } else {
-                alert(
-                  "Report Issue feature will be connected here."
-                );
-              }
-            }}
-            title="Report Issue"
-          >
-            <span className="tool-icon">
-              📝
-            </span>
+       {role === "user" && (
+       <button
+        type="button"
+        className="map-tool-btn"
+        onClick={() => {
+        const location = getCurrentSelectedPosition
+          ? getCurrentSelectedPosition()
+          : null;
 
-            <span className="tool-label">
-              Report Issue
-            </span>
-          </button>
-        )}
+        // Parent can override navigation
+        if (onReportIssue) {
+        if (location) {
+          onReportIssue({
+            latitude: location.latitude,
+            longitude: location.longitude,
+          });
+        } else {
+          onReportIssue();
+        }
+        return;
+      }
+
+      // Open citizen report form; include coords when available
+      const params = new URLSearchParams();
+      if (location) {
+        params.set("lat", String(location.latitude));
+        params.set("lng", String(location.longitude));
+      }
+
+      const query = params.toString();
+      window.location.assign(
+        query ? `/citizen/report?${query}` : "/citizen/report"
+      );
+    }}
+    title="Report Issue"
+    >
+      <span className="tool-icon">📝</span>
+      <span className="tool-label">Report Issue</span>
+    </button>
+    )}
+
+        {/* PROFILE */}
+
+        <button
+          type="button"
+          className={`map-tool-btn ${showProfile ? "active" : ""}`}
+          onClick={() => setShowProfile((prev) => !prev)}
+          title="My Profile"
+        >
+          <span className="tool-icon">
+            <img
+              src={profileIcon}
+              alt="Profile"
+              className="map-profile-icon"
+            />
+          </span>
+          <span className="tool-label">My Profile</span>
+        </button>
 
         {/* NEARBY */}
 
@@ -270,6 +314,49 @@ function MapSearch({
           </span>
         </button>
       </div>
+
+      {/* PROFILE PANEL — name + email only */}
+
+      {showProfile && (
+        <div className="map-floating-panel profile-panel">
+          <div className="floating-panel-header">
+            <strong>My Profile</strong>
+            <button
+              type="button"
+              onClick={() => setShowProfile(false)}
+              aria-label="Close profile"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="profile-panel-content">
+            <div className="profile-avatar">
+              <img
+                src={profileIcon}
+                alt="Profile"
+                className="profile-avatar-image"
+              />
+            </div>
+
+            <h3 className="profile-name">
+              {currentUser?.name || "My Account"}
+            </h3>
+
+            <p className="profile-email">
+              {currentUser?.email || "Signed in to Smart City Command Center"}
+            </p>
+
+            <button
+              type="button"
+              className="profile-logout-btn"
+              onClick={onLogout}
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* LIVE TRACKING PANEL */}
 

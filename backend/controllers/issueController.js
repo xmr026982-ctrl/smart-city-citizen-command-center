@@ -1,5 +1,7 @@
 const issueService = require("../services/issue.service");
 
+// ==================== MAP / GEOLOCATION ====================
+
 const createIssue = async (req, res) => {
   try {
     const { title, type, status, latitude, longitude } = req.body;
@@ -106,17 +108,19 @@ const getNearbyIssues = async (req, res) => {
       });
     }
 
-    const issues = await issueService.getNearbyIssues(
-      lat,
-      lng,
-      distance
+   const issues = await issueService.getNearbyIssues(
+        lat,
+        lng,
+        distance,
+     req.user
     );
 
-    return res.status(200).json({
-      success: true,
-      count: issues.length,
-      data: issues,
-    });
+   return res.status(200).json({
+     success: true,
+     count: issues.length,
+     data: issues,
+   });
+
   } catch (error) {
     console.error("Nearby issues error:", error);
 
@@ -128,7 +132,192 @@ const getNearbyIssues = async (req, res) => {
   }
 };
 
+// ==================== ISSUE MANAGEMENT ====================
+
+const list = async (req, res) => {
+  res.json(await issueService.list(req.user));
+};
+
+const getOne = async (req, res) => {
+  const issue = await issueService.getOne(req.params.id, req.user);
+
+  if (issue === false) {
+    return res.status(403).json({
+      message: "You are not allowed to view this issue.",
+    });
+  }
+
+  if (!issue) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(issue);
+};
+
+const create = async (req, res) => {
+  if (req.user.role !== "citizen") {
+    return res.status(403).json({
+      message: "Citizen only",
+    });
+  }
+
+  res.status(201).json(
+    await issueService.create(req.body, req.files, req.user)
+  );
+};
+
+const setStatus = async (req, res) => {
+  const allowedStatuses = new Set([
+    "submitted",
+    "acknowledged",
+    "in_progress",
+    "pending_review",
+    "resolved",
+  ]);
+  const status = String(req.body.status || "").toLowerCase();
+
+  if (!allowedStatuses.has(status)) {
+    return res.status(400).json({
+      message: "Invalid status value.",
+    });
+  }
+
+  const result = await issueService.setStatus(
+    req.params.id,
+    status,
+    req.user
+  );
+
+  if (result === null) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  if (result === false) {
+    return res.status(403).json({
+      message: "Status move not allowed",
+    });
+  }
+
+  res.json(result);
+};
+
+const assign = async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      message: "Admin only",
+    });
+  }
+
+  const issue = await issueService.assign(
+    req.params.id,
+    req.body.assignedTo,
+    req.user
+  );
+
+  if (issue === false) {
+    return res.status(403).json({
+      message: "Assignment is not allowed.",
+    });
+  }
+
+  if (!issue) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(issue);
+};
+
+const setPriority = async (req, res) => {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      message: "Admin only",
+    });
+  }
+
+  const allowedPriorities = new Set(["low", "medium", "high", "critical"]);
+  const priority = String(req.body.priority || "").toLowerCase();
+
+  if (!allowedPriorities.has(priority)) {
+    return res.status(400).json({
+      message: "priority must be low, medium, high, or critical",
+    });
+  }
+
+  const issue = await issueService.setPriority(
+    req.params.id,
+    priority
+  );
+
+  if (!issue) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(issue);
+};
+
+const comment = async (req, res) => {
+  if (req.user.role === "citizen") {
+    return res.status(403).json({
+      message: "No citizen comments",
+    });
+  }
+
+  const issue = await issueService.comment(
+    req.params.id,
+    req.body.body,
+    req.user
+  );
+
+  if (issue === false) {
+    return res.status(403).json({
+      message: "You are not allowed to add a work update to this issue.",
+    });
+  }
+
+  if (!issue) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(issue);
+};
+
+const toggleSave = async (req, res) => {
+  const issue = await issueService.toggleSave(
+    req.params.id,
+    req.user
+  );
+
+  if (!issue) {
+    return res.status(404).json({
+      message: "Not found",
+    });
+  }
+
+  res.json(issue);
+};
+
 module.exports = {
+  // Map
   createIssue,
   getNearbyIssues,
+
+  // Issue Management
+  list,
+  getOne,
+  create,
+  setStatus,
+  assign,
+  setPriority,
+  comment,
+  toggleSave,
 };

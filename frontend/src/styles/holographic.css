@@ -1,0 +1,84 @@
+/* Year-3000 holographic layer – soft, premium, never gaudy */
+
+.holo-surface {
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  position: relative;
+  overflow: hidden;
+}
+
+.holo-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    rgba(34, 211, 238, 0.04) 50%,
+    transparent 60%
+  );
+  pointer-events: none;
+  animation: holo-sweep 8s linear infinite;
+}
+
+.holo-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(34, 211, 238, 0.15), rgba(14, 165, 233, 0.3)) border-box;
+}
+
+.holo-glow:hover {
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+  transition: all 280ms var(--ease);
+}
+
+.neural-pulse {
+  position: relative;
+}
+
+.neural-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--neon) 0%, transparent 70%);
+  opacity: 0;
+  animation: neural-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.08), transparent);
+  animation: scan 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes holo-sweep {
+  0% { transform: translateX(-100%) rotate(15deg); }
+  100% { transform: translateX(200%) rotate(15deg); }
+}
+
+@keyframes neural-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.95); }
+  50% { opacity: 0.35; transform: scale(1.05); }
+}
+
+@keyframes scan {
+  0% { left: -100%; }
+  100% { left: 160%; }
+}

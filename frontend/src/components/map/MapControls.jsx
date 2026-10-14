@@ -141,17 +141,47 @@ function MapButtons({
    MAP CLICK
 ========================= */
 
+// UI overlays that must not trigger map pin / Kolkata boundary checks
+const UI_OVERLAY_SELECTORS = [
+  ".playlist-card",
+  ".pick-confirm-button",
+  ".pick-mode-bar",
+  ".map-left-toolbar",
+  ".map-tool-btn",
+  ".map-floating-panel",
+  ".map-search-box",
+  ".search-results",
+  ".layer-control-wrapper",
+  ".layer-popup-card",
+  ".layer-toggle-btn",
+  ".layer-selector",
+  ".layer-card",
+  ".admin-layer-manager",
+  ".admin-city-status-bar",
+  ".admin-issue-filter",
+  ".staff-status-filter",
+  ".admin-issue-details-panel",
+  ".staff-issue-details-panel",
+  ".custom-map-controls",
+  ".map-api-feedback",
+  ".leaflet-control",
+  ".leaflet-control-container",
+  ".leaflet-popup",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "label",
+  "a",
+].join(", ");
+
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
     click: (event) => {
       const target = event.originalEvent?.target;
 
-      // Ignore clicks on map overlay controls
-      if (
-        target?.closest(".playlist-card") ||
-        target?.closest(".pick-confirm-button") ||
-        target?.closest(".pick-mode-bar")
-      ) {
+      // Ignore clicks that started on any map overlay / control UI
+      if (target?.closest?.(UI_OVERLAY_SELECTORS)) {
         return;
       }
 
