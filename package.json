@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "leaflet.markercluster": "^1.5.3",
+    "react-leaflet-cluster": "^4.1.3"
+  }
+}

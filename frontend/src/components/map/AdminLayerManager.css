@@ -1,0 +1,476 @@
+
+/* =========================================================
+   ADMIN LAYER MANAGER — PREMIUM SMART CITY CONTROL PANEL
+   Modern | Glassmorphism | Responsive | Accessible
+   ========================================================= */
+
+.admin-layer-manager {
+  position: absolute;
+  top: 84px;
+  right: 16px;
+  width: 290px;
+  max-width: calc(100vw - 32px);
+  z-index: 3200;
+
+  background: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  border-radius: 20px;
+
+  box-shadow:
+    0 24px 60px -20px rgba(15, 23, 42, 0.24),
+    0 8px 22px -8px rgba(15, 23, 42, 0.12),
+    0 1px 3px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+
+  overflow: hidden;
+
+  font-family:
+    "Plus Jakarta Sans",
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #0f172a;
+
+  animation: adminLayerIn 0.32s
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Entrance Animation ---------- */
+
+@keyframes adminLayerIn {
+  from {
+    opacity: 0;
+    transform: translate3d(14px, -8px, 0) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* ---------- Premium Header ---------- */
+
+.admin-layer-header {
+  position: relative;
+  padding: 17px 16px 16px;
+
+  border-bottom: 1px solid rgba(203, 213, 225, 0.65);
+
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgba(59, 130, 246, 0.15),
+      transparent 58%
+    ),
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #f5f9ff 55%,
+      #eff6ff 100%
+    );
+}
+
+.admin-layer-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+
+  border-radius: 0 0 4px 4px;
+
+  background: linear-gradient(
+    90deg,
+    #2563eb,
+    #60a5fa,
+    #a5b4fc
+  );
+}
+
+.admin-layer-header-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-layer-icon {
+  width: 43px;
+  height: 43px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+
+  background: linear-gradient(
+    145deg,
+    #dbeafe 0%,
+    #eff6ff 55%,
+    #ffffff 100%
+  );
+
+  border: 1px solid rgba(147, 197, 253, 0.65);
+
+  color: #1d4ed8;
+  font-size: 19px;
+
+  box-shadow:
+    0 4px 12px rgba(37, 99, 235, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.admin-layer-header strong {
+  display: block;
+  color: #0f172a;
+
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.35px;
+  line-height: 1.4;
+}
+
+.admin-layer-header small {
+  display: block;
+  margin-top: 4px;
+
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.015em;
+}
+
+/* ---------- Layer List ---------- */
+
+.admin-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  padding: 11px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.admin-layer-row {
+  position: relative;
+
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 11px 12px;
+
+  border: 1px solid transparent;
+  border-radius: 13px;
+
+  background: transparent;
+  color: #334155;
+
+  cursor: pointer;
+  text-align: left;
+
+  font: inherit;
+
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.18s ease;
+}
+
+.admin-layer-row:hover {
+  background: #f5f8ff;
+  border-color: #e2eaf8;
+
+  box-shadow:
+    0 3px 10px rgba(30, 64, 175, 0.045);
+}
+
+.admin-layer-row:active {
+  transform: scale(0.985);
+}
+
+/* ---------- Active Layer ---------- */
+
+.admin-layer-row.active {
+  background: linear-gradient(
+    120deg,
+    #eff6ff 0%,
+    #f5f9ff 58%,
+    #f0f9ff 100%
+  );
+
+  border-color: #bfdbfe;
+
+  box-shadow:
+    0 3px 12px rgba(37, 99, 235, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+.admin-layer-row.active::before {
+  content: "";
+  position: absolute;
+
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+
+  background: linear-gradient(
+    180deg,
+    #60a5fa,
+    #2563eb
+  );
+
+  pointer-events: none;
+}
+
+.admin-layer-row:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.4);
+  outline-offset: 3px;
+}
+
+/* ---------- Layer Name and Icon ---------- */
+
+.admin-layer-name {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  min-width: 0;
+
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.4;
+
+  transition: color 0.2s ease;
+}
+
+.admin-layer-item-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 11px;
+
+  background: linear-gradient(
+    145deg,
+    #f8fafc,
+    #eef2f7
+  );
+
+  border: 1px solid #e2e8f0;
+
+  color: #475569;
+  font-size: 15px;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  transition:
+    background 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+
+.admin-layer-row:hover .admin-layer-item-icon {
+  transform: translateY(-1px);
+  border-color: #cbd5e1;
+}
+
+.admin-layer-row.active .admin-layer-item-icon {
+  background: linear-gradient(
+    145deg,
+    #ffffff,
+    #eaf2ff
+  );
+
+  border-color: #bfdbfe;
+  color: #2563eb;
+
+  box-shadow:
+    0 3px 8px rgba(37, 99, 235, 0.09),
+    inset 0 1px 0 #ffffff;
+}
+
+.admin-layer-row.active .admin-layer-name {
+  color: #1d4ed8;
+}
+
+/* ---------- Modern Toggle Switch ---------- */
+
+.admin-layer-switch {
+  position: relative;
+
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+
+  display: flex;
+  align-items: center;
+
+  padding: 3px;
+
+  border-radius: 999px;
+
+  background: linear-gradient(
+    135deg,
+    #cbd5e1,
+    #b8c4d3
+  );
+
+  box-shadow:
+    inset 0 1px 3px rgba(15, 23, 42, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+
+  transition:
+    background 0.24s ease,
+    box-shadow 0.24s ease;
+}
+
+.admin-layer-switch-dot {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: block;
+
+  border-radius: 50%;
+
+  background: linear-gradient(
+    145deg,
+    #ffffff,
+    #f8fafc
+  );
+
+  box-shadow:
+    0 2px 4px rgba(15, 23, 42, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.8);
+
+  transition:
+    transform 0.24s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.admin-layer-switch.on {
+  background: linear-gradient(
+    135deg,
+    #60a5fa 0%,
+    #2563eb 100%
+  );
+
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.08),
+    0 0 0 3px rgba(59, 130, 246, 0.10);
+}
+
+.admin-layer-switch.on .admin-layer-switch-dot {
+  transform: translateX(18px);
+}
+
+/* ---------- Disabled State ---------- */
+
+.admin-layer-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.admin-layer-row:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.admin-layer-row:disabled .admin-layer-item-icon {
+  transform: none;
+}
+
+/* ---------- Responsive Layout ---------- */
+
+@media (max-width: 640px) {
+  .admin-layer-manager {
+    top: 76px;
+    right: 10px;
+
+    width: min(290px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
+
+    border-radius: 17px;
+  }
+
+  .admin-layer-header {
+    padding: 15px 14px 14px;
+  }
+
+  .admin-layer-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .admin-layer-list {
+    gap: 4px;
+    padding: 9px;
+  }
+
+  .admin-layer-row {
+    padding: 10px 11px;
+    border-radius: 12px;
+  }
+
+  .admin-layer-name {
+    gap: 9px;
+    font-size: 12px;
+  }
+
+  .admin-layer-item-icon {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ---------- Reduced Motion Accessibility ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-layer-manager {
+    animation: none;
+  }
+
+  .admin-layer-row,
+  .admin-layer-name,
+  .admin-layer-switch,
+  .admin-layer-switch-dot,
+  .admin-layer-item-icon {
+    transition: none;
+  }
+
+  .admin-layer-row:active {
+    transform: none;
+  }
+}
