@@ -1,9 +1,15 @@
-import { Navigate } from "react-router-dom";
-import { getRole } from "../store/authStore";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../store/authStore";
 
-function ProtectedRoute({ children }) {
-  if (!getRole()) return <Navigate to="/" replace />;
-  return children;
+function ProtectedRoute() {
+  const user = useAuth();
+  const location = useLocation();
+
+  if (!user) {
+    return <Navigate to="/" replace state={{ from: location.pathname }} />;
+  }
+
+  return <Outlet />;
 }
 
 export default ProtectedRoute;

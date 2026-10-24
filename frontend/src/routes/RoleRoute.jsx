@@ -1,11 +1,17 @@
-import { Navigate } from "react-router-dom";
-import { getRole } from "../store/authStore";
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../store/authStore";
 
-function RoleRoute({ allow, children }) {
-  const role = getRole();
-  if (!role) return <Navigate to="/" replace />;
-  if (role !== allow) return <Navigate to="/unauthorized" replace />;
-  return children;
+const HOME = {
+  citizen: "/citizen/report",
+  staff: "/staff",
+  admin: "/admin/command",
+};
+
+function RoleRoute({ allow }) {
+  const user = useAuth();
+  if (!user) return <Navigate to="/" replace />;
+  if (!allow.includes(user.role)) return <Navigate to={HOME[user.role]} replace />;
+  return <Outlet />;
 }
 
 export default RoleRoute;

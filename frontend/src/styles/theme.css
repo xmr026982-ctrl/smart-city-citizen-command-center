@@ -1,27 +1,51 @@
-/* Premium White only. No dark mode. */
 :root {
-  --bg: #f4f6fa;
-  --panel: #ffffff;
-  --ink: #0f172a;
-  --muted: #64748b;
-  --line: #e7ebf1;
-  --blue: #2563eb;
-  --cyan: #0ea5e9;
-  --blue-soft: #eaf1ff;
-  --green: #16a34a;
-  --amber: #f59e0b;
-  --radius: 18px;
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.08);
-  --font-display: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-num: "Space Grotesk", "Inter", system-ui, sans-serif;
+  /* Premium white + soft holographic cyan (Year 3000) */
+  --bg: #f4f7fb;
+  --surface: #f8fafc;
+  --card: #ffffff;
+  --fg: #0b1220;
+  --muted: #5b6573;
+  --subtle: #8a94a3;
+  --primary: #0ea5e9;
+  --primary-deep: #0284c7;
+  --primary-fg: #f0f9ff;
+  --accent: #38bdf8;
+  --neon: #22d3ee;
+  --neon-soft: rgba(34, 211, 238, 0.12);
+  --line: #e2e8f0;
+  --border: #e6ebf1;
+  --live: #10b981;
+  --danger: #ef4444;
+  --danger-soft: #fef2f2;
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-soft: #fffbeb;
+  --info: #0ea5e9;
+  --info-soft: #f0f9ff;
 
-  /* kept so old components that read these still work */
-  --void: var(--bg);
-  --stage: var(--panel);
-  --glass: rgba(255, 255, 255, 0.82);
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-xl: 28px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --shadow: 0 1px 1px rgba(15, 23, 32, 0.03), 0 18px 40px rgba(14, 165, 233, 0.06);
+  --shadow-hover: 0 20px 50px rgba(14, 165, 233, 0.12);
+  --shadow-glow: 0 0 0 1px rgba(34, 211, 238, 0.25), 0 0 24px rgba(34, 211, 238, 0.15);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --glass: color-mix(in oklab, white 78%, transparent);
 }
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; }
-body { margin: 0; color: var(--ink); background: var(--bg); font-family: var(--font-display); -webkit-font-smoothing: antialiased; }
-a { color: inherit; }
-button { font: inherit; }
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+  line-height: 1.12;
+  color: var(--fg);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
