@@ -105,7 +105,7 @@ const updateUser = async (req, res) => {
         }
 
         if (role !== undefined) {
-            const allowedRoles = ["citizen", "moderator", "admin"];
+           const allowedRoles = ["citizen", "staff", "moderator", "admin"];
 
             if (!allowedRoles.includes(role)) {
                 return res.status(400).json({
