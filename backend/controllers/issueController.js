@@ -31,7 +31,7 @@ async function assign(req, res) {
 
 async function setPriority(req, res) {
   if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
-  const issue = await issues.setPriority(req.params.id, req.body.priority);
+  const issue = await issues.setPriority(req.params.id, req.body.priority, req.user);
   if (!issue) return res.status(404).json({ message: "Not found" });
   res.json(issue);
 }

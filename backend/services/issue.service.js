@@ -68,18 +68,26 @@ async function setStatus(id, next, user) {
 async function assign(id, assignedTo, user) {
   const issue = await Issue.findById(id);
   if (!issue) return null;
-  issue.assignedTo = assignedTo;
-  issue.assignedAt = new Date();
-  if (issue.status === "submitted") {
+
+  const next = assignedTo && String(assignedTo).trim() ? String(assignedTo).trim() : null;
+  issue.assignedTo = next;
+  issue.assignedAt = next ? new Date() : null;
+
+  if (next && issue.status === "submitted") {
     issue.status = "acknowledged";
     issue.timeline.push({ status: "acknowledged", by: user.name, role: "admin" });
   }
+
   await issue.save();
   return forUser(issue, user);
 }
 
-async function setPriority(id, priority) {
-  return Issue.findByIdAndUpdate(id, { priority }, { new: true });
+async function setPriority(id, priority, user) {
+  const issue = await Issue.findById(id);
+  if (!issue) return null;
+  issue.priority = priority;
+  await issue.save();
+  return forUser(issue, user);
 }
 
 async function comment(id, body, user) {
