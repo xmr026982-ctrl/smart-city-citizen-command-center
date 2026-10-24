@@ -1,0 +1,27 @@
+/* Premium White only. No dark mode. */
+:root {
+  --bg: #f4f6fa;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e7ebf1;
+  --blue: #2563eb;
+  --cyan: #0ea5e9;
+  --blue-soft: #eaf1ff;
+  --green: #16a34a;
+  --amber: #f59e0b;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(15, 23, 42, 0.08);
+  --font-display: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-num: "Space Grotesk", "Inter", system-ui, sans-serif;
+
+  /* kept so old components that read these still work */
+  --void: var(--bg);
+  --stage: var(--panel);
+  --glass: rgba(255, 255, 255, 0.82);
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; color: var(--ink); background: var(--bg); font-family: var(--font-display); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font: inherit; }
