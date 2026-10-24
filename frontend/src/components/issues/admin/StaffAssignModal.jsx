@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, UserPlus, Shield, Flag, MapPin } from "lucide-react";
+import { Search, X, Flag, MapPin, Zap } from "lucide-react";
 import { STAFF_ROSTER } from "../../../constants/issueConstants";
-import { STATUS_LABEL } from "../../../constants/issueStatuses";
 import { ISSUE_PRIORITIES, PRIORITY_LABEL } from "../../../constants/issuePriorities";
+import { CATEGORY_LABEL } from "../../../constants/issueCategories";
 import { useIssues } from "../../../store/issueStore";
 import { getStaffTitle } from "../../../store/staffTitleStore";
+import { getStaffExpertise, expertiseLabel, matchesExpertise } from "../../../store/staffExpertiseStore";
 
 function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
   const issues = useIssues();
@@ -20,14 +21,26 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
   }, [isOpen, issue]);
 
   const rows = useMemo(() => {
+    if (!issue) return [];
     return STAFF_ROSTER
       .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
-      .map((name) => ({
-        name,
-        title: getStaffTitle(name),
-        active: issues.filter((i) => i.assignedTo === name && i.status !== "resolved").length,
-      }));
-  }, [issues, query]);
+      .map((name) => {
+        const expertise = getStaffExpertise(name);
+        const match = matchesExpertise(expertise, issue.category);
+        return {
+          name,
+          title: getStaffTitle(name),
+          expertise,
+          expertiseLabel: expertiseLabel(expertise),
+          match,
+          active: issues.filter((i) => i.assignedTo === name && i.status !== "resolved").length,
+        };
+      })
+      .sort((a, b) => {
+        if (a.match !== b.match) return a.match ? -1 : 1;
+        return a.active - b.active;
+      });
+  }, [issues, query, issue]);
 
   if (!isOpen || !issue) return null;
 
@@ -61,7 +74,7 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
           top: "50%",
           left: "50%",
           transform: "translate(-50%, -50%)",
-          width: "min(520px, calc(100vw - 24px))",
+          width: "min(540px, calc(100vw - 24px))",
           maxHeight: "86dvh",
           display: "flex",
           flexDirection: "column",
@@ -78,78 +91,44 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
           background: "linear-gradient(90deg, transparent, #0ea5e9, #22d3ee, transparent)",
         }} />
 
-        <div style={{
-          padding: "16px 18px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderBottom: "1px solid rgba(14,165,233,0.1)",
-        }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-              display: "grid", placeItems: "center", color: "white",
-            }}>
-              <UserPlus size={18} />
-            </div>
-            <div>
-              <p style={{ fontWeight: 700, fontSize: 16 }}>Assign Specialist</p>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                Issue #{issue.id} · Acknowledge + dispatch
-              </p>
-            </div>
+        <div style={{ padding: "16px 18px 10px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--primary-deep)", fontWeight: 650 }}>
+              Dispatch
+            </p>
+            <h3 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 20 }}>
+              Assign specialist
+            </h3>
+            <p style={{ marginTop: 4, fontSize: 12.5, color: "var(--muted)" }}>
+              {issue.title} · {CATEGORY_LABEL[issue.category] || issue.category}
+            </p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
-              background: "white", display: "grid", placeItems: "center", cursor: "pointer",
-            }}
-          >
-            <X size={16} />
+          <button onClick={onClose} style={{
+            width: 34, height: 34, borderRadius: 10, border: "1px solid var(--line)",
+            background: "white", display: "grid", placeItems: "center", cursor: "pointer",
+          }}>
+            <X size={15} />
           </button>
         </div>
 
-        <div style={{ padding: 16, display: "grid", gap: 12, borderBottom: "1px solid rgba(14,165,233,0.08)" }}>
-          <div>
-            <span style={labelStyle}><Shield size={12} /> Status</span>
-            <div style={{ ...selectStyle, display: "flex", alignItems: "center", fontWeight: 650 }}>
-              {STATUS_LABEL[dispatchStatus]}
-            </div>
-            <p style={{ fontSize: 12, color: "var(--subtle)", marginTop: 6 }}>
-              {issue.status === "submitted"
-                ? "First dispatch acknowledges the ticket. Admin cannot set In Progress or Resolved here."
-                : "Field owns In Progress. Admin only confirms close from the issue file."}
-            </p>
+        <div style={{ padding: "0 18px 10px" }}>
+          <div style={{ position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search staff"
+              style={{
+                width: "100%", height: 40, borderRadius: 12, border: "1px solid var(--line)",
+                paddingLeft: 34, paddingRight: 12, fontSize: 13.5, background: "white",
+              }}
+            />
           </div>
-          <label>
-            <span style={labelStyle}><Flag size={12} /> Priority</span>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} style={selectStyle}>
-              {ISSUE_PRIORITIES.map((p) => (
-                <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
-              ))}
-            </select>
-          </label>
         </div>
 
-        <div style={{ padding: "12px 16px 8px", position: "relative" }}>
-          <Search size={14} style={{ position: "absolute", left: 28, top: 24, color: "var(--subtle)" }} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name…"
-            style={{
-              width: "100%", height: 40, paddingLeft: 36, paddingRight: 12,
-              borderRadius: 12, border: "1px solid var(--line)",
-              background: "rgba(255,255,255,0.95)", outline: "none", fontSize: 13.5,
-            }}
-          />
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 12px 12px" }}>
+        <div style={{ flex: 1, overflow: "auto", padding: "0 12px" }}>
           {rows.map((row) => {
-            const active = staff === row.name;
+            const selected = staff === row.name;
             return (
               <button
                 key={row.name}
@@ -157,16 +136,24 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
                 style={{
                   width: "100%",
                   textAlign: "left",
-                  border: active ? "1.5px solid var(--primary)" : "1px solid transparent",
-                  background: active ? "rgba(14,165,233,0.08)" : "transparent",
+                  padding: "10px 12px",
+                  marginBottom: 6,
                   borderRadius: 14,
-                  padding: "10px 10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
+                  border: selected
+                    ? "1px solid rgba(14,165,233,0.5)"
+                    : row.match
+                    ? "1px solid rgba(16,185,129,0.35)"
+                    : "1px solid rgba(14,165,233,0.12)",
+                  background: selected
+                    ? "rgba(14,165,233,0.08)"
+                    : row.match
+                    ? "rgba(16,185,129,0.06)"
+                    : "rgba(255,255,255,0.5)",
                   cursor: "pointer",
-                  marginBottom: 4,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -181,6 +168,17 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
                   <div>
                     <p style={{ fontWeight: 600, fontSize: 13.5 }}>{row.name}</p>
                     <p style={{ fontSize: 12, color: "var(--muted)" }}>{row.title}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                      <Zap size={11} color={row.match ? "#059669" : "var(--subtle)"} />
+                      <span style={{
+                        fontSize: 11.5,
+                        fontWeight: 650,
+                        color: row.match ? "#059669" : "var(--subtle)",
+                      }}>
+                        {row.expertiseLabel}
+                        {row.match ? " · Match" : " · Other"}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <span style={{ fontSize: 12, color: "var(--subtle)", display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -189,6 +187,21 @@ function StaffAssignModal({ isOpen, onClose, issue, onAssign }) {
               </button>
             );
           })}
+        </div>
+
+        <div style={{ padding: "10px 18px", borderTop: "1px solid rgba(14,165,233,0.1)" }}>
+          <label style={labelStyle}>
+            <Flag size={12} /> Priority
+          </label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            style={selectStyle}
+          >
+            {ISSUE_PRIORITIES.map((p) => (
+              <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{

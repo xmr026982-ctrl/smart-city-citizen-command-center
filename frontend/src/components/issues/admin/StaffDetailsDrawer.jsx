@@ -1,20 +1,13 @@
 import { useEffect } from "react";
 import {
-  X, User, Shield, Activity, CheckCircle2, AlertTriangle,
-  MapPin, Clock
+  X, Shield, Activity, CheckCircle2, AlertTriangle,
+  Lock, Zap
 } from "lucide-react";
 import IssueStatusBadge from "../shared/IssueStatusBadge";
 import IssuePriorityBadge from "../shared/IssuePriorityBadge";
 import { CATEGORY_LABEL } from "../../../constants/issueCategories";
-import { formatDateTime } from "../../../utils/formatDate";
-import { STAFF_TITLES, getStaffTitle, setStaffTitle } from "../../../store/staffTitleStore";
-
-function suggestedTitle(perf) {
-  if (perf.resolved >= 3 && perf.open === 0) return "Senior Specialist";
-  if (perf.resolved >= 2 || perf.assigned >= 2) return "Specialist";
-  if (perf.assigned >= 1) return "Field Operative";
-  return "Field Operative";
-}
+import { getStaffTitle } from "../../../store/staffTitleStore";
+import { getStaffExpertise, expertiseLabel } from "../../../store/staffExpertiseStore";
 
 function StaffDetailsDrawer({ staff, issues, audit, onClose }) {
   useEffect(() => {
@@ -25,17 +18,14 @@ function StaffDetailsDrawer({ staff, issues, audit, onClose }) {
 
   if (!staff) return null;
 
+  const title = getStaffTitle(staff);
+  const expertise = getStaffExpertise(staff);
+  const expertiseLabelText = expertiseLabel(expertise);
+
   const assigned = issues.filter((i) => i.assignedTo === staff);
   const open = assigned.filter((i) => i.status !== "resolved");
   const resolved = assigned.filter((i) => i.status === "resolved");
   const critical = assigned.filter((i) => i.priority === "critical" || i.priority === "high");
-  const events = (audit || []).filter((e) => e.actor === staff).slice(0, 8);
-  const title = getStaffTitle(staff);
-  const suggest = suggestedTitle({
-    assigned: assigned.length,
-    open: open.length,
-    resolved: resolved.length,
-  });
 
   return (
     <>
@@ -69,83 +59,83 @@ function StaffDetailsDrawer({ staff, issues, audit, onClose }) {
         }}
       >
         <div style={{
-          height: 3,
-          background: "linear-gradient(90deg, transparent, #0ea5e9 20%, #22d3ee 50%, #0ea5e9 80%, transparent)",
-        }} />
-
-        <div style={{
-          padding: "16px 22px",
-          borderBottom: "1px solid rgba(14,165,233,0.1)",
+          padding: "18px 20px",
+          borderBottom: "1px solid rgba(14,165,233,0.12)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          background: "rgba(14,165,233,0.04)",
         }}>
           <div>
-            <p style={{
-              fontSize: 10.5, fontWeight: 600, letterSpacing: "0.14em",
-              textTransform: "uppercase", color: "var(--primary)", marginBottom: 4,
-            }}>
-              Personnel File · Neural Dossier
+            <p style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--primary-deep)", fontWeight: 650 }}>
+              Personnel File
             </p>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, margin: 0 }}>
-              {staff}
-            </h2>
+            <h2 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 22 }}>{staff}</h2>
             <p style={{ marginTop: 4, fontSize: 13, color: "var(--muted)" }}>{title}</p>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 38, height: 38, borderRadius: 11, border: "1px solid var(--line)",
-              background: "white", display: "grid", placeItems: "center", cursor: "pointer",
-            }}
-          >
-            <X size={17} />
+          <button type="button" onClick={onClose} style={{
+            width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
+            background: "white", display: "grid", placeItems: "center", cursor: "pointer",
+          }}>
+            <X size={16} />
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: 22 }}>
-          {/* Performance */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 22,
-          }}>
-            <Mini icon={Activity} label="Assigned" value={assigned.length} color="#0ea5e9" />
-            <Mini icon={AlertTriangle} label="Open" value={open.length} color="#f59e0b" />
-            <Mini icon={CheckCircle2} label="Resolved" value={resolved.length} color="#10b981" />
-            <Mini icon={Shield} label="High / Critical" value={critical.length} color="#ef4444" />
+        <div style={{ flex: 1, overflow: "auto", padding: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
+            <GlassStat icon={Activity} label="Open" value={open.length} />
+            <GlassStat icon={CheckCircle2} label="Resolved" value={resolved.length} />
+            <GlassStat icon={AlertTriangle} label="High/Critical" value={critical.length} />
+            <GlassStat icon={Shield} label="Total assigned" value={assigned.length} />
           </div>
 
-          {/* Promote */}
           <div style={{
-            borderRadius: 16, padding: 16, marginBottom: 22,
-            background: "rgba(255,255,255,0.6)",
-            border: "1px solid rgba(14,165,233,0.16)",
+            borderRadius: 16, padding: 16, marginBottom: 12,
+            background: "rgba(255,255,255,0.55)",
+            border: "1px solid rgba(14,165,233,0.14)",
+            display: "flex", alignItems: "center", gap: 12,
           }}>
-            <p style={{
-              fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "var(--subtle)", marginBottom: 8,
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(14,165,233,0.12)",
+              display: "grid", placeItems: "center",
             }}>
-              Rank Control
-            </p>
-            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
-              Suggested rank from live work: <strong>{suggest}</strong>
-            </p>
-            <select
-              value={title}
-              onChange={(e) => setStaffTitle(staff, e.target.value)}
-              style={{
-                width: "100%", height: 42, borderRadius: 11,
-                border: "1px solid var(--line)", background: "white",
-                padding: "0 12px", fontSize: 13.5,
-              }}
-            >
-              {STAFF_TITLES.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+              <Lock size={16} color="var(--primary)" />
+            </div>
+            <div>
+              <p style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)", fontWeight: 650 }}>
+                Rank (locked)
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 650, marginTop: 2 }}>{title}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                Controlled from Staff Desk
+              </p>
+            </div>
           </div>
 
-          {/* Current assignments */}
+          <div style={{
+            borderRadius: 16, padding: 16, marginBottom: 20,
+            background: "rgba(255,255,255,0.55)",
+            border: "1px solid rgba(16,185,129,0.2)",
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: "rgba(16,185,129,0.12)",
+              display: "grid", placeItems: "center",
+            }}>
+              <Zap size={16} color="#059669" />
+            </div>
+            <div>
+              <p style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)", fontWeight: 650 }}>
+                Expertise (locked)
+              </p>
+              <p style={{ fontSize: 15, fontWeight: 650, marginTop: 2 }}>{expertiseLabelText}</p>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                Set at clearance. Cannot be changed.
+              </p>
+            </div>
+          </div>
+
           <p style={{
             fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
             textTransform: "uppercase", color: "var(--subtle)", marginBottom: 10,
@@ -154,66 +144,40 @@ function StaffDetailsDrawer({ staff, issues, audit, onClose }) {
           </p>
 
           {assigned.length === 0 ? (
-            <p style={{ color: "var(--subtle)", fontSize: 13, marginBottom: 22 }}>No active file lock.</p>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>No current assignments.</p>
           ) : (
-            <div style={{ display: "grid", gap: 10, marginBottom: 22 }}>
-              {assigned.map((issue) => (
-                <div key={issue.id} style={{
-                  borderRadius: 14, padding: 12,
-                  background: "rgba(255,255,255,0.55)",
-                  border: "1px solid rgba(14,165,233,0.12)",
-                }}>
-                  <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--subtle)" }}>{issue.id}</p>
-                  <p style={{ fontWeight: 600, fontSize: 14, margin: "4px 0 8px" }}>{issue.title}</p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <IssueStatusBadge status={issue.status} />
-                    <IssuePriorityBadge priority={issue.priority} />
-                    <span style={{ fontSize: 12, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <MapPin size={11} /> {issue.ward}
-                    </span>
-                    <span style={{ fontSize: 12, color: "var(--subtle)" }}>
-                      {CATEGORY_LABEL[issue.category]}
-                    </span>
-                  </div>
+            assigned.map((issue) => (
+              <div
+                key={issue.id}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  marginBottom: 8,
+                  background: "rgba(255,255,255,0.5)",
+                  border: "1px solid rgba(14,165,233,0.1)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <p style={{ fontWeight: 600, fontSize: 13.5 }}>{issue.title}</p>
+                  <IssueStatusBadge status={issue.status} />
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Activity */}
-          <p style={{
-            fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
-            textTransform: "uppercase", color: "var(--subtle)", marginBottom: 10,
-          }}>
-            Recent Activity
-          </p>
-
-          {events.length === 0 ? (
-            <p style={{ color: "var(--subtle)", fontSize: 13 }}>No traced actions yet.</p>
-          ) : (
-            <div style={{ display: "grid", gap: 8 }}>
-              {events.map((event) => (
-                <div key={event.id} style={{
-                  display: "flex", gap: 10, alignItems: "flex-start",
-                  padding: "10px 0",
-                  borderBottom: "1px solid rgba(14,165,233,0.08)",
-                }}>
-                  <Clock size={14} color="var(--primary)" style={{ marginTop: 2 }} />
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{event.action}</p>
-                    <p style={{ fontSize: 12, color: "var(--subtle)" }}>
-                      {formatDateTime(event.at)} {event.issueId ? `· ${event.issueId}` : ""}
-                    </p>
-                  </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center" }}>
+                  <IssuePriorityBadge priority={issue.priority} />
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {CATEGORY_LABEL[issue.category] || issue.category}
+                  </span>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))
           )}
         </div>
       </aside>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
         @keyframes slideInCyborg {
           from { transform: translateX(110%); opacity: 0.4; }
           to { transform: translateX(0); opacity: 1; }
@@ -223,23 +187,21 @@ function StaffDetailsDrawer({ staff, issues, audit, onClose }) {
   );
 }
 
-function Mini({ icon: Icon, label, value, color }) {
+function GlassStat({ icon: Icon, label, value }) {
   return (
     <div style={{
-      borderRadius: 14, padding: 12,
-      background: "rgba(255,255,255,0.58)",
-      border: "1px solid rgba(14,165,233,0.12)",
-      display: "flex", gap: 10, alignItems: "center",
+      background: "rgba(255,255,255,0.55)",
+      border: "1px solid rgba(14,165,233,0.14)",
+      borderRadius: 12,
+      padding: "12px 14px",
+      display: "flex",
+      gap: 10,
+      alignItems: "center",
     }}>
-      <div style={{
-        width: 32, height: 32, borderRadius: 9,
-        background: `${color}18`, display: "grid", placeItems: "center",
-      }}>
-        <Icon size={14} color={color} />
-      </div>
+      <Icon size={16} color="var(--primary)" />
       <div>
         <p style={{ fontSize: 11, color: "var(--subtle)" }}>{label}</p>
-        <p style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-display)" }}>{value}</p>
+        <p style={{ fontSize: 16, fontWeight: 650 }}>{value}</p>
       </div>
     </div>
   );

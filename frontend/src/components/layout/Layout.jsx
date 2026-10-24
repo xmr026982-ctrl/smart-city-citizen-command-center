@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-import Navbar from "./Navbar";
+import TopBar from "./TopBar";
 
 function Layout() {
   const [open, setOpen] = useState(false);
@@ -18,7 +18,7 @@ function Layout() {
         />
       ) : null}
       <div className="shell-main">
-        <Navbar onMenu={() => setOpen(true)} />
+        <TopBar onMenu={() => setOpen(true)} />
         <div className="page-canvas">
           <Outlet />
         </div>

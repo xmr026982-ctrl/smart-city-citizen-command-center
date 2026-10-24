@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import ProtectedRoute from "./ProtectedRoute";
 import RoleRoute from "./RoleRoute";
-import SignIn from "../pages/common/SignIn";
 import ReportIssue from "../pages/citizen/ReportIssue";
 import MyReports from "../pages/citizen/MyReports";
 import CitizenIssueDetails from "../pages/citizen/CitizenIssueDetails";
@@ -25,7 +24,7 @@ import { useAuth } from "../store/authStore";
 
 function HomeRedirect() {
   const user = useAuth();
-  if (!user) return <Navigate to="/sign-in" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (user.role === "staff") return <Navigate to="/staff" replace />;
   if (user.role === "admin") return <Navigate to="/admin/command" replace />;
   return <Navigate to="/citizen/report" replace />;
@@ -34,8 +33,6 @@ function HomeRedirect() {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/sign-in" element={<SignIn />} />
-
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<HomeRedirect />} />

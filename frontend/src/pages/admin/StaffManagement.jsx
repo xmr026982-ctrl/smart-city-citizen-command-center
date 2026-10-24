@@ -48,7 +48,7 @@ function StaffManagement() {
         <PageHeader
           eyebrow="Personnel · Neural Roster"
           title="Staff Management"
-          description="Open a specialist file. Review load, performance, and promote by contribution."
+          description="Open a specialist file. Review load and performance. Rank is controlled from Staff Desk."
         />
         <div style={{
           display: "inline-flex", alignItems: "center", gap: 8,
@@ -105,48 +105,36 @@ function StaffManagement() {
           return (
             <button
               key={row.name}
+              type="button"
               onClick={() => setSelected(row.name)}
               style={{
-                textAlign: "left",
-                borderRadius: 18,
-                padding: "16px 18px",
-                background: "rgba(255,255,255,0.74)",
+                width: "100%", textAlign: "left", cursor: "pointer",
+                borderRadius: 18, padding: "16px 18px",
+                background: "rgba(255,255,255,0.78)",
                 backdropFilter: "blur(16px) saturate(1.4)",
-                border: "1px solid rgba(255,255,255,0.75)",
-                boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
-                cursor: "pointer",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 16,
-                position: "relative",
-                overflow: "hidden",
-                transform: "perspective(900px) rotateX(2deg)",
-                transition: "transform 220ms, box-shadow 220ms",
+                border: "1px solid rgba(255,255,255,0.85)",
+                boxShadow: "0 8px 28px rgba(14,165,233,0.06), inset 0 1px 0 rgba(255,255,255,0.9)",
+                display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16,
+                transition: "transform 200ms, box-shadow 200ms",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
-                e.currentTarget.style.boxShadow = "0 18px 40px rgba(14,165,233,0.16), inset 0 1px 0 rgba(255,255,255,0.9)";
+                e.currentTarget.style.transform = "translateY(-3px)";
+                e.currentTarget.style.boxShadow = "0 16px 36px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.95)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
-                e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.06), inset 0 1px 0 rgba(255,255,255,0.9)";
               }}
             >
-              <div style={{
-                position: "absolute", top: 0, left: 0, right: 0, height: 2,
-                background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)",
-              }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
                 <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: "rgba(14,165,233,0.12)",
-                  display: "grid", placeItems: "center",
-                  boxShadow: "0 0 0 1px rgba(14,165,233,0.16)",
+                  width: 44, height: 44, borderRadius: 14,
+                  background: "linear-gradient(145deg, #0ea5e9, #0369a1)",
+                  display: "grid", placeItems: "center", color: "white", flexShrink: 0,
                 }}>
-                  <User size={18} color="var(--primary)" />
+                  <User size={20} />
                 </div>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <p style={{ fontWeight: 650, fontSize: 15 }}>{row.name}</p>
                   <p style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>{row.title}</p>
                   <div style={{

@@ -6,7 +6,7 @@ function ProtectedRoute() {
   const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/sign-in" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/" replace state={{ from: location.pathname }} />;
   }
 
   return <Outlet />;
