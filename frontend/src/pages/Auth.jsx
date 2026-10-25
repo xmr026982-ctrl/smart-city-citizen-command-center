@@ -257,19 +257,39 @@ export default function App() {
     setMessage('')
   }
 
-  function submitStaffDetails(event) {
+  async function submitStaffDetails(event) {
     event.preventDefault()
     setMessage('')
 
-    // Frontend-only submission.
-    // Connect your backend API to save staff requests.
-    console.log('Staff request submitted:', staffDetails)
+    try {
+      const response = await fetch('http://localhost:5000/api/staff-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: staffDetails.name.trim(),
+          email: staffDetails.email.trim().toLowerCase(),
+          // Map the existing form fields to the backend's expected field names.
+          qualification: staffDetails.experience,
+          department: staffDetails.workArea,
+        }),
+      })
 
-    setStaffRequestSubmitted(true)
+      const data = await response.json().catch(() => ({}))
 
-    setMessage(
-      'Your staff request has been submitted successfully. Backend submission and admin approval are not connected yet.'
-    )
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to submit staff request.')
+      }
+
+      setStaffRequestSubmitted(true)
+      setMessage(data.message || 'Your staff request has been submitted successfully!')
+    } catch (error) {
+      console.error('Staff request submission error:', error)
+      setMessage(
+        error.message || 'Cannot connect to the backend. Please make sure the backend is running.'
+      )
+    }
   }
 
   function resetStaffRequest() {
