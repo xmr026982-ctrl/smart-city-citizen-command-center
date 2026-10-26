@@ -7,6 +7,8 @@ import {
 } from 'firebase/auth'
 import { auth } from '../firebase'
 
+const API_URL = 'http://127.0.0.1:5000/api'
+
 const roles = [
   {
     id: 'admin',
@@ -36,7 +38,7 @@ const staffExperiences = [
   'Senior Field',
 ]
 
-const staffWorkAreas = [
+const staffexpertise = [
   'Electrical',
   'Roads',
   'Waste',
@@ -52,6 +54,15 @@ const staffZones = [
   'B.P. Township',
   'Dharmatala',
 ]
+
+const emptyStaffDetails = {
+  name: '',
+  email: '',
+  experience: '',
+  workArea: '',
+  zone: '',
+  note: '',
+}
 
 function CityMark({ role }) {
   const serviceLabel =
@@ -130,23 +141,21 @@ export default function App() {
   const [step, setStep] = useState('role')
   const [role, setRole] = useState(null)
 
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStep, setPasswordStep] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const [message, setMessage] = useState('')
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [staffSubmitting, setStaffSubmitting] = useState(false)
   const [staffRequestSubmitted, setStaffRequestSubmitted] =
     useState(false)
 
   const [staffDetails, setStaffDetails] = useState({
-    name: '',
-    email: '',
-    experience: '',
-    workArea: '',
-    zone: '',
-    note: '',
+    ...emptyStaffDetails,
   })
 
   const selectedRole = roles.find(
@@ -161,6 +170,130 @@ export default function App() {
     !citizenLogin ||
     passwordStep
 
+  function switchMode(nextMode) {
+    setMode(nextMode)
+    setStep(nextMode === 'login' ? 'role' : 'credentials')
+    setRole(null)
+    setName('')
+    setEmail('')
+    setPassword('')
+    setShowPassword(false)
+    setPasswordStep(false)
+    setMessage('')
+    setStaffRequestSubmitted(false)
+    setSubmitting(false)
+  }
+
+  // Real backend login and citizen registration.
+  async function submit(event) {
+    event.preventDefault()
+
+    if (submitting) return
+
+    setMessage('')
+
+    // Citizen login: first check the email, then show the password.
+    if (citizenLogin && !passwordStep) {
+      if (!email.trim()) {
+        setMessage('Please enter your email address.')
+        return
+      }
+
+      setPasswordStep(true)
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      if (mode === 'login') {
+        const response = await fetch(
+          `${API_URL}/auth/login`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: email.trim().toLowerCase(),
+              password,
+              role,
+            }),
+          }
+        )
+
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Login failed.')
+        }
+
+        if (!data.token || !data.user) {
+          throw new Error(
+            'The server did not return a login token and user.'
+          )
+        }
+
+        // Save the authenticated session.
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+
+        setMessage(
+          `${selectedRole?.name || 'User'} login successful!`
+        )
+
+        console.log('Authenticated user:', data.user)
+
+        // Dashboard navigation can be added after confirming
+        // the routes in your React application.
+      } else {
+        // Registration is for citizens only.
+        if (!name.trim()) {
+          throw new Error('Please enter your full name.')
+        }
+
+        const response = await fetch(
+          `${API_URL}/auth/register`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: name.trim(),
+              email: email.trim().toLowerCase(),
+              password,
+              role: 'citizen',
+            }),
+          }
+        )
+
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || 'Account registration failed.'
+          )
+        }
+
+        setMessage(
+          data.message ||
+            'Your citizen account was created successfully.'
+        )
+      }
+    } catch (error) {
+      console.error('Authentication error:', error)
+
+      setMessage(
+        error.message ||
+          'Unable to connect to the backend. Please try again.'
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Existing Firebase Google sign-in.
   async function handleGoogleLogin() {
     setMessage('')
     setGoogleLoading(true)
@@ -215,37 +348,6 @@ export default function App() {
     }
   }
 
-  function switchMode(nextMode) {
-    setMode(nextMode)
-    setStep(
-      nextMode === 'login' ? 'role' : 'credentials'
-    )
-    setRole(null)
-    setEmail('')
-    setPassword('')
-    setShowPassword(false)
-    setPasswordStep(false)
-    setMessage('')
-  }
-
-  function submit(event) {
-    event.preventDefault()
-    setMessage('')
-
-    if (citizenLogin && !passwordStep) {
-      setPasswordStep(true)
-      return
-    }
-
-    if (mode === 'login') {
-      setMessage(
-        `${selectedRole?.name || 'User'} login submitted successfully.`
-      )
-    } else {
-      setMessage('Your account details are ready.')
-    }
-  }
-
   function handleStaffDetailsChange(event) {
     const { name, value } = event.target
 
@@ -259,54 +361,104 @@ export default function App() {
 
   async function submitStaffDetails(event) {
     event.preventDefault()
+
+    if (staffSubmitting) return
+
     setMessage('')
 
+    const staffName = staffDetails.name.trim()
+    const staffEmail = staffDetails.email.trim().toLowerCase()
+    const experience = staffDetails.experience
+    const expertise = staffDetails.workArea
+    const zone = staffDetails.zone
+    const note = staffDetails.note.trim()
+
+    if (
+      !staffName ||
+      !staffEmail ||
+      !experience ||
+      !expertise ||
+      !zone
+    ) {
+      setMessage(
+        'Please fill in all required staff application fields.'
+      )
+      return
+    }
+
+    setStaffSubmitting(true)
+
     try {
-      const response = await fetch('http://localhost:5000/api/staff-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: staffDetails.name.trim(),
-          email: staffDetails.email.trim().toLowerCase(),
-          // Map the existing form fields to the backend's expected field names.
-          qualification: staffDetails.experience,
-          department: staffDetails.workArea,
-        }),
-      })
+      const response = await fetch(
+        `${API_URL}/staff-requests`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: staffName,
+            email: staffEmail,
+            qualification: experience,
+            department: expertise,
+            zone,
+            note,
+          }),
+        }
+      )
 
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to submit staff request.')
+        throw new Error(
+          data.message ||
+            'Could not submit your staff application.'
+        )
       }
 
+      setStaffDetails({
+        ...emptyStaffDetails,
+        name: staffName,
+        email: staffEmail,
+        experience,
+        workArea: expertise,
+        zone,
+        note,
+      })
+
+      setMessage('')
       setStaffRequestSubmitted(true)
-      setMessage(data.message || 'Your staff request has been submitted successfully!')
     } catch (error) {
-      console.error('Staff request submission error:', error)
+      console.error('Staff application error:', error)
+
       setMessage(
-        error.message || 'Cannot connect to the backend. Please make sure the backend is running.'
+        error.message ||
+          'Unable to connect to the server. Please try again.'
       )
+    } finally {
+      setStaffSubmitting(false)
     }
   }
 
   function resetStaffRequest() {
-    setStaffDetails({
-      name: '',
-      email: '',
-      experience: '',
-      workArea: '',
-      zone: '',
-      note: '',
-    })
-
+    setStaffDetails({ ...emptyStaffDetails })
     setStaffRequestSubmitted(false)
+    setStaffSubmitting(false)
     setMessage('')
   }
 
-  // Role selection page
+  function returnToStaffLogin() {
+    resetStaffRequest()
+    setStep('credentials')
+    setRole('staff')
+    setMode('login')
+    setEmail('')
+    setPassword('')
+    setPasswordStep(false)
+    setShowPassword(false)
+  }
+
+  // Role selection.
   if (mode === 'login' && step === 'role') {
     return (
       <>
@@ -335,21 +487,18 @@ export default function App() {
                     setStep('credentials')
                     setMessage('')
                     setPasswordStep(false)
+                    setEmail('')
+                    setPassword('')
                   }}
                 >
-                  <span className="role-icon">
-                    {item.icon}
-                  </span>
+                  <span className="role-icon">{item.icon}</span>
 
                   <span className="role-copy">
                     <strong>{item.name} Login</strong>
                     <small>{item.description}</small>
                   </span>
 
-                  <span
-                    className="role-arrow"
-                    aria-hidden="true"
-                  >
+                  <span className="role-arrow" aria-hidden="true">
                     →
                   </span>
                 </button>
@@ -374,7 +523,7 @@ export default function App() {
     )
   }
 
-  // Staff request form
+  // Staff application and success screen.
   if (mode === 'login' && step === 'staff-details') {
     return (
       <>
@@ -387,180 +536,225 @@ export default function App() {
             className="auth-card staff-card"
             style={{ maxWidth: '520px', width: '100%' }}
           >
-            <button
-              className="back-button"
-              type="button"
-              onClick={() => {
-                setStep('credentials')
-                setMessage('')
-              }}
-            >
-              <span aria-hidden="true">←</span> BACK TO STAFF LOGIN
-            </button>
+            {!staffRequestSubmitted && (
+              <button
+                className="back-button"
+                type="button"
+                disabled={staffSubmitting}
+                onClick={() => {
+                  setStep('credentials')
+                  setMessage('')
+                }}
+              >
+                <span aria-hidden="true">←</span> BACK TO STAFF LOGIN
+              </button>
+            )}
 
             <CityMark role="staff" />
 
-            <h1>Staff Request</h1>
-
-            <p className="intro">
-              Provide your staff information for Smart City.
-            </p>
-
             {staffRequestSubmitted ? (
               <div className="staff-request-success">
-                <p className="status-message" role="status">
-                  Your staff request has been submitted successfully.
+                <div className="success-icon" aria-hidden="true">
+                  ✓
+                </div>
+
+                <h1>Request Submitted Successfully!</h1>
+
+                <p className="success-description">
+                  Thank you, {staffDetails.name}. Your staff
+                  application has been submitted successfully.
                 </p>
 
-                <p className="intro">
-                  Your request details have been entered. Please contact
-                  the administrator regarding approval.
+                <div className="success-details">
+                  <p>
+                    <strong>Status:</strong>{' '}
+                    <span className="pending-badge">
+                      Pending Approval
+                    </span>
+                  </p>
+
+                  <p>
+                    <strong>Email:</strong> {staffDetails.email}
+                  </p>
+
+                  <p>
+                    <strong>Expertise:</strong>{' '}
+                    {staffDetails.workArea}
+                  </p>
+
+                  <p>
+                    <strong>Zone:</strong> {staffDetails.zone}
+                  </p>
+                </div>
+
+                <p className="success-note">
+                  Your application is awaiting administrator review.
+                  If it is approved, you will receive an email with
+                  instructions to set up your staff password.
                 </p>
-              </div>
-            ) : (
-              <form onSubmit={submitStaffDetails}>
-                <label htmlFor="staff-name">
-                  Full Name
-                </label>
-
-                <input
-                  id="staff-name"
-                  className="field"
-                  type="text"
-                  name="name"
-                  placeholder="Enter your full name"
-                  value={staffDetails.name}
-                  onChange={handleStaffDetailsChange}
-                  autoComplete="name"
-                  required
-                />
-
-                <label
-                  htmlFor="staff-email"
-                  style={{ display: 'block', marginTop: '16px' }}
-                >
-                  Staff Email Address
-                </label>
-
-                <input
-                  id="staff-email"
-                  className="field"
-                  type="email"
-                  name="email"
-                  placeholder="Enter your official email"
-                  value={staffDetails.email}
-                  onChange={handleStaffDetailsChange}
-                  autoComplete="email"
-                  required
-                />
-
-                {/* Experience dropdown */}
-                <label
-                  htmlFor="staff-experience"
-                  style={{ display: 'block', marginTop: '16px' }}
-                >
-                  Experience
-                </label>
-
-                <select
-                  id="staff-experience"
-                  className="field"
-                  name="experience"
-                  value={staffDetails.experience}
-                  onChange={handleStaffDetailsChange}
-                  required
-                >
-                  <option value="">Select your experience</option>
-
-                  {staffExperiences.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Department / Work Area dropdown */}
-                <label
-                  htmlFor="staff-work-area"
-                  style={{ display: 'block', marginTop: '16px' }}
-                >
-                  Department / Work Area
-                </label>
-
-                <select
-                  id="staff-work-area"
-                  className="field"
-                  name="workArea"
-                  value={staffDetails.workArea}
-                  onChange={handleStaffDetailsChange}
-                  required
-                >
-                  <option value="">Select your work area</option>
-
-                  {staffWorkAreas.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Zone dropdown */}
-                <label
-                  htmlFor="staff-zone"
-                  style={{ display: 'block', marginTop: '16px' }}
-                >
-                  Zone
-                </label>
-
-                <select
-                  id="staff-zone"
-                  className="field"
-                  name="zone"
-                  value={staffDetails.zone}
-                  onChange={handleStaffDetailsChange}
-                  required
-                >
-                  <option value="">Select your zone</option>
-
-                  {staffZones.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Optional note */}
-                <label
-                  htmlFor="staff-note"
-                  style={{ display: 'block', marginTop: '16px' }}
-                >
-                  Short Note About Your Request (Optional)
-                </label>
-
-                <textarea
-                  id="staff-note"
-                  className="field"
-                  name="note"
-                  placeholder="Briefly explain your staff request (optional)"
-                  value={staffDetails.note}
-                  onChange={handleStaffDetailsChange}
-                  rows={3}
-                />
 
                 <button
+                  type="button"
                   className="submit-button"
-                  type="submit"
-                  style={{ marginTop: '22px' }}
+                  onClick={returnToStaffLogin}
                 >
-                  SUBMIT REQUEST
+                  RETURN TO STAFF LOGIN
                 </button>
-              </form>
-            )}
+              </div>
+            ) : (
+              <>
+                <h1>Staff Request</h1>
 
-            {message && !staffRequestSubmitted && (
-              <p className="status-message" role="status">
-                {message}
-              </p>
+                <p className="intro">
+                  Provide your staff information for Smart City.
+                </p>
+
+                <form onSubmit={submitStaffDetails}>
+                  <label htmlFor="staff-name">
+                    Full Name <span className="required-mark">*</span>
+                  </label>
+
+                  <input
+                    id="staff-name"
+                    className="field"
+                    type="text"
+                    name="name"
+                    placeholder="Enter your full name"
+                    value={staffDetails.name}
+                    onChange={handleStaffDetailsChange}
+                    autoComplete="name"
+                    required
+                  />
+
+                  <label
+                    htmlFor="staff-email"
+                    className="staff-field-label"
+                  >
+                    Staff Email Address{' '}
+                    <span className="required-mark">*</span>
+                  </label>
+
+                  <input
+                    id="staff-email"
+                    className="field"
+                    type="email"
+                    name="email"
+                    placeholder="Enter your official email"
+                    value={staffDetails.email}
+                    onChange={handleStaffDetailsChange}
+                    autoComplete="email"
+                    required
+                  />
+
+                  <label
+                    htmlFor="staff-experience"
+                    className="staff-field-label"
+                  >
+                    Experience <span className="required-mark">*</span>
+                  </label>
+
+                  <select
+                    id="staff-experience"
+                    className="field"
+                    name="experience"
+                    value={staffDetails.experience}
+                    onChange={handleStaffDetailsChange}
+                    required
+                  >
+                    <option value="">Select your experience</option>
+                    {staffExperiences.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label
+                    htmlFor="staff-work-area"
+                    className="staff-field-label"
+                  >
+                    Staff Expertise{' '}
+                    <span className="required-mark">*</span>
+                  </label>
+
+                  <select
+                    id="staff-work-area"
+                    className="field"
+                    name="workArea"
+                    value={staffDetails.workArea}
+                    onChange={handleStaffDetailsChange}
+                    required
+                  >
+                    <option value="">Select your expertise</option>
+                    {staffexpertise.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label
+                    htmlFor="staff-zone"
+                    className="staff-field-label"
+                  >
+                    Zone <span className="required-mark">*</span>
+                  </label>
+
+                  <select
+                    id="staff-zone"
+                    className="field"
+                    name="zone"
+                    value={staffDetails.zone}
+                    onChange={handleStaffDetailsChange}
+                    required
+                  >
+                    <option value="">Select your zone</option>
+                    {staffZones.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label
+                    htmlFor="staff-note"
+                    className="staff-field-label"
+                  >
+                    Short Note About Your Request (Optional)
+                  </label>
+
+                  <textarea
+                    id="staff-note"
+                    className="field"
+                    name="note"
+                    placeholder="Briefly explain your staff request (optional)"
+                    value={staffDetails.note}
+                    onChange={handleStaffDetailsChange}
+                    rows={3}
+                  />
+
+                  <button
+                    className="submit-button"
+                    type="submit"
+                    style={{ marginTop: '22px' }}
+                    disabled={staffSubmitting}
+                  >
+                    {staffSubmitting
+                      ? 'SUBMITTING REQUEST...'
+                      : 'SUBMIT REQUEST'}
+                  </button>
+                </form>
+
+                {message && (
+                  <p
+                    className="status-message"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {message}
+                  </p>
+                )}
+              </>
             )}
           </section>
         </main>
@@ -570,7 +764,7 @@ export default function App() {
     )
   }
 
-  // Login / signup page
+  // Login and signup form.
   return (
     <>
       <main className="auth-page">
@@ -594,6 +788,8 @@ export default function App() {
               onClick={() => {
                 setStep('role')
                 setRole(null)
+                setEmail('')
+                setPassword('')
                 setMessage('')
                 setPasswordStep(false)
               }}
@@ -605,7 +801,15 @@ export default function App() {
           <CityMark role={mode === 'login' ? role : null} />
 
           <h1>
-            {mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'signup'
+              ? 'Create Citizen Account'
+              : role === 'admin'
+                ? 'Admin Login'
+                : role === 'staff'
+                  ? 'Staff Login'
+                  : role === 'user'
+                    ? 'Citizen Login'
+                    : 'Sign in'}
           </h1>
 
           {mode === 'signup' && (
@@ -634,30 +838,44 @@ export default function App() {
           )}
 
           <form onSubmit={submit}>
+            {mode === 'signup' && (
+              <>
+                <label htmlFor="full-name">Full name</label>
+                <input
+                  id="full-name"
+                  className="field"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoComplete="name"
+                  required
+                />
+              </>
+            )}
+
             <label htmlFor="identity">
-              {mode === 'login' && role === 'staff'
-                ? 'Staff ID'
-                : 'Email address'}
+              {role === 'staff' && mode === 'login'
+                ? 'Staff Email Address'
+                : role === 'admin' && mode === 'login'
+                  ? 'Admin Email Address'
+                  : 'Email address'}
             </label>
 
             <input
               id="identity"
               className="field"
-              type={
-                mode === 'login' && role === 'staff'
-                  ? 'text'
-                  : 'email'
-              }
+              type="email"
               placeholder={
-                mode === 'login' && role === 'staff'
-                  ? 'Enter your staff ID'
-                  : 'name@email.com'
+                role === 'staff' && mode === 'login'
+                  ? 'Enter your registered staff email'
+                  : role === 'admin' && mode === 'login'
+                    ? 'Enter your admin email'
+                    : 'name@email.com'
               }
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              autoComplete={
-                mode === 'login' ? 'username' : 'email'
-              }
+              autoComplete="email"
               required
             />
 
@@ -672,7 +890,7 @@ export default function App() {
                       className="text-button"
                       onClick={() =>
                         setMessage(
-                          'Connect your password reset flow to enable password recovery.'
+                          'Password recovery has not been connected yet.'
                         )
                       }
                     >
@@ -715,20 +933,35 @@ export default function App() {
               </>
             )}
 
-            <button className="submit-button" type="submit">
-              {mode === 'login'
-                ? 'CONTINUE'
-                : 'CREATE ACCOUNT'}
-            </button>
+          
+<button
+  className="submit-button"
+  type="submit"
+  disabled={submitting}
+>
+  {submitting
+    ? 'PLEASE WAIT...'
+    : mode === 'login'
+      ? citizenLogin && !passwordStep
+        ? 'CONTINUE'
+        : role === 'admin'
+          ? 'LOG IN'
+          : 'SIGN IN'
+      : 'CREATE ACCOUNT'}
+</button>
+
           </form>
 
           {message && (
-            <p className="status-message" role="status">
+            <p
+              className="status-message"
+              role="status"
+              aria-live="polite"
+            >
               {message}
             </p>
           )}
 
-          {/* Hide account creation only on Admin Login */}
           {role !== 'admin' && (
             <p className="switch-copy">
               {mode === 'login'
