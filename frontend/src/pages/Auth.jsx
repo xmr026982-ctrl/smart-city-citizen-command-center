@@ -64,6 +64,19 @@ const emptyStaffDetails = {
   note: '',
 }
 
+// Red asterisk for required fields.
+function RequiredMark() {
+  return (
+    <span
+      className="required-mark"
+      style={{ color: '#ef4444', fontWeight: 700 }}
+      aria-label="required"
+    >
+      *
+    </span>
+  )
+}
+
 function CityMark({ role }) {
   const serviceLabel =
     role === 'admin'
@@ -184,7 +197,8 @@ export default function App() {
     setSubmitting(false)
   }
 
-  // Real backend login and citizen registration.
+  // Admin, staff and citizen login.
+  // Citizen registration is also handled here.
   async function submit(event) {
     event.preventDefault()
 
@@ -192,7 +206,7 @@ export default function App() {
 
     setMessage('')
 
-    // Citizen login: first check the email, then show the password.
+    // Citizen login: ask for email before showing password.
     if (citizenLogin && !passwordStep) {
       if (!email.trim()) {
         setMessage('Please enter your email address.')
@@ -207,6 +221,7 @@ export default function App() {
 
     try {
       if (mode === 'login') {
+        // Keep the existing admin login endpoint and role.
         const response = await fetch(
           `${API_URL}/auth/login`,
           {
@@ -247,7 +262,7 @@ export default function App() {
         // Dashboard navigation can be added after confirming
         // the routes in your React application.
       } else {
-        // Registration is for citizens only.
+        // Citizen registration.
         if (!name.trim()) {
           throw new Error('Please enter your full name.')
         }
@@ -359,6 +374,7 @@ export default function App() {
     setMessage('')
   }
 
+  // Submit staff application for administrator approval.
   async function submitStaffDetails(event) {
     event.preventDefault()
 
@@ -399,8 +415,12 @@ export default function App() {
           body: JSON.stringify({
             name: staffName,
             email: staffEmail,
-            qualification: experience,
-            department: expertise,
+
+            // These names must match the backend controller
+            // and the existing StaffRequest model.
+            Experience: experience,
+            Expertise: expertise,
+
             zone,
             note,
           }),
@@ -458,7 +478,7 @@ export default function App() {
     setShowPassword(false)
   }
 
-  // Role selection.
+  // Role selection screen.
   if (mode === 'login' && step === 'role') {
     return (
       <>
@@ -611,7 +631,7 @@ export default function App() {
 
                 <form onSubmit={submitStaffDetails}>
                   <label htmlFor="staff-name">
-                    Full Name <span className="required-mark">*</span>
+                    Full Name <RequiredMark />
                   </label>
 
                   <input
@@ -630,8 +650,7 @@ export default function App() {
                     htmlFor="staff-email"
                     className="staff-field-label"
                   >
-                    Staff Email Address{' '}
-                    <span className="required-mark">*</span>
+                    Staff Email Address <RequiredMark />
                   </label>
 
                   <input
@@ -650,7 +669,7 @@ export default function App() {
                     htmlFor="staff-experience"
                     className="staff-field-label"
                   >
-                    Experience <span className="required-mark">*</span>
+                    Experience <RequiredMark />
                   </label>
 
                   <select
@@ -673,8 +692,7 @@ export default function App() {
                     htmlFor="staff-work-area"
                     className="staff-field-label"
                   >
-                    Staff Expertise{' '}
-                    <span className="required-mark">*</span>
+                    Staff Expertise <RequiredMark />
                   </label>
 
                   <select
@@ -697,7 +715,7 @@ export default function App() {
                     htmlFor="staff-zone"
                     className="staff-field-label"
                   >
-                    Zone <span className="required-mark">*</span>
+                    Zone <RequiredMark />
                   </label>
 
                   <select
@@ -764,7 +782,7 @@ export default function App() {
     )
   }
 
-  // Login and signup form.
+  // Login and signup screen.
   return (
     <>
       <main className="auth-page">
@@ -933,23 +951,21 @@ export default function App() {
               </>
             )}
 
-          
-<button
-  className="submit-button"
-  type="submit"
-  disabled={submitting}
->
-  {submitting
-    ? 'PLEASE WAIT...'
-    : mode === 'login'
-      ? citizenLogin && !passwordStep
-        ? 'CONTINUE'
-        : role === 'admin'
-          ? 'LOG IN'
-          : 'SIGN IN'
-      : 'CREATE ACCOUNT'}
-</button>
-
+            <button
+              className="submit-button"
+              type="submit"
+              disabled={submitting}
+            >
+              {submitting
+                ? 'PLEASE WAIT...'
+                : mode === 'login'
+                  ? citizenLogin && !passwordStep
+                    ? 'CONTINUE'
+                    : role === 'admin'
+                      ? 'LOG IN'
+                      : 'SIGN IN'
+                  : 'CREATE ACCOUNT'}
+            </button>
           </form>
 
           {message && (
