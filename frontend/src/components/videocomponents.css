@@ -1,8 +1,0 @@
-.home-video {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 68%;
-  height: 54%;
-  object-fit: cover;
-}
