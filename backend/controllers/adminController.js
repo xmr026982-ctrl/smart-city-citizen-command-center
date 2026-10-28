@@ -243,6 +243,7 @@ const deleteUser = async (req, res) => {
 
 const bcrypt = require("bcryptjs");
 
+
 const createUser = async (req, res) => {
     try {
         const { name, email, password, role, ward } = req.body;
@@ -259,6 +260,28 @@ const createUser = async (req, res) => {
             });
         }
 
+        const allowedRoles = ["citizen", "staff", "admin"];
+        const selectedRole = role || "citizen";
+
+        if (!allowedRoles.includes(selectedRole)) {
+            return res.status(400).json({
+                message: "Invalid role."
+            });
+        }
+
+        // Admin-only password rule: at least 2 special characters.
+        if (selectedRole === "admin") {
+            const specialCharacterCount =
+                (password.match(/[^A-Za-z0-9]/g) || []).length;
+
+            if (specialCharacterCount < 2) {
+                return res.status(400).json({
+                    message:
+                        "Admin password must contain at least 2 special characters."
+                });
+            }
+        }
+
         const normalizedEmail = email.trim().toLowerCase();
 
         const existingUser = await User.findOne({
@@ -268,15 +291,6 @@ const createUser = async (req, res) => {
         if (existingUser) {
             return res.status(409).json({
                 message: "A user with this email already exists."
-            });
-        }
-
-        const allowedRoles = ["citizen", "staff", "admin"];
-        const selectedRole = role || "citizen";
-
-        if (!allowedRoles.includes(selectedRole)) {
-            return res.status(400).json({
-                message: "Invalid role."
             });
         }
 
@@ -293,7 +307,7 @@ const createUser = async (req, res) => {
 
         const safeUser = await User.findById(user._id).select("-password");
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "User created successfully.",
             user: safeUser
         });
@@ -302,17 +316,17 @@ const createUser = async (req, res) => {
         console.error("Create user error:", error);
 
         if (error.code === 11000) {
-        return res.status(409).json({
-            message: "A user with this email already exists."
-        });
+            return res.status(409).json({
+                message: "A user with this email already exists."
+            });
         }
 
-        res.status(500).json({
-        message: "Failed to create user."
+        return res.status(500).json({
+            message: "Failed to create user."
         });
-
     }
 };
+
 
 module.exports = {
     createUser,
