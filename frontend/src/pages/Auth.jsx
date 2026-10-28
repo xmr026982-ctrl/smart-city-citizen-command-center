@@ -11,6 +11,15 @@ const API_URL = (
   import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api'
 ).replace(/\/+$/, '')
 
+const CITIZEN_ZONES = [
+  'Shyambazar',
+  'B.B.D. Bagh',
+  'Ballygunge',
+  'College Street',
+  'B.P. Township',
+  'Dharmatala',
+]
+
 const roles = [
   {
     id: 'admin',
@@ -48,15 +57,6 @@ const staffExpertise = [
   'Civic',
 ]
 
-const staffZones = [
-  'Shyambazar',
-  'B.B.D. Bagh',
-  'Ballygunge',
-  'College Street',
-  'B.P. Township',
-  'Dharmatala',
-]
-
 const emptyStaffDetails = {
   name: '',
   email: '',
@@ -67,7 +67,7 @@ const emptyStaffDetails = {
 }
 
 // =====================================
-// HELPERS
+// REUSABLE COMPONENTS
 // =====================================
 
 function RequiredMark() {
@@ -145,10 +145,40 @@ function GoogleButton({ onClick, disabled }) {
 }
 
 function AuthFooter() {
+  return <footer className="auth-footer">© 2026 Smart City</footer>
+}
+
+function CitizenZoneSelect({
+  value,
+  onChange,
+  id = 'citizen-zone',
+}) {
   return (
-    <footer className="auth-footer">
-      © 2026 Smart City
-    </footer>
+    <>
+      <label htmlFor={id}>
+        Select Your Zone <RequiredMark />
+      </label>
+
+      <select
+        id={id}
+        className="field"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required
+      >
+        <option value="">Choose your city zone</option>
+
+        {CITIZEN_ZONES.map((zone) => (
+          <option key={zone} value={zone}>
+            {zone}
+          </option>
+        ))}
+      </select>
+
+      <small className="zone-help">
+        Select the approved zone where you live or use Smart City services.
+      </small>
+    </>
   )
 }
 
@@ -167,6 +197,11 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStep, setPasswordStep] = useState(false)
 
+  const [citizenZone, setCitizenZone] = useState('')
+  const [requiresZoneForLogin, setRequiresZoneForLogin] =
+    useState(false)
+  const [pendingGoogleToken, setPendingGoogleToken] = useState('')
+
   const [submitting, setSubmitting] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [forgotLoading, setForgotLoading] = useState(false)
@@ -183,14 +218,13 @@ export default function Auth() {
   })
 
   const selectedRole = roles.find((item) => item.id === role)
-
   const citizenLogin = mode === 'login' && role === 'user'
 
   const showPasswordField =
     mode === 'signup' || !citizenLogin || passwordStep
 
   // =====================================
-  // MESSAGE HELPER
+  // HELPERS
   // =====================================
 
   function showStatus(text, type = 'error') {
@@ -198,9 +232,11 @@ export default function Auth() {
     setMessageType(type)
   }
 
-  // =====================================
-  // MODE / ROLE RESET
-  // =====================================
+  function resetCitizenZoneFlow() {
+    setCitizenZone('')
+    setRequiresZoneForLogin(false)
+    setPendingGoogleToken('')
+  }
 
   function switchMode(nextMode) {
     setMode(nextMode)
@@ -214,9 +250,10 @@ export default function Auth() {
     setShowPassword(false)
     setPasswordStep(false)
 
+    resetCitizenZoneFlow()
+
     setMessage('')
     setMessageType('error')
-
     setStaffRequestSubmitted(false)
   }
 
@@ -230,12 +267,9 @@ export default function Auth() {
     setPasswordStep(false)
     setShowPassword(false)
 
+    resetCitizenZoneFlow()
     setMessage('')
   }
-
-  // =====================================
-  // SAVE AUTHENTICATED SESSION
-  // =====================================
 
   function saveSession(data) {
     if (!data?.token || !data?.user) {
@@ -248,9 +282,26 @@ export default function Auth() {
     localStorage.setItem('user', JSON.stringify(data.user))
   }
 
+  async function postAuth(path, body) {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Request failed.')
+    }
+
+    return data
+  }
+
   // =====================================
-  // EMAIL / PASSWORD LOGIN
-  // AND CITIZEN REGISTRATION
+  // EMAIL / PASSWORD LOGIN AND REGISTER
   // =====================================
 
   async function submit(event) {
@@ -260,7 +311,7 @@ export default function Auth() {
 
     setMessage('')
 
-    // Citizen login first asks for an email address.
+    // First step of citizen login: collect email.
     if (citizenLogin && !passwordStep) {
       if (!email.trim()) {
         showStatus('Please enter your email address.')
@@ -271,34 +322,71 @@ export default function Auth() {
       return
     }
 
+    if (mode === 'signup') {
+      if (!name.trim()) {
+        showStatus('Please enter your full name.')
+        return
+      }
+
+      if (!CITIZEN_ZONES.includes(citizenZone)) {
+        showStatus('Please select a valid city zone.')
+        return
+      }
+    }
+
+    // Do not attempt citizen login without a zone once requested.
+    if (
+      citizenLogin &&
+      requiresZoneForLogin &&
+      !CITIZEN_ZONES.includes(citizenZone)
+    ) {
+      showStatus('Please select a valid city zone.')
+      return
+    }
+
     setSubmitting(true)
 
     try {
       if (mode === 'login') {
-        const response = await fetch(`${API_URL}/auth/login`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            password,
-            role,
-          }),
-        })
-
-        const data = await response.json().catch(() => ({}))
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Login failed.')
+        const requestBody = {
+          email: email.trim().toLowerCase(),
+          password,
+          role,
         }
 
-        // Verify the returned role before accepting the session.
+        // Always include the selected zone for citizen login
+        // when a zone has been selected.
+        if (citizenLogin && citizenZone) {
+          requestBody.zone = citizenZone
+        }
+
+        const data = await postAuth('/auth/login', requestBody)
+
+        // Legacy citizen account needs a zone.
+        if (data.requiresZone && citizenLogin) {
+          setRequiresZoneForLogin(true)
+          setCitizenZone('')
+
+          showStatus(
+            'Your account needs a zone. Select your zone below, then click SIGN IN again.'
+          )
+          return
+        }
+
         const expectedRole = role === 'user' ? 'citizen' : role
 
         if (data.user?.role !== expectedRole) {
           throw new Error(
             'The server returned an unexpected account role.'
+          )
+        }
+
+        if (
+          expectedRole === 'citizen' &&
+          !CITIZEN_ZONES.includes(data.user?.zone)
+        ) {
+          throw new Error(
+            'The server returned an invalid citizen zone. Please check your account zone and try again.'
           )
         }
 
@@ -309,30 +397,22 @@ export default function Auth() {
           'success'
         )
 
-        // The session is stored. Dashboard navigation depends on
-        // the routes configured in your main React application.
+        resetCitizenZoneFlow()
       } else {
-        if (!name.trim()) {
-          throw new Error('Please enter your full name.')
-        }
-
-        const response = await fetch(`${API_URL}/auth/register`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            password,
-          }),
+        const data = await postAuth('/auth/register', {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          zone: citizenZone,
         })
 
-        const data = await response.json().catch(() => ({}))
+        if (data.user?.role && data.user.role !== 'citizen') {
+          throw new Error('Unexpected account role returned by server.')
+        }
 
-        if (!response.ok) {
+        if (!CITIZEN_ZONES.includes(data.user?.zone)) {
           throw new Error(
-            data.message || 'Account registration failed.'
+            'Registration succeeded without a valid saved zone. Please contact support.'
           )
         }
 
@@ -342,14 +422,12 @@ export default function Auth() {
           'Citizen account created successfully!',
           'success'
         )
+
+        resetCitizenZoneFlow()
       }
     } catch (error) {
       console.error('Authentication error:', error.message)
-
-      showStatus(
-        error.message ||
-          'Unable to connect to the backend. Please try again.'
-      )
+      showStatus(error.message || 'Authentication failed.')
     } finally {
       setSubmitting(false)
     }
@@ -357,7 +435,6 @@ export default function Auth() {
 
   // =====================================
   // GOOGLE SIGN-IN
-  // FIREBASE + BACKEND JWT
   // =====================================
 
   async function handleGoogleLogin() {
@@ -374,22 +451,20 @@ export default function Auth() {
       })
 
       const result = await signInWithPopup(auth, provider)
-
-      // Get a Firebase ID token and send it to Express.
       const idToken = await result.user.getIdToken()
 
-      const response = await fetch(`${API_URL}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ idToken }),
-      })
+      const data = await postAuth('/auth/google', { idToken })
 
-      const data = await response.json().catch(() => ({}))
+      if (data.requiresZone) {
+        setPendingGoogleToken(idToken)
+        setEmail(data.email || result.user.email || '')
+        setCitizenZone('')
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Google sign-in failed.')
+        showStatus(
+          'Google account verified. Select your zone to continue.',
+          'success'
+        )
+        return
       }
 
       if (data.user?.role !== 'citizen') {
@@ -398,9 +473,21 @@ export default function Auth() {
         )
       }
 
-      saveSession(data)
+      if (!CITIZEN_ZONES.includes(data.user?.zone)) {
+        setPendingGoogleToken(idToken)
+        setEmail(data.user?.email || result.user.email || '')
+        setCitizenZone('')
 
+        showStatus(
+          'Select your city zone to finish Google sign-in.',
+          'success'
+        )
+        return
+      }
+
+      saveSession(data)
       setEmail(data.user.email || result.user.email || '')
+      setCitizenZone(data.user.zone)
 
       showStatus('Google sign-in successful!', 'success')
     } catch (error) {
@@ -413,7 +500,7 @@ export default function Auth() {
         showStatus('Google sign-in was cancelled.')
       } else if (error.code === 'auth/unauthorized-domain') {
         showStatus(
-          'This website is not authorized in Firebase. Add your domain to Firebase Authorized domains.'
+          'This website is not authorized in Firebase. Add its domain to Firebase Authorized domains.'
         )
       } else if (error.code === 'auth/popup-blocked') {
         showStatus(
@@ -422,6 +509,63 @@ export default function Auth() {
       } else {
         showStatus(error.message || 'Google sign-in failed.')
       }
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
+  // =====================================
+  // COMPLETE GOOGLE LOGIN AFTER ZONE
+  // =====================================
+
+  async function completeGoogleLogin() {
+    if (googleLoading) return
+
+    if (!pendingGoogleToken) {
+      showStatus('Please start Google sign-in again.')
+      return
+    }
+
+    if (!CITIZEN_ZONES.includes(citizenZone)) {
+      showStatus('Please select a valid city zone.')
+      return
+    }
+
+    setGoogleLoading(true)
+    setMessage('')
+
+    try {
+      const data = await postAuth('/auth/google', {
+        idToken: pendingGoogleToken,
+        zone: citizenZone,
+      })
+
+      if (data.requiresZone || !data.token || !data.user) {
+        throw new Error(
+          'The server has not completed your login. Please try again.'
+        )
+      }
+
+      if (
+        data.user.role !== 'citizen' ||
+        data.user.zone !== citizenZone ||
+        !CITIZEN_ZONES.includes(data.user.zone)
+      ) {
+        throw new Error(
+          'The selected zone could not be verified. Please try again.'
+        )
+      }
+
+      saveSession(data)
+
+      setEmail(data.user.email || email)
+      setPendingGoogleToken('')
+      setRequiresZoneForLogin(false)
+
+      showStatus('Google sign-in successful!', 'success')
+    } catch (error) {
+      console.error('Google zone completion error:', error.message)
+      showStatus(error.message || 'Unable to complete Google sign-in.')
     } finally {
       setGoogleLoading(false)
     }
@@ -445,26 +589,9 @@ export default function Auth() {
     setMessage('')
 
     try {
-      const response = await fetch(
-        `${API_URL}/auth/forgot-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: normalizedEmail,
-          }),
-        }
-      )
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || 'Unable to process your request.'
-        )
-      }
+      const data = await postAuth('/auth/forgot-password', {
+        email: normalizedEmail,
+      })
 
       showStatus(
         data.message ||
@@ -473,10 +600,8 @@ export default function Auth() {
       )
     } catch (error) {
       console.error('Forgot-password error:', error.message)
-
       showStatus(
-        error.message ||
-          'Unable to connect to the backend. Please try again.'
+        error.message || 'Unable to process your password reset request.'
       )
     } finally {
       setForgotLoading(false)
@@ -484,7 +609,7 @@ export default function Auth() {
   }
 
   // =====================================
-  // STAFF APPLICATION FORM
+  // STAFF APPLICATION
   // =====================================
 
   function handleStaffDetailsChange(event) {
@@ -512,39 +637,28 @@ export default function Auth() {
     const zone = staffDetails.zone
     const note = staffDetails.note.trim()
 
-    if (
-      !staffName ||
-      !staffEmail ||
-      !experience ||
-      !expertise ||
-      !zone
-    ) {
-      showStatus(
-        'Please fill in all required staff application fields.'
-      )
+    if (!staffName || !staffEmail || !experience || !expertise || !zone) {
+      showStatus('Please fill in all required staff application fields.')
       return
     }
 
     setStaffSubmitting(true)
 
     try {
-      const response = await fetch(
-        `${API_URL}/staff-requests`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: staffName,
-            email: staffEmail,
-            Experience: experience,
-            Expertise: expertise,
-            zone,
-            note,
-          }),
-        }
-      )
+      const response = await fetch(`${API_URL}/staff-requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: staffName,
+          email: staffEmail,
+          Experience: experience,
+          Expertise: expertise,
+          zone,
+          note,
+        }),
+      })
 
       const data = await response.json().catch(() => ({}))
 
@@ -568,10 +682,8 @@ export default function Auth() {
       showStatus('', 'success')
     } catch (error) {
       console.error('Staff application error:', error.message)
-
       showStatus(
-        error.message ||
-          'Unable to connect to the server. Please try again.'
+        error.message || 'Unable to connect to the server. Please try again.'
       )
     } finally {
       setStaffSubmitting(false)
@@ -596,6 +708,8 @@ export default function Auth() {
     setPassword('')
     setPasswordStep(false)
     setShowPassword(false)
+
+    resetCitizenZoneFlow()
   }
 
   // =====================================
@@ -614,10 +728,7 @@ export default function Auth() {
             <CityMark />
 
             <h1>Login to Smart City</h1>
-
-            <p className="intro">
-              Choose your login type to continue.
-            </p>
+            <p className="intro">Choose your login type to continue.</p>
 
             <div className="role-options">
               {roles.map((item) => (
@@ -660,7 +771,7 @@ export default function Auth() {
   }
 
   // =====================================
-  // STAFF APPLICATION / SUCCESS SCREEN
+  // STAFF APPLICATION SCREEN
   // =====================================
 
   if (mode === 'login' && step === 'staff-details') {
@@ -693,15 +804,13 @@ export default function Auth() {
 
             {staffRequestSubmitted ? (
               <div className="staff-request-success">
-                <div className="success-icon" aria-hidden="true">
-                  ✓
-                </div>
+                <div className="success-icon" aria-hidden="true">✓</div>
 
                 <h1>Request Submitted Successfully!</h1>
 
                 <p className="success-description">
-                  Thank you, {staffDetails.name}. Your staff
-                  application has been submitted successfully.
+                  Thank you, {staffDetails.name}. Your staff application
+                  has been submitted successfully.
                 </p>
 
                 <div className="success-details">
@@ -712,29 +821,16 @@ export default function Auth() {
                     </span>
                   </p>
 
-                  <p>
-                    <strong>Email:</strong> {staffDetails.email}
-                  </p>
-
-                  <p>
-                    <strong>Experience:</strong>{' '}
-                    {staffDetails.experience}
-                  </p>
-
-                  <p>
-                    <strong>Expertise:</strong>{' '}
-                    {staffDetails.workArea}
-                  </p>
-
-                  <p>
-                    <strong>Zone:</strong> {staffDetails.zone}
-                  </p>
+                  <p><strong>Email:</strong> {staffDetails.email}</p>
+                  <p><strong>Experience:</strong> {staffDetails.experience}</p>
+                  <p><strong>Expertise:</strong> {staffDetails.workArea}</p>
+                  <p><strong>Zone:</strong> {staffDetails.zone}</p>
                 </div>
 
                 <p className="success-note">
                   Your application is awaiting administrator review.
-                  If approved, you will receive an email with
-                  instructions to set up your staff password.
+                  If approved, you will receive an email with instructions
+                  to set up your staff password.
                 </p>
 
                 <button
@@ -748,7 +844,6 @@ export default function Auth() {
             ) : (
               <>
                 <h1>Staff Request</h1>
-
                 <p className="intro">
                   Provide your staff information for Smart City.
                 </p>
@@ -770,10 +865,7 @@ export default function Auth() {
                     required
                   />
 
-                  <label
-                    htmlFor="staff-email"
-                    className="staff-field-label"
-                  >
+                  <label htmlFor="staff-email" className="staff-field-label">
                     Staff Email Address <RequiredMark />
                   </label>
 
@@ -789,10 +881,7 @@ export default function Auth() {
                     required
                   />
 
-                  <label
-                    htmlFor="staff-experience"
-                    className="staff-field-label"
-                  >
+                  <label htmlFor="staff-experience" className="staff-field-label">
                     Experience <RequiredMark />
                   </label>
 
@@ -806,16 +895,11 @@ export default function Auth() {
                   >
                     <option value="">Select your experience</option>
                     {staffExperiences.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
 
-                  <label
-                    htmlFor="staff-expertise"
-                    className="staff-field-label"
-                  >
+                  <label htmlFor="staff-expertise" className="staff-field-label">
                     Staff Expertise <RequiredMark />
                   </label>
 
@@ -829,16 +913,11 @@ export default function Auth() {
                   >
                     <option value="">Select your expertise</option>
                     {staffExpertise.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
 
-                  <label
-                    htmlFor="staff-zone"
-                    className="staff-field-label"
-                  >
+                  <label htmlFor="staff-zone" className="staff-field-label">
                     Zone <RequiredMark />
                   </label>
 
@@ -851,17 +930,12 @@ export default function Auth() {
                     required
                   >
                     <option value="">Select your zone</option>
-                    {staffZones.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
+                    {CITIZEN_ZONES.map((item) => (
+                      <option key={item} value={item}>{item}</option>
                     ))}
                   </select>
 
-                  <label
-                    htmlFor="staff-note"
-                    className="staff-field-label"
-                  >
+                  <label htmlFor="staff-note" className="staff-field-label">
                     Short Note About Your Request (Optional)
                   </label>
 
@@ -881,15 +955,15 @@ export default function Auth() {
                     style={{ marginTop: '22px' }}
                     disabled={staffSubmitting}
                   >
-                    {staffSubmitting
-                      ? 'SUBMITTING REQUEST...'
-                      : 'SUBMIT REQUEST'}
+                    {staffSubmitting ? 'SUBMITTING REQUEST...' : 'SUBMIT REQUEST'}
                   </button>
                 </form>
 
                 {message && (
                   <p
-                    className="status-message"
+                    className={`status-message ${
+                      messageType === 'success' ? 'success-message' : ''
+                    }`}
                     role="status"
                     aria-live="polite"
                   >
@@ -938,6 +1012,7 @@ export default function Auth() {
                 setMessage('')
                 setPasswordStep(false)
                 setShowPassword(false)
+                resetCitizenZoneFlow()
               }}
             >
               <span aria-hidden="true">←</span> ROLES
@@ -972,133 +1047,189 @@ export default function Auth() {
 
           {(mode === 'signup' || citizenLogin) && (
             <>
-              <GoogleButton
-                onClick={handleGoogleLogin}
-                disabled={googleLoading}
-              />
+              {!pendingGoogleToken && (
+                <>
+                  <GoogleButton
+                    onClick={handleGoogleLogin}
+                    disabled={googleLoading}
+                  />
 
-              <div className="divider">
-                <span>or</span>
-              </div>
-            </>
-          )}
+                  <div className="divider"><span>or</span></div>
+                </>
+              )}
 
-          <form onSubmit={submit}>
-            {mode === 'signup' && (
-              <>
-                <label htmlFor="full-name">
-                  Full name
-                </label>
+              {pendingGoogleToken && (
+                <div className="google-zone-step">
+                  <p className="intro">
+                    Google account verified. Select your zone to continue.
+                  </p>
 
-                <input
-                  id="full-name"
-                  className="field"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  autoComplete="name"
-                  required
-                />
-              </>
-            )}
-
-            <label htmlFor="identity">
-              {role === 'staff' && mode === 'login'
-                ? 'Staff Email Address'
-                : role === 'admin' && mode === 'login'
-                  ? 'Admin Email Address'
-                  : 'Email address'}
-            </label>
-
-            <input
-              id="identity"
-              className="field"
-              type="email"
-              placeholder={
-                role === 'staff' && mode === 'login'
-                  ? 'Enter your registered staff email'
-                  : role === 'admin' && mode === 'login'
-                    ? 'Enter your admin email'
-                    : 'name@email.com'
-              }
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              required
-            />
-
-            {showPasswordField && (
-              <>
-                <div className="password-label">
-                  <label htmlFor="password">
-                    Password
-                  </label>
-
-                  {mode === 'login' && (
-                    <button
-                      type="button"
-                      className="text-button"
-                      disabled={forgotLoading}
-                      onClick={handleForgotPassword}
-                    >
-                      {forgotLoading
-                        ? 'Sending...'
-                        : 'Forgot password?'}
-                    </button>
-                  )}
-                </div>
-
-                <div className="password-input-wrap">
-                  <input
-                    id="password"
-                    className="field"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
-                    autoComplete={
-                      mode === 'login'
-                        ? 'current-password'
-                        : 'new-password'
-                    }
-                    required
+                  <CitizenZoneSelect
+                    id="google-citizen-zone"
+                    value={citizenZone}
+                    onChange={setCitizenZone}
                   />
 
                   <button
                     type="button"
-                    className="password-toggle"
-                    onClick={() =>
-                      setShowPassword((visible) => !visible)
-                    }
-                    aria-label={
-                      showPassword ? 'Hide password' : 'Show password'
-                    }
+                    className="submit-button"
+                    style={{ marginTop: '16px' }}
+                    onClick={completeGoogleLogin}
+                    disabled={googleLoading || !citizenZone}
                   >
-                    {showPassword ? 'Hide' : 'Show'}
+                    {googleLoading
+                      ? 'PLEASE WAIT...'
+                      : 'CONTINUE WITH SELECTED ZONE'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="text-button"
+                    style={{ marginTop: '12px' }}
+                    disabled={googleLoading}
+                    onClick={() => {
+                      setPendingGoogleToken('')
+                      setCitizenZone('')
+                      setMessage('')
+                    }}
+                  >
+                    Cancel Google sign-in
                   </button>
                 </div>
-              </>
-            )}
+              )}
+            </>
+          )}
 
-            <button
-              className="submit-button"
-              type="submit"
-              disabled={submitting}
-            >
-              {submitting
-                ? 'PLEASE WAIT...'
-                : mode === 'login'
-                  ? citizenLogin && !passwordStep
-                    ? 'CONTINUE'
-                    : role === 'admin'
-                      ? 'LOG IN'
-                      : 'SIGN IN'
-                  : 'CREATE ACCOUNT'}
-            </button>
-          </form>
+          {!pendingGoogleToken && (
+            <form onSubmit={submit}>
+              {mode === 'signup' && (
+                <>
+                  <label htmlFor="full-name">
+                    Full name <RequiredMark />
+                  </label>
+
+                  <input
+                    id="full-name"
+                    className="field"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="name"
+                    required
+                  />
+                </>
+              )}
+
+              <label htmlFor="identity">
+                {role === 'staff' && mode === 'login'
+                  ? 'Staff Email Address'
+                  : role === 'admin' && mode === 'login'
+                    ? 'Admin Email Address'
+                    : 'Email address'}
+              </label>
+
+              <input
+                id="identity"
+                className="field"
+                type="email"
+                placeholder={
+                  role === 'staff' && mode === 'login'
+                    ? 'Enter your registered staff email'
+                    : role === 'admin' && mode === 'login'
+                      ? 'Enter your admin email'
+                      : 'name@email.com'
+                }
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
+              />
+
+              {mode === 'signup' && (
+                <CitizenZoneSelect
+                  value={citizenZone}
+                  onChange={setCitizenZone}
+                />
+              )}
+
+              {citizenLogin && requiresZoneForLogin && (
+                <div className="login-zone-step">
+                  <p className="intro">
+                    Your account needs a zone before you can continue.
+                    Select a zone below, then sign in again.
+                  </p>
+
+                  <CitizenZoneSelect
+                    id="login-citizen-zone"
+                    value={citizenZone}
+                    onChange={setCitizenZone}
+                  />
+                </div>
+              )}
+
+              {showPasswordField && (
+                <>
+                  <div className="password-label">
+                    <label htmlFor="password">Password</label>
+
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={forgotLoading}
+                        onClick={handleForgotPassword}
+                      >
+                        {forgotLoading ? 'Sending...' : 'Forgot password?'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="password-input-wrap">
+                    <input
+                      id="password"
+                      className="field"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete={
+                        mode === 'login'
+                          ? 'current-password'
+                          : 'new-password'
+                      }
+                      required
+                    />
+
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <button
+                className="submit-button"
+                type="submit"
+                disabled={submitting}
+              >
+                {submitting
+                  ? 'PLEASE WAIT...'
+                  : mode === 'login'
+                    ? citizenLogin && !passwordStep
+                      ? 'CONTINUE'
+                      : role === 'admin'
+                        ? 'LOG IN'
+                        : 'SIGN IN'
+                    : 'CREATE ACCOUNT'}
+              </button>
+            </form>
+          )}
 
           {message && (
             <p
@@ -1112,7 +1243,7 @@ export default function Auth() {
             </p>
           )}
 
-          {role !== 'admin' && (
+          {!pendingGoogleToken && role !== 'admin' && (
             <p className="switch-copy">
               {mode === 'login'
                 ? role === 'staff'
@@ -1128,9 +1259,7 @@ export default function Auth() {
                     resetStaffRequest()
                     setStep('staff-details')
                   } else {
-                    switchMode(
-                      mode === 'login' ? 'signup' : 'login'
-                    )
+                    switchMode(mode === 'login' ? 'signup' : 'login')
                   }
                 }}
               >

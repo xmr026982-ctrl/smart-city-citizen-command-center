@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
     email: {
       type: String,
       required: true,
@@ -15,27 +16,41 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+
     password: {
       type: String,
       required: true,
     },
+
     role: {
       type: String,
-      enum: ["citizen", "staff", "admin"],
+      enum: ["citizen", "staff", "moderator", "admin"],
       default: "citizen",
     },
+
+    zone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     ward: {
       type: String,
       default: "",
+      trim: true,
     },
+
     department: {
       type: String,
       default: "",
+      trim: true,
     },
+
     isActive: {
       type: Boolean,
       default: true,
     },
+
     location: {
       latitude: {
         type: Number,
@@ -47,7 +62,9 @@ const userSchema = new mongoose.Schema(
       },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 module.exports = mongoose.model("User", userSchema);

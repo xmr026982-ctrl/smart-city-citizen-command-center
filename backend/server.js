@@ -15,13 +15,7 @@ console.log("Backend .env path:", envPath);
 console.log("Backend .env loaded:", !dotenvResult.error);
 
 // Never print actual credentials.
-console.log("Admin environment status:", {
-  emailExists: Boolean(process.env.ADMIN_EMAIL?.trim()),
-  passwordExists: Boolean(process.env.ADMIN_PASSWORD),
-  passwordHasTwoSpecialCharacters:
-    typeof process.env.ADMIN_PASSWORD === "string" &&
-    (process.env.ADMIN_PASSWORD.match(/[^A-Za-z0-9]/g) || []).length >= 2,
-});
+
 
 // =====================================
 // IMPORT DATABASE AND ROUTES

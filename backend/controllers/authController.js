@@ -6,33 +6,50 @@ const User = require("../models/User");
 const PasswordResetToken = require("../models/PasswordResetToken");
 
 const { generateToken } = require("../services/jwtService");
-
 const {
   sendWelcomeEmail,
   sendPasswordResetEmail,
 } = require("../services/emailService");
 
 const { adminAuth } = require("../config/firebaseAdmin");
+const { isValidCitizenZone } = require("../config/citizenZones");
 
 // =========================
 // HELPERS
 // =========================
 
-// Return safe user details without exposing the password.
 const getPublicUser = (user) => ({
-  id: user._id,
+  id: String(user._id),
   name: user.name,
   email: user.email,
   role: user.role,
   ward: user.ward || "",
+  zone: user.zone || "",
 });
+
+const normalizeZone = (zone) =>
+  typeof zone === "string" ? zone.trim() : "";
+
+const validateCitizenZone = (zone) =>
+  typeof zone === "string" && isValidCitizenZone(zone.trim());
+
+const isMissingOrInvalidZone = (zone) =>
+  !validateCitizenZone(zone);
 
 // =========================
 // REGISTER CITIZEN
+// POST /api/auth/register
 // =========================
+
 const register = async (req, res) => {
   try {
-    const { name, email, password, ward } = req.body;
+    const { name, email, password, ward, zone } = req.body || {};
+
+    // Temporary diagnostic log: confirms the submitted zone.
+    console.log(
+      "[Citizen Registration] Submitted zone:",
+      JSON.stringify(zone)
+    );
 
     if (
       typeof name !== "string" ||
@@ -47,10 +64,17 @@ const register = async (req, res) => {
       });
     }
 
-    // Citizen password rule remains unchanged.
     if (password.length < 8) {
       return res.status(400).json({
         message: "Password must contain at least 8 characters.",
+      });
+    }
+
+    const selectedZone = normalizeZone(zone);
+
+    if (!validateCitizenZone(selectedZone)) {
+      return res.status(400).json({
+        message: "Please select a valid citizen zone.",
       });
     }
 
@@ -66,23 +90,60 @@ const register = async (req, res) => {
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
+    // Create the citizen account with the selected zone.
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
-      password: hashedPassword,
+      password: await bcrypt.hash(password, 12),
       role: "citizen",
       ward: typeof ward === "string" ? ward.trim() : "",
+      zone: selectedZone,
       isActive: true,
     });
 
-    const token = generateToken(user);
+    // Read the saved record back from MongoDB.
+    const savedUser = await User.findById(user._id);
+
+    console.log(
+      "[Citizen Registration] Saved zone:",
+      JSON.stringify(savedUser?.zone)
+    );
+
+    // Verify that the zone was actually persisted.
+    if (
+      !savedUser ||
+      savedUser.role !== "citizen" ||
+      !validateCitizenZone(savedUser.zone)
+    ) {
+      console.error(
+        "[Citizen Registration] Saved-zone verification failed.",
+        {
+          userId: String(user._id),
+          submittedZone: selectedZone,
+          savedZone: savedUser?.zone,
+        }
+      );
+
+      return res.status(500).json({
+        message:
+          "Registration could not verify your saved zone. Please contact support.",
+      });
+    }
+
+    // Email failure must not undo a successfully saved account.
+    try {
+      await sendWelcomeEmail(savedUser);
+    } catch (emailError) {
+      console.error(
+        "[Citizen Registration] Welcome email failed:",
+        emailError.message
+      );
+    }
 
     return res.status(201).json({
       message: "Citizen registered successfully.",
-      token,
-      user: getPublicUser(user),
+      token: generateToken(savedUser),
+      user: getPublicUser(savedUser),
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -91,7 +152,10 @@ const register = async (req, res) => {
       });
     }
 
-    console.error("Registration Error:", error.message);
+    console.error(
+      "[Citizen Registration] Error:",
+      error.message
+    );
 
     return res.status(500).json({
       message: "Registration failed. Please try again.",
@@ -101,18 +165,20 @@ const register = async (req, res) => {
 
 // =========================
 // LOGIN
+// POST /api/auth/login
 // CITIZEN, STAFF, MODERATOR, ADMIN
 // =========================
+
 const login = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, zone } = req.body || {};
 
     if (
       typeof email !== "string" ||
-      typeof password !== "string" ||
-      typeof role !== "string" ||
       !email.trim() ||
+      typeof password !== "string" ||
       !password ||
+      typeof role !== "string" ||
       !role.trim()
     ) {
       return res.status(400).json({
@@ -123,7 +189,6 @@ const login = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedRole = role.trim().toLowerCase();
 
-    // Support frontend role name "user".
     const databaseRole =
       normalizedRole === "user" ? "citizen" : normalizedRole;
 
@@ -137,22 +202,17 @@ const login = async (req, res) => {
       });
     }
 
-    // =========================
-    // STATIC ADMIN LOGIN
-    // =========================
+    // ADMIN LOGIN
     if (databaseRole === "admin") {
       const adminEmail = process.env.ADMIN_EMAIL;
       const adminPassword = process.env.ADMIN_PASSWORD;
 
-      // No special-character requirement for the static admin.
       if (
         typeof adminEmail !== "string" ||
         !adminEmail.trim() ||
         typeof adminPassword !== "string" ||
         !adminPassword
       ) {
-        console.error("Admin login configuration is invalid.");
-
         return res.status(500).json({
           message: "Admin login is not configured correctly.",
         });
@@ -160,65 +220,36 @@ const login = async (req, res) => {
 
       const normalizedAdminEmail = adminEmail.trim().toLowerCase();
 
-     const emailMatches =
-  normalizedEmail === normalizedAdminEmail;
+      if (
+        normalizedEmail !== normalizedAdminEmail ||
+        password !== adminPassword
+      ) {
+        return res.status(401).json({
+          message: "Invalid email, password or role.",
+        });
+      }
 
-const passwordMatches =
-  password === adminPassword;
+      const adminUser = await User.findOne({
+        email: normalizedAdminEmail,
+        role: "admin",
+        isActive: { $ne: false },
+      });
 
-console.log("Admin login diagnostic:", {
-  emailMatches,
-  passwordMatches,
-  configuredEmailExists: Boolean(normalizedAdminEmail),
-  configuredPasswordExists: Boolean(adminPassword),
-});
-
-if (!emailMatches || !passwordMatches) {
-  return res.status(401).json({
-    message: "Invalid email, password or role.",
-  });
-}
-      // The configured admin must also have an active database record.
-     const adminUser = await User.findOne({
-  role: "admin",
-  isActive: { $ne: false },
-  $expr: {
-    $eq: [
-      {
-        $toLower: {
-          $trim: {
-            input: "$email",
-          },
-        },
-      },
-      normalizedAdminEmail,
-    ],
-  },
-});
-
-if (!adminUser) {
-  console.error(
-    "Admin account lookup failed. Check the MongoDB database and admin email."
-  );
-
-  return res.status(403).json({
-    message:
-      "Admin account is not provisioned or is disabled. Contact the system administrator.",
-  });
-}
-      const token = generateToken(adminUser);
+      if (!adminUser) {
+        return res.status(403).json({
+          message:
+            "Admin account is not provisioned or is disabled.",
+        });
+      }
 
       return res.status(200).json({
         message: "Admin login successful.",
-        token,
+        token: generateToken(adminUser),
         user: getPublicUser(adminUser),
       });
     }
 
-    // =========================
-    // DATABASE LOGIN
-    // CITIZEN, STAFF, MODERATOR
-    // =========================
+    // FIND CITIZEN, STAFF OR MODERATOR
     const user = await User.findOne({
       email: normalizedEmail,
       role: databaseRole,
@@ -230,45 +261,67 @@ if (!adminUser) {
       });
     }
 
-    if (typeof user.password !== "string" || !user.password) {
+    if (
+      typeof user.password !== "string" ||
+      !user.password ||
+      !(await bcrypt.compare(password, user.password))
+    ) {
       return res.status(401).json({
         message: "Invalid email, password or role.",
       });
     }
 
-    // Staff login already has no special-character requirement.
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-    if (!passwordMatch) {
-      return res.status(401).json({
-        message: "Invalid email, password or role.",
-      });
-    }
-
-    const token = generateToken(user);
-
-    // Email failure must not invalidate a successful login.
+    // CITIZENS MUST HAVE A VALID SAVED ZONE.
     if (user.role === "citizen") {
-      try {
-        await sendWelcomeEmail(user);
-      } catch (emailError) {
-        console.error(
-          "Welcome email failed:",
-          emailError.message
-        );
+      const selectedZone = normalizeZone(zone);
+
+      if (selectedZone) {
+        if (!validateCitizenZone(selectedZone)) {
+          return res.status(400).json({
+            message: "Please select a valid citizen zone.",
+          });
+        }
+
+        user.zone = selectedZone;
+        await user.save();
+
+        // Confirm MongoDB persisted the updated zone.
+        const savedUser = await User.findById(user._id);
+
+        if (
+          !savedUser ||
+          !validateCitizenZone(savedUser.zone)
+        ) {
+          return res.status(500).json({
+            message:
+              "Your zone could not be saved. Please try again.",
+          });
+        }
+
+        return res.status(200).json({
+          message: "Login successful.",
+          token: generateToken(savedUser),
+          user: getPublicUser(savedUser),
+        });
+      }
+
+      // Legacy accounts may not have a zone.
+      if (isMissingOrInvalidZone(user.zone)) {
+        return res.status(200).json({
+          requiresZone: true,
+          message: "Please select your zone to continue.",
+          email: user.email,
+        });
       }
     }
 
     return res.status(200).json({
       message: "Login successful.",
-      token,
+      token: generateToken(user),
       user: getPublicUser(user),
     });
   } catch (error) {
-    console.error("Login Error:", error.message);
+    console.error("[Login] Error:", error.message);
 
     return res.status(500).json({
       message: "Login failed. Please try again.",
@@ -278,11 +331,18 @@ if (!adminUser) {
 
 // =========================
 // GOOGLE LOGIN / SIGNUP
+// POST /api/auth/google
 // CITIZENS ONLY
 // =========================
+
 const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, zone } = req.body || {};
+
+    console.log(
+      "[Google Authentication] Submitted zone:",
+      JSON.stringify(zone)
+    );
 
     if (typeof idToken !== "string" || !idToken.trim()) {
       return res.status(400).json({
@@ -303,40 +363,84 @@ const googleLogin = async (req, res) => {
 
     const email = decodedToken.email.trim().toLowerCase();
     const name = decodedToken.name || email.split("@")[0];
+    const selectedZone = normalizeZone(zone);
 
     let user = await User.findOne({ email });
 
-    if (user) {
-      if (user.role !== "citizen") {
-        return res.status(403).json({
-          message:
-            "This email belongs to a non-citizen account. Please use the appropriate login method.",
-        });
-      }
+    if (user && user.role !== "citizen") {
+      return res.status(403).json({
+        message:
+          "This email belongs to another account type. Use the appropriate login method.",
+      });
+    }
 
-      if (user.isActive === false) {
-        return res.status(403).json({
-          message: "This account is disabled. Please contact support.",
-        });
-      }
-    } else {
+    if (user && user.isActive === false) {
+      return res.status(403).json({
+        message: "This account is disabled. Please contact support.",
+      });
+    }
+
+    if (selectedZone && !validateCitizenZone(selectedZone)) {
+      return res.status(400).json({
+        message: "Please select a valid citizen zone.",
+      });
+    }
+
+    // New Google accounts must select a zone.
+    if (!user && !validateCitizenZone(selectedZone)) {
+      return res.status(200).json({
+        requiresZone: true,
+        message: "Please select your zone to continue.",
+        email,
+      });
+    }
+
+    // Existing accounts with an invalid zone must select one.
+    if (
+      user &&
+      isMissingOrInvalidZone(user.zone) &&
+      !validateCitizenZone(selectedZone)
+    ) {
+      return res.status(200).json({
+        requiresZone: true,
+        message: "Please select your zone to continue.",
+        email,
+      });
+    }
+
+    if (!user) {
       const randomPassword = crypto.randomBytes(48).toString("hex");
-      const hashedPassword = await bcrypt.hash(randomPassword, 12);
 
       user = await User.create({
         name,
         email,
-        password: hashedPassword,
+        password: await bcrypt.hash(randomPassword, 12),
         role: "citizen",
+        zone: selectedZone,
         isActive: true,
+      });
+    } else if (selectedZone) {
+      user.zone = selectedZone;
+      await user.save();
+    }
+
+    // Reload to ensure the response uses the persisted record.
+    user = await User.findById(user._id);
+
+    console.log(
+      "[Google Authentication] Saved zone:",
+      JSON.stringify(user?.zone)
+    );
+
+    if (!user || isMissingOrInvalidZone(user.zone)) {
+      return res.status(500).json({
+        message: "Your account does not have a valid saved zone.",
       });
     }
 
-    const token = generateToken(user);
-
     return res.status(200).json({
       message: "Google sign-in successful.",
-      token,
+      token: generateToken(user),
       user: getPublicUser(user),
     });
   } catch (error) {
@@ -347,7 +451,7 @@ const googleLogin = async (req, res) => {
       });
     }
 
-    console.error("Google Login Error:", error.message);
+    console.error("[Google Authentication] Error:", error.message);
 
     return res.status(401).json({
       message: "Google sign-in failed. Please try again.",
@@ -357,10 +461,12 @@ const googleLogin = async (req, res) => {
 
 // =========================
 // FORGOT PASSWORD
+// POST /api/auth/forgot-password
 // =========================
+
 const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
 
     const safeMessage =
       "If an account exists for that email, a password reset link will be sent.";
@@ -371,10 +477,8 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-
     const user = await User.findOne({
-      email: normalizedEmail,
+      email: email.trim().toLowerCase(),
       isActive: { $ne: false },
     });
 
@@ -433,22 +537,24 @@ const forgotPassword = async (req, res) => {
       message: safeMessage,
     });
   } catch (error) {
-    console.error("Forgot Password Error:", error.message);
+    console.error("[Forgot Password] Error:", error.message);
 
     return res.status(500).json({
       message:
-        "Unable to process your request right now. Please try again later.",
+        "Unable to process your request right now. Please try again.",
     });
   }
 };
 
 // =========================
 // RESET PASSWORD
+// POST /api/auth/reset-password/:token
 // =========================
+
 const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
-    const { password, confirmPassword } = req.body;
+    const { password, confirmPassword } = req.body || {};
 
     if (
       typeof token !== "string" ||
@@ -513,7 +619,7 @@ const resetPassword = async (req, res) => {
         "Password changed successfully. Please sign in with your new password.",
     });
   } catch (error) {
-    console.error("Reset Password Error:", error.message);
+    console.error("[Reset Password] Error:", error.message);
 
     return res.status(500).json({
       message:
@@ -523,8 +629,9 @@ const resetPassword = async (req, res) => {
 };
 
 // =========================
-// EXPORT CONTROLLER FUNCTIONS
+// EXPORT CONTROLLERS
 // =========================
+
 module.exports = {
   register,
   login,
