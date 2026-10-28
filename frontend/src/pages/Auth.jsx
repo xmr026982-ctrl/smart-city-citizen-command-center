@@ -7,7 +7,9 @@ import {
 } from 'firebase/auth'
 import { auth } from '../firebase'
 
-const API_URL = 'http://127.0.0.1:5000/api'
+const API_URL = (
+  import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000/api'
+).replace(/\/+$/, '')
 
 const roles = [
   {
@@ -38,7 +40,7 @@ const staffExperiences = [
   'Senior Field',
 ]
 
-const staffexpertise = [
+const staffExpertise = [
   'Electrical',
   'Roads',
   'Waste',
@@ -64,7 +66,10 @@ const emptyStaffDetails = {
   note: '',
 }
 
-// Red asterisk for required fields.
+// =====================================
+// HELPERS
+// =====================================
+
 function RequiredMark() {
   return (
     <span
@@ -83,7 +88,7 @@ function CityMark({ role }) {
       ? 'ADMIN'
       : role === 'staff'
         ? 'STAFF'
-        : role === 'user'
+        : role === 'user' || role === 'citizen'
           ? 'CITIZEN'
           : null
 
@@ -133,9 +138,7 @@ function GoogleButton({ onClick, disabled }) {
       </svg>
 
       <span>
-        {disabled
-          ? 'Connecting to Google...'
-          : 'Continue with Google'}
+        {disabled ? 'Connecting to Google...' : 'Continue with Google'}
       </span>
     </button>
   )
@@ -149,7 +152,11 @@ function AuthFooter() {
   )
 }
 
-export default function App() {
+// =====================================
+// MAIN AUTH COMPONENT
+// =====================================
+
+export default function Auth() {
   const [mode, setMode] = useState('login')
   const [step, setStep] = useState('role')
   const [role, setRole] = useState(null)
@@ -159,11 +166,15 @@ export default function App() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [passwordStep, setPasswordStep] = useState(false)
+
   const [submitting, setSubmitting] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [staffSubmitting, setStaffSubmitting] = useState(false)
 
   const [message, setMessage] = useState('')
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const [staffSubmitting, setStaffSubmitting] = useState(false)
+  const [messageType, setMessageType] = useState('error')
+
   const [staffRequestSubmitted, setStaffRequestSubmitted] =
     useState(false)
 
@@ -171,34 +182,77 @@ export default function App() {
     ...emptyStaffDetails,
   })
 
-  const selectedRole = roles.find(
-    (item) => item.id === role
-  )
+  const selectedRole = roles.find((item) => item.id === role)
 
-  const citizenLogin =
-    mode === 'login' && role === 'user'
+  const citizenLogin = mode === 'login' && role === 'user'
 
   const showPasswordField =
-    mode === 'signup' ||
-    !citizenLogin ||
-    passwordStep
+    mode === 'signup' || !citizenLogin || passwordStep
+
+  // =====================================
+  // MESSAGE HELPER
+  // =====================================
+
+  function showStatus(text, type = 'error') {
+    setMessage(text)
+    setMessageType(type)
+  }
+
+  // =====================================
+  // MODE / ROLE RESET
+  // =====================================
 
   function switchMode(nextMode) {
     setMode(nextMode)
     setStep(nextMode === 'login' ? 'role' : 'credentials')
     setRole(null)
+
     setName('')
     setEmail('')
     setPassword('')
+
     setShowPassword(false)
     setPasswordStep(false)
+
     setMessage('')
+    setMessageType('error')
+
     setStaffRequestSubmitted(false)
-    setSubmitting(false)
   }
 
-  // Admin, staff and citizen login.
-  // Citizen registration is also handled here.
+  function selectRole(nextRole) {
+    setRole(nextRole)
+    setStep('credentials')
+
+    setEmail('')
+    setPassword('')
+
+    setPasswordStep(false)
+    setShowPassword(false)
+
+    setMessage('')
+  }
+
+  // =====================================
+  // SAVE AUTHENTICATED SESSION
+  // =====================================
+
+  function saveSession(data) {
+    if (!data?.token || !data?.user) {
+      throw new Error(
+        'The server did not return a valid login session.'
+      )
+    }
+
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+  }
+
+  // =====================================
+  // EMAIL / PASSWORD LOGIN
+  // AND CITIZEN REGISTRATION
+  // =====================================
+
   async function submit(event) {
     event.preventDefault()
 
@@ -206,10 +260,10 @@ export default function App() {
 
     setMessage('')
 
-    // Citizen login: ask for email before showing password.
+    // Citizen login first asks for an email address.
     if (citizenLogin && !passwordStep) {
       if (!email.trim()) {
-        setMessage('Please enter your email address.')
+        showStatus('Please enter your email address.')
         return
       }
 
@@ -221,21 +275,17 @@ export default function App() {
 
     try {
       if (mode === 'login') {
-        // Keep the existing admin login endpoint and role.
-        const response = await fetch(
-          `${API_URL}/auth/login`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              email: email.trim().toLowerCase(),
-              password,
-              role,
-            }),
-          }
-        )
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password,
+            role,
+          }),
+        })
 
         const data = await response.json().catch(() => ({}))
 
@@ -243,45 +293,40 @@ export default function App() {
           throw new Error(data.message || 'Login failed.')
         }
 
-        if (!data.token || !data.user) {
+        // Verify the returned role before accepting the session.
+        const expectedRole = role === 'user' ? 'citizen' : role
+
+        if (data.user?.role !== expectedRole) {
           throw new Error(
-            'The server did not return a login token and user.'
+            'The server returned an unexpected account role.'
           )
         }
 
-        // Save the authenticated session.
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(data.user))
+        saveSession(data)
 
-        setMessage(
-          `${selectedRole?.name || 'User'} login successful!`
+        showStatus(
+          `${selectedRole?.name || 'User'} login successful!`,
+          'success'
         )
 
-        console.log('Authenticated user:', data.user)
-
-        // Dashboard navigation can be added after confirming
-        // the routes in your React application.
+        // The session is stored. Dashboard navigation depends on
+        // the routes configured in your main React application.
       } else {
-        // Citizen registration.
         if (!name.trim()) {
           throw new Error('Please enter your full name.')
         }
 
-        const response = await fetch(
-          `${API_URL}/auth/register`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: name.trim(),
-              email: email.trim().toLowerCase(),
-              password,
-              role: 'citizen',
-            }),
-          }
-        )
+        const response = await fetch(`${API_URL}/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+          }),
+        })
 
         const data = await response.json().catch(() => ({}))
 
@@ -291,15 +336,17 @@ export default function App() {
           )
         }
 
-        setMessage(
-          data.message ||
-            'Your citizen account was created successfully.'
+        saveSession(data)
+
+        showStatus(
+          'Citizen account created successfully!',
+          'success'
         )
       }
     } catch (error) {
-      console.error('Authentication error:', error)
+      console.error('Authentication error:', error.message)
 
-      setMessage(
+      showStatus(
         error.message ||
           'Unable to connect to the backend. Please try again.'
       )
@@ -308,8 +355,14 @@ export default function App() {
     }
   }
 
-  // Existing Firebase Google sign-in.
+  // =====================================
+  // GOOGLE SIGN-IN
+  // FIREBASE + BACKEND JWT
+  // =====================================
+
   async function handleGoogleLogin() {
+    if (googleLoading) return
+
     setMessage('')
     setGoogleLoading(true)
 
@@ -321,60 +374,130 @@ export default function App() {
       })
 
       const result = await signInWithPopup(auth, provider)
-      const googleUser = result.user
 
-      setEmail(googleUser.email || '')
+      // Get a Firebase ID token and send it to Express.
+      const idToken = await result.user.getIdToken()
 
-      setMessage(
-        `Google sign-in successful! Welcome, ${
-          googleUser.displayName || googleUser.email
-        }.`
-      )
-
-      console.log('Firebase user:', {
-        uid: googleUser.uid,
-        name: googleUser.displayName,
-        email: googleUser.email,
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idToken }),
       })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Google sign-in failed.')
+      }
+
+      if (data.user?.role !== 'citizen') {
+        throw new Error(
+          'Google sign-in is available for citizen accounts only.'
+        )
+      }
+
+      saveSession(data)
+
+      setEmail(data.user.email || result.user.email || '')
+
+      showStatus('Google sign-in successful!', 'success')
     } catch (error) {
       console.error(
         'Google sign-in error:',
-        error.code,
-        error.message
+        error.code || error.message
       )
 
       if (error.code === 'auth/popup-closed-by-user') {
-        setMessage('Google sign-in was cancelled.')
-      } else if (
-        error.code === 'auth/unauthorized-domain'
-      ) {
-        setMessage(
-          'This website is not authorized in Firebase. Add localhost to Authorized domains.'
+        showStatus('Google sign-in was cancelled.')
+      } else if (error.code === 'auth/unauthorized-domain') {
+        showStatus(
+          'This website is not authorized in Firebase. Add your domain to Firebase Authorized domains.'
         )
       } else if (error.code === 'auth/popup-blocked') {
-        setMessage(
+        showStatus(
           'Your browser blocked the popup. Allow popups and try again.'
         )
       } else {
-        setMessage(error.message || 'Google sign-in failed.')
+        showStatus(error.message || 'Google sign-in failed.')
       }
     } finally {
       setGoogleLoading(false)
     }
   }
 
+  // =====================================
+  // FORGOT PASSWORD
+  // =====================================
+
+  async function handleForgotPassword() {
+    if (forgotLoading) return
+
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!normalizedEmail) {
+      showStatus('Please enter your email address first.')
+      return
+    }
+
+    setForgotLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch(
+        `${API_URL}/auth/forgot-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: normalizedEmail,
+          }),
+        }
+      )
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Unable to process your request.'
+        )
+      }
+
+      showStatus(
+        data.message ||
+          'If an account exists for that email, a reset link will be sent.',
+        'success'
+      )
+    } catch (error) {
+      console.error('Forgot-password error:', error.message)
+
+      showStatus(
+        error.message ||
+          'Unable to connect to the backend. Please try again.'
+      )
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  // =====================================
+  // STAFF APPLICATION FORM
+  // =====================================
+
   function handleStaffDetailsChange(event) {
-    const { name, value } = event.target
+    const { name: fieldName, value } = event.target
 
     setStaffDetails((previous) => ({
       ...previous,
-      [name]: value,
+      [fieldName]: value,
     }))
 
     setMessage('')
   }
 
-  // Submit staff application for administrator approval.
   async function submitStaffDetails(event) {
     event.preventDefault()
 
@@ -396,7 +519,7 @@ export default function App() {
       !expertise ||
       !zone
     ) {
-      setMessage(
+      showStatus(
         'Please fill in all required staff application fields.'
       )
       return
@@ -415,12 +538,8 @@ export default function App() {
           body: JSON.stringify({
             name: staffName,
             email: staffEmail,
-
-            // These names must match the backend controller
-            // and the existing StaffRequest model.
             Experience: experience,
             Expertise: expertise,
-
             zone,
             note,
           }),
@@ -431,8 +550,7 @@ export default function App() {
 
       if (!response.ok) {
         throw new Error(
-          data.message ||
-            'Could not submit your staff application.'
+          data.message || 'Could not submit your staff application.'
         )
       }
 
@@ -446,12 +564,12 @@ export default function App() {
         note,
       })
 
-      setMessage('')
       setStaffRequestSubmitted(true)
+      showStatus('', 'success')
     } catch (error) {
-      console.error('Staff application error:', error)
+      console.error('Staff application error:', error.message)
 
-      setMessage(
+      showStatus(
         error.message ||
           'Unable to connect to the server. Please try again.'
       )
@@ -469,16 +587,21 @@ export default function App() {
 
   function returnToStaffLogin() {
     resetStaffRequest()
+
     setStep('credentials')
     setRole('staff')
     setMode('login')
+
     setEmail('')
     setPassword('')
     setPasswordStep(false)
     setShowPassword(false)
   }
 
-  // Role selection screen.
+  // =====================================
+  // ROLE SELECTION SCREEN
+  // =====================================
+
   if (mode === 'login' && step === 'role') {
     return (
       <>
@@ -502,14 +625,7 @@ export default function App() {
                   key={item.id}
                   type="button"
                   className="role-card"
-                  onClick={() => {
-                    setRole(item.id)
-                    setStep('credentials')
-                    setMessage('')
-                    setPasswordStep(false)
-                    setEmail('')
-                    setPassword('')
-                  }}
+                  onClick={() => selectRole(item.id)}
                 >
                   <span className="role-icon">{item.icon}</span>
 
@@ -543,7 +659,10 @@ export default function App() {
     )
   }
 
-  // Staff application and success screen.
+  // =====================================
+  // STAFF APPLICATION / SUCCESS SCREEN
+  // =====================================
+
   if (mode === 'login' && step === 'staff-details') {
     return (
       <>
@@ -598,6 +717,11 @@ export default function App() {
                   </p>
 
                   <p>
+                    <strong>Experience:</strong>{' '}
+                    {staffDetails.experience}
+                  </p>
+
+                  <p>
                     <strong>Expertise:</strong>{' '}
                     {staffDetails.workArea}
                   </p>
@@ -609,7 +733,7 @@ export default function App() {
 
                 <p className="success-note">
                   Your application is awaiting administrator review.
-                  If it is approved, you will receive an email with
+                  If approved, you will receive an email with
                   instructions to set up your staff password.
                 </p>
 
@@ -689,14 +813,14 @@ export default function App() {
                   </select>
 
                   <label
-                    htmlFor="staff-work-area"
+                    htmlFor="staff-expertise"
                     className="staff-field-label"
                   >
                     Staff Expertise <RequiredMark />
                   </label>
 
                   <select
-                    id="staff-work-area"
+                    id="staff-expertise"
                     className="field"
                     name="workArea"
                     value={staffDetails.workArea}
@@ -704,7 +828,7 @@ export default function App() {
                     required
                   >
                     <option value="">Select your expertise</option>
-                    {staffexpertise.map((item) => (
+                    {staffExpertise.map((item) => (
                       <option key={item} value={item}>
                         {item}
                       </option>
@@ -782,48 +906,10 @@ export default function App() {
     )
   }
 
-  // Send a password-reset request for the entered email address.
-  async function handleForgotPassword() {
-    const normalizedEmail = email.trim().toLowerCase()
+  // =====================================
+  // LOGIN / SIGNUP SCREEN
+  // =====================================
 
-    if (!normalizedEmail) {
-      setMessage('Please enter your email address first.')
-      return
-    }
-
-    setMessage('')
-
-    try {
-      const response = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: normalizedEmail }),
-      })
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || 'Unable to process your password-reset request.'
-        )
-      }
-
-      setMessage(
-        data.message ||
-          'If an eligible account exists, password-reset instructions will be sent to your email.'
-      )
-    } catch (error) {
-      console.error('Forgot-password error:', error)
-      setMessage(
-        error.message ||
-          'Unable to connect to the server. Please try again.'
-      )
-    }
-  }
-
-  // Login and signup screen.
   return (
     <>
       <main className="auth-page">
@@ -851,6 +937,7 @@ export default function App() {
                 setPassword('')
                 setMessage('')
                 setPasswordStep(false)
+                setShowPassword(false)
               }}
             >
               <span aria-hidden="true">←</span> ROLES
@@ -899,7 +986,10 @@ export default function App() {
           <form onSubmit={submit}>
             {mode === 'signup' && (
               <>
-                <label htmlFor="full-name">Full name</label>
+                <label htmlFor="full-name">
+                  Full name
+                </label>
+
                 <input
                   id="full-name"
                   className="field"
@@ -941,15 +1031,20 @@ export default function App() {
             {showPasswordField && (
               <>
                 <div className="password-label">
-                  <label htmlFor="password">Password</label>
+                  <label htmlFor="password">
+                    Password
+                  </label>
 
                   {mode === 'login' && (
                     <button
                       type="button"
                       className="text-button"
+                      disabled={forgotLoading}
                       onClick={handleForgotPassword}
                     >
-                      Forgot password?
+                      {forgotLoading
+                        ? 'Sending...'
+                        : 'Forgot password?'}
                     </button>
                   )}
                 </div>
@@ -1007,7 +1102,9 @@ export default function App() {
 
           {message && (
             <p
-              className="status-message"
+              className={`status-message ${
+                messageType === 'success' ? 'success-message' : ''
+              }`}
               role="status"
               aria-live="polite"
             >
