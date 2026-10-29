@@ -8,8 +8,8 @@ const createAdmin = async () => {
   try {
     await connectDB();
 
-    const email = "admin@smartcity.com";
-    const password = "Admin@12345";
+    const email = process.env.ADMIN_EMAIL.trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD;
 
     const existingAdmin = await User.findOne({ email });
 

@@ -16,8 +16,10 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "firebase-admin": "^14.5.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.4",
+    "nodemailer": "^10.3.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

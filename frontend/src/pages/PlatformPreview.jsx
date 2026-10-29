@@ -491,4 +491,8 @@ function PlatformPreview({ onNavigate }) {
   )
 }
 
+<<<<<<< HEAD
 export default PlatformPreview
+=======
+export default PlatformPreview
+>>>>>>> 4e7ddac (Integrated)

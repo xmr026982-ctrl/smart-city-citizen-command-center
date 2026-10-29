@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
@@ -5,7 +6,7 @@ const userSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true
+      trim: true,
     },
 
     email: {
@@ -13,44 +14,56 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
     },
 
     password: {
       type: String,
-      required: true
+      required: true,
     },
 
     role: {
       type: String,
-      enum: ["user", "staff", "admin"],
-      default: "user"
+      enum: ["citizen", "staff", "moderator", "admin"],
+      default: "citizen",
+    },
+
+    zone: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     ward: {
       type: String,
-      default: ""
+      default: "",
+      trim: true,
+    },
+
+    department: {
+      type: String,
+      default: "",
+      trim: true,
     },
 
     isActive: {
       type: Boolean,
-      default: true
+      default: true,
     },
 
-    contributionStats: {
-      reportsCount: {
+    location: {
+      latitude: {
         type: Number,
-        default: 0
+        default: null,
       },
-
-      votesCount: {
+      longitude: {
         type: Number,
-        default: 0
-      }
-    }
+        default: null,
+      },
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 

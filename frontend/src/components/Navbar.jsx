@@ -1,33 +1,25 @@
-import { useLocation, useNavigate } from "react-router-dom";
-
-export default function Navbar() {
-  const navigate = useNavigate();
-  const location = useLocation();
+export default function Navbar({ page, onNavigate }) {
 
   return (
     <nav className="site-nav" aria-label="Main navigation">
       <button
         type="button"
-        className={location.pathname === "/home" ? "active" : ""}
-        onClick={() => navigate("/home")}
+        className={page === 'home' ? 'active' : ''}
+        onClick={() => onNavigate('home')}
       >
         Home
       </button>
-
       <button
         type="button"
-        className={location.pathname === "/about" ? "active" : ""}
-        onClick={() => navigate("/about")}
+        className={page === 'about' ? 'active' : ''}
+        onClick={() => onNavigate('about')}
       >
         About
       </button>
-
-      <button
-        type="button"
-        onClick={() => navigate("/contact")}
-      >
-        Contact
-      </button>
+      <button onClick={() => onNavigate?.("contact")}>
+  Contact
+</button>
+     
     </nav>
-  );
+  )
 }
