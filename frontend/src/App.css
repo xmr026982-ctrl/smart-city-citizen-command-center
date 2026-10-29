@@ -278,10 +278,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 
 
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 4e7ddac (Integrated)
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
@@ -393,7 +389,6 @@ button { -webkit-tap-highlight-color: transparent; }
   width: 100%;
   margin: 0 auto 24px;
 }
-<<<<<<< HEAD
 
 /* Blue building logo */
 .brand-mark {
@@ -426,40 +421,6 @@ button { -webkit-tap-highlight-color: transparent; }
   gap: 5px;
 }
 
-=======
-
-/* Blue building logo */
-.brand-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 15px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(145deg, #0ea5e9, #0369a1) !important;
-  color: #ffffff !important;
-  box-shadow: 0 8px 22px rgba(14, 165, 233, 0.3);
-  border: none;
-  flex-shrink: 0;
-}
-
-/* Building icon inside logo */
-.brand-mark svg {
-  width: 28px;
-  height: 28px;
-  color: #ffffff;
-  stroke: #ffffff;
-}
-
-/* Smart City and role text */
-.brand-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
->>>>>>> 4e7ddac (Integrated)
 /* Smart City title */
 .brand-copy strong {
   font-size: 25px;
@@ -503,107 +464,6 @@ button { -webkit-tap-highlight-color: transparent; }
     font-size: 23px;
   }
 }
-<<<<<<< HEAD
-
-
-
-
-.brand-copy span {
-  color: #698093;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-}
-.auth-card h1 { margin: 0; color: #172b41; text-align: center; font-size: 34px; font-weight: 800; letter-spacing: -.055em; }
-.intro { margin: 9px 0 22px; color: var(--muted); text-align: center; font-size: 14px; line-height: 1.55; }
-.role-selection-card .intro { margin-bottom: 24px; }
-.role-options { display: grid; gap: 11px; }
-.role-card {
-  display: flex;
-  width: 100%;
-  min-height: 74px;
-  align-items: center;
-  gap: 13px;
-  padding: 12px 15px;
-  border: 1px solid rgba(198,215,229,.8);
-  border-radius: 16px;
-  color: #1e70bd;
-  text-align: left;
-  background: linear-gradient(135deg, rgba(255,255,255,.84), rgba(244,249,253,.66));
-  box-shadow: 0 1px 0 #fff inset, 0 5px 14px rgba(38,76,111,.04);
-  cursor: pointer;
-  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-}
-.role-card:hover { transform: translateY(-2px); border-color: #8dc7f2; box-shadow: 0 9px 20px rgba(36,115,179,.12), 0 1px 0 #fff inset; }
-.role-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(255,255,255,.9); border-radius: 13px; background: linear-gradient(145deg, #e6f5ff, #d3e9f9); font-size: 20px; }
-.role-copy { display: grid; flex: 1; gap: 4px; }
-.role-copy strong { font-size: 14px; font-weight: 700; }
-.role-copy small { color: #718396; font-size: 12px; }
-.role-arrow { color: #418ac4; font-size: 23px; }
-
-.back-button { display: inline-flex; align-items: center; gap: 7px; margin: -8px 0 20px; padding: 5px 0; border: 0; color: #546c80; background: transparent; font-size: 11px; font-weight: 800; letter-spacing: .14em; cursor: pointer; }
-.back-button:hover { color: var(--blue); }
-.back-button span { font-size: 18px; line-height: 1; }
-.login-identity { display: flex; align-items: center; justify-content: center; gap: 10px; margin: -7px 0 18px; padding: 12px; border: 1px solid rgba(188,215,236,.65); border-radius: 14px; background: rgba(232,245,255,.56); }
-.login-identity > span { font-size: 23px; }
-.login-identity div { display: grid; gap: 3px; }
-.login-identity strong { color: #2d699e; font-size: 13px; }
-.login-identity small { color: #72879a; font-size: 11px; }
-.admin-card::after, .staff-card::after {
-  position: absolute;
-  top: 0;
-  right: 18%;
-  left: 18%;
-  height: 2px;
-  border-radius: 0 0 3px 3px;
-  background: linear-gradient(90deg, transparent, rgba(56,160,231,.8), transparent);
-  content: "";
-  pointer-events: none;
-}
-.admin-card .login-identity { border-color: rgba(158,190,224,.72); background: rgba(225,239,252,.66); }
-.staff-card .login-identity { border-color: rgba(166,204,225,.72); background: rgba(229,244,250,.68); }
-
-.google-button, .field, .submit-button { width: 100%; border-radius: 12px; }
-.google-button { display: flex; height: 51px; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(193,211,226,.88); color: #263c50; background: rgba(255,255,255,.83); box-shadow: 0 1px 0 #fff inset, 0 5px 12px rgba(37,76,109,.04); font-size: 14px; font-weight: 650; cursor: pointer; transition: background .16s ease, transform .16s ease, box-shadow .16s ease; }
-.google-button:hover { transform: translateY(-1px); background: #fff; box-shadow: 0 7px 17px rgba(37,76,109,.1); }
-.google-icon { width: 19px; height: 19px; }
-.divider { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 13px; margin: 20px 0; color: #8999a8; font-size: 12px; }
-.divider::before, .divider::after { height: 1px; background: rgba(161,181,198,.56); content: ""; }
-
-form { display: grid; }
-form > label, .password-label label { margin: 0 0 8px; color: #26394c; font-size: 13px; font-weight: 700; }
-.field { height: 50px; padding: 0 15px; border: 1px solid rgba(189,207,222,.9); outline: none; color: #17283c; background: rgba(255,255,255,.66); font-size: 14px; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
-.field::placeholder { color: #9aa8b5; }
-.field:focus { border-color: #68afe8; background: rgba(255,255,255,.92); box-shadow: 0 0 0 4px rgba(40,142,219,.12); }
-.password-label { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
-.password-label label { margin-bottom: 8px; }
-.password-input-wrap { position: relative; }
-.password-input-wrap .field { padding-right: 66px; }
-.password-toggle { position: absolute; top: 50%; right: 13px; padding: 5px; transform: translateY(-50%); border: 0; color: #60809a; background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
-.password-toggle:hover { color: var(--blue); }
-.text-button { padding: 0; border: 0; color: #1676c7; background: transparent; font-size: inherit; font-weight: 700; cursor: pointer; }
-.text-button:hover { color: #0c5797; text-decoration: underline; text-underline-offset: 3px; }
-.password-label .text-button { margin: 0 0 8px; font-size: 11px; }
-.submit-button { height: 52px; margin-top: 19px; border: 1px solid rgba(255,255,255,.28); color: #fff; background: linear-gradient(180deg, #28639a 0%, #163e6b 100%); box-shadow: 0 9px 18px rgba(23,68,111,.22), 0 1px 0 rgba(255,255,255,.25) inset; font-size: 13px; font-weight: 800; letter-spacing: .14em; cursor: pointer; transition: transform .16s ease, filter .16s ease, box-shadow .16s ease; }
-.submit-button:hover { transform: translateY(-1px); filter: brightness(1.09); box-shadow: 0 12px 22px rgba(23,68,111,.27), 0 1px 0 rgba(255,255,255,.25) inset; }
-.submit-button:active { transform: translateY(1px); }
-.switch-copy { margin: 24px 0 0; color: #6a7d8e; text-align: center; font-size: 12px; }
-.role-selection-card .switch-copy { margin-top: 23px; }
-.status-message { margin: 15px 0 -7px; padding: 10px 12px; border: 1px solid rgba(75,159,124,.23); border-radius: 10px; color: #236749; background: rgba(229,248,239,.72); font-size: 12px; line-height: 1.5; text-align: center; }
-footer { position: absolute; right: 12px; bottom: 18px; left: 12px; color: #728496; text-align: center; font-size: 11px; }
-
-@media (max-width: 480px) {
-  .auth-page { padding: 28px 14px 60px; }
-  .auth-card { padding: 27px 22px 24px; border-radius: 23px; }
-  .auth-card h1 { font-size: 30px; }
-  .role-card { min-height: 70px; padding: 10px 12px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
-}
-=======
->>>>>>> 4e7ddac (Integrated)
 
 
 
@@ -1324,8 +1184,4 @@ button { font: inherit; cursor: pointer; }
   top: 25px;
   left: 30px;
   z-index: 20;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 4e7ddac (Integrated)

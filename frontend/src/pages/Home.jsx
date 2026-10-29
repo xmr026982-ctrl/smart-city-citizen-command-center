@@ -1,20 +1,12 @@
 import VideoComponents from "../components/videocomponents.jsx";
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 4e7ddac (Integrated)
 export default function Home({ onNavigate }) {
   return (
     <main className="home-page">
 
       <VideoComponents />
 
-<<<<<<< HEAD
-      
-
-=======
->>>>>>> 4e7ddac (Integrated)
       <section
         className="home-corner-content"
         aria-labelledby="home-title"
