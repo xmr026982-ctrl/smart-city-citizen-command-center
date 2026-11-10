@@ -1,18 +1,16 @@
+/* Issue Management responsive rules (scoped to .ix so the original desk pages are untouched) */
 @media (max-width: 960px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: 260px;
-    z-index: 30;
-    transform: translateX(-100%);
-    transition: transform 200ms var(--ease);
-  }
-  .sidebar.open { transform: none; }
-  .menu-btn { display: grid; place-items: center; }
-  .hero-grid, .report-layout, .step-grid, .stats-grid, .form-grid, .intel-grid, .category-grid {
+  .ix .hero-grid,
+  .ix .report-layout,
+  .ix .step-grid,
+  .ix .stats-grid,
+  .ix .form-grid,
+  .ix .intel-grid,
+  .ix .category-grid {
     grid-template-columns: 1fr;
   }
-  .span-2 { grid-column: auto; }
-  .page-wrap, .topbar, .hero-card { padding-left: 16px; padding-right: 16px; }
+  .ix .span-2 { grid-column: auto; }
+  .ix .page-wrap,
+  .ix .page-stack,
+  .ix .hero-card { padding-left: 16px; padding-right: 16px; }
 }

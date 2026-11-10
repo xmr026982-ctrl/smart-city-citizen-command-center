@@ -1,6 +1,6 @@
 /* Year-3000 holographic layer – soft, premium, never gaudy */
 
-.holo-surface {
+.ix .holo-surface {
   background: var(--glass);
   backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -9,7 +9,7 @@
   overflow: hidden;
 }
 
-.holo-surface::before {
+.ix .holo-surface::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -23,24 +23,24 @@
   animation: holo-sweep 8s linear infinite;
 }
 
-.holo-border {
+.ix .holo-border {
   border: 1px solid transparent;
   background:
     linear-gradient(var(--card), var(--card)) padding-box,
     linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(34, 211, 238, 0.15), rgba(14, 165, 233, 0.3)) border-box;
 }
 
-.holo-glow:hover {
+.ix .holo-glow:hover {
   box-shadow: var(--shadow-glow);
   transform: translateY(-2px);
   transition: all 280ms var(--ease);
 }
 
-.neural-pulse {
+.ix .neural-pulse {
   position: relative;
 }
 
-.neural-pulse::after {
+.ix .neural-pulse::after {
   content: "";
   position: absolute;
   inset: -4px;
@@ -51,12 +51,12 @@
   pointer-events: none;
 }
 
-.scan-line {
+.ix .scan-line {
   position: relative;
   overflow: hidden;
 }
 
-.scan-line::after {
+.ix .scan-line::after {
   content: "";
   position: absolute;
   top: 0;

@@ -1,0 +1,101 @@
+/* ------------------------------------------------------------------
+   City Health / Field Health 3D: role accent (--acc, set on .stage),
+   the coverage card, the issue hover strip.
+------------------------------------------------------------------- */
+.stage { --acc: #2563eb; }
+.stage .zone-chip i { background: var(--acc); }
+.stage .map-tools button[aria-pressed="true"] { background: var(--acc); color: #fff; box-shadow: 0 10px 22px -10px var(--acc); }
+.stage .map-tools button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+.cov-card {
+  position: absolute; z-index: 6; left: 16px; top: 206px; width: 262px; display: grid; gap: 6px;
+  padding: 12px 14px 13px; border-radius: 16px; background: rgba(255, 255, 255, .95); border: 1px solid #fff;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 16%, transparent), 0 16px 34px -18px rgba(15, 23, 42, .35);
+  animation: covIn .3s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes covIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.cov-card p { margin: 0; }
+.cov-k { display: flex; align-items: center; gap: 6px; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--acc); }
+.cov-card.out .cov-k { color: #64748b; }
+.cov-v { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font: 500 13px "IBM Plex Sans", system-ui, sans-serif; color: #334155; }
+.cov-v b { font: 650 15px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; }
+.cov-card.in .cov-v b { font-size: 20px; letter-spacing: -.01em; }
+.cov-v em { margin-left: auto; font-style: normal; font: 700 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 7px; border-radius: 999px; }
+.cov-h { font: 400 11.5px/1.4 "IBM Plex Sans", system-ui, sans-serif; color: #64748b; }
+.cov-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.cov-chips button {
+  padding: 4px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--acc) 26%, #e2e8f0); background: color-mix(in srgb, var(--acc) 6%, #fff);
+  font: 600 11px "IBM Plex Sans", system-ui, sans-serif; color: #1e293b; cursor: pointer; transition: background .15s ease, color .15s ease, transform .15s ease;
+}
+.cov-chips button:hover { background: var(--acc); color: #fff; transform: translateY(-1px); }
+.cov-chips button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+
+.cp-issue {
+  position: absolute; z-index: 6; top: 166px; left: 50%; transform: translateX(-50%); max-width: min(560px, calc(100% - 340px));
+  display: flex; align-items: center; gap: 9px; padding: 7px 14px 7px 11px; border-radius: 999px; pointer-events: none;
+  background: rgba(255, 255, 255, .97); box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 30%, transparent), 0 14px 30px -14px rgba(15, 23, 42, .4);
+  font: 500 12.5px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; white-space: nowrap; animation: covIn .18s ease both;
+}
+.cp-issue .m { font: 700 11px "JetBrains Mono", ui-monospace, monospace; color: var(--acc); }
+.cp-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cp-s { font: 600 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+.cp-go { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: var(--acc); }
+.cp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #64748b; }
+.cp-dot.s-acknowledged { background: #7c3aed; }
+.cp-dot.s-in_progress { background: #f59e0b; }
+.cp-dot.s-pending_review { background: #06b6d4; }
+.cp-dot.s-resolved { background: #10b981; }
+.cp-dot.br { background: #ef4444; box-shadow: 0 0 0 3px #fee2e2; }
+
+@media (max-width: 900px) {
+  .cov-card { top: auto; bottom: 12px; width: auto; right: 64px; }
+  .cp-issue { max-width: calc(100% - 32px); }
+}
+@media (prefers-reduced-motion: reduce) { .cov-card, .cp-issue { animation: none; } }
+.stage .hud { border-color: color-mix(in srgb, var(--acc) 55%, transparent); }
+.cov-comm { justify-self: start; display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; padding: 4px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--acc) 30%, #e2e8f0); background: color-mix(in srgb, var(--acc) 7%, #fff); font: 600 11.5px "IBM Plex Sans", system-ui, sans-serif; color: var(--acc); cursor: pointer; }
+.cov-comm:hover { background: var(--acc); color: #fff; }
+.cov-open { background: var(--acc); border-color: var(--acc); color: #fff; box-shadow: 0 6px 16px color-mix(in srgb, var(--acc) 30%, transparent); }
+.cov-open:hover { filter: brightness(1.08); }
+
+/* ------------------------------------------------------------------
+   Night: the stage follows the sky (--night 0..1 from the model).
+   The light fades and overlays cross-fade to the night set, the HUD
+   chrome turns to dark glass. Day keeps everything as it was.
+------------------------------------------------------------------- */
+.stage { --night: 0; transition: background-color 1.6s ease, border-color 1.6s ease; }
+.stage.is-night { background: #050b18; border-color: #16223a; }
+.stage .fade::after { content: ""; position: absolute; inset: 0; opacity: var(--night); transition: opacity 1.6s ease; }
+.stage .fade-top::after { background: linear-gradient(180deg, rgba(4, 9, 22, .94), rgba(4, 9, 22, 0)); }
+.stage .fade-bottom::after { background: linear-gradient(0deg, rgba(4, 9, 22, .96), rgba(4, 9, 22, 0)); }
+.stage .fade { transition: opacity 1.6s ease; }
+.stage .aurora { transition: opacity 1.6s ease; }
+.stage.is-night .aurora { opacity: .55; }
+.stage.is-night .hud-grid { opacity: .5; }
+.stage.is-night .scan { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--acc) 12%, transparent), transparent); }
+
+/* chrome on the model: dark glass after dusk */
+.stage.is-night .zone-chip,
+.stage.is-night .map-tools button:not([aria-pressed="true"]),
+.stage.is-night .cov-card,
+.stage.is-night .cp-issue {
+  background: rgba(9, 16, 34, .82); border-color: rgba(148, 163, 184, .16); color: #cbd5e1;
+  -webkit-backdrop-filter: blur(10px) saturate(1.3); backdrop-filter: blur(10px) saturate(1.3);
+}
+.stage.is-night .zone-chip { color: #8ea3c2; }
+.stage.is-night .zone-chip b, .stage.is-night .cov-v b, .stage.is-night .cp-issue { color: #f1f5f9; }
+.stage.is-night .cov-v { color: #cbd5e1; }
+.stage.is-night .cov-h, .stage.is-night .cp-s { color: #8ea3c2; }
+.stage.is-night .cov-card { box-shadow: 0 0 0 1px color-mix(in srgb, var(--acc) 34%, transparent), 0 20px 40px -18px rgba(0, 0, 0, .7); }
+.stage.is-night .cov-k { color: color-mix(in srgb, var(--acc) 60%, #fff); }
+.stage.is-night .cov-card.out .cov-k { color: #8ea3c2; }
+.stage.is-night .cov-chips button, .stage.is-night .cov-comm:not(.cov-open) { background: color-mix(in srgb, var(--acc) 14%, rgba(9, 16, 34, .6)); border-color: color-mix(in srgb, var(--acc) 40%, transparent); color: #e2e8f0; }
+.stage.is-night .cov-v em { background: rgba(127, 29, 29, .35); border-color: rgba(248, 113, 113, .4); color: #fca5a5; }
+.stage.is-night .cp-go, .stage.is-night .cp-issue .m { color: color-mix(in srgb, var(--acc) 55%, #fff); }
+.stage.is-night .map-tools button:not([aria-pressed="true"]) { color: #cbd5e1; box-shadow: 0 10px 24px -12px rgba(0, 0, 0, .8); }
+
+/* the sky button: a small live dot while it follows the real sun */
+.sky-btn { position: relative; }
+.sky-live { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 2px rgba(255, 255, 255, .9); }
+.stage.is-night .sky-live { box-shadow: 0 0 0 2px rgba(9, 16, 34, .9), 0 0 8px var(--acc); }
+@media (prefers-reduced-motion: reduce) { .stage, .stage .fade::after, .stage .aurora { transition: none; } }

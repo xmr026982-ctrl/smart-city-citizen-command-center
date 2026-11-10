@@ -1,0 +1,126 @@
+/* ==================================================================
+   Service Windows (admin, violet): the deadline table editor.
+   Built on the Civic Command kit; only the editor parts live here (.sw-).
+   ================================================================== */
+
+@keyframes swTick { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.sw-help { margin: 0 0 12px !important; font-size: 12.5px; line-height: 1.5; color: var(--ac-muted); }
+.sw-list { display: grid; gap: 8px; }
+.sw-row {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  padding: 11px 12px 11px 14px; border-radius: 14px; background: rgba(255, 255, 255, .9); border: 1px solid var(--ac-line);
+  transition: border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+.sw-row.changed { border-color: var(--v); box-shadow: 0 0 0 3px var(--v-soft); }
+.sw-row.changed::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--v); }
+.sw-row.idle .sw-row-copy { opacity: .7; }
+.sw-row-copy { min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.sw-row-copy p { margin: 0 !important; font-size: 13px; color: #334155; }
+.sw-row-copy small { font: 600 10.5px var(--ac-mono); color: var(--ac-faint); }
+.sw-cat { display: inline-flex; align-items: center; gap: 9px; }
+.sw-cat b { font-size: 13.5px; font-weight: 650; }
+
+.sw-rules { margin: 14px 0 0; padding: 12px 14px; list-style: none; display: grid; gap: 8px; border-radius: 14px; background: var(--v-soft); border: 1px dashed var(--v-edge); }
+.sw-rules li { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; color: #475569; }
+.sw-rules li b { flex-shrink: 0; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; font: 700 10px var(--ac-mono); color: #fff; background: var(--v); }
+
+/* stepper */
+.sw-step { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 12px; background: var(--v-soft); border: 1px solid var(--v-edge); }
+.sw-step button {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; cursor: pointer;
+  border: 0; background: #fff; color: var(--v-deep); box-shadow: 0 1px 2px rgba(15, 23, 42, .06); transition: transform .15s ease, background .15s ease;
+}
+.sw-step button:hover:not(:disabled) { background: var(--v); color: #fff; transform: translateY(-1px); }
+.sw-step button:disabled { opacity: .35; cursor: not-allowed; }
+.sw-step > span { min-width: 64px; display: grid; justify-items: center; line-height: 1.1; animation: swTick .25s var(--ac-ease); }
+.sw-step b { font: 650 15px var(--font-display); color: var(--ac-ink); }
+.sw-step em { font: 600 9.5px var(--ac-mono); font-style: normal; color: var(--ac-faint); }
+.sw-step.off { opacity: .45; }
+
+/* ceiling switch */
+.sw-cap { display: flex; align-items: center; gap: 10px; }
+.sw-switch { position: relative; width: 38px; height: 22px; border-radius: 999px; border: 0; cursor: pointer; background: #e2e8f0; transition: background .2s ease; flex-shrink: 0; }
+.sw-switch i { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(15, 23, 42, .2); transition: transform .22s var(--ac-ease); }
+.sw-switch.on { background: linear-gradient(135deg, var(--v), var(--v2)); }
+.sw-switch.on i { transform: translateX(16px); }
+.sw-switch:focus-visible, .sw-step button:focus-visible { outline: 2px solid var(--v); outline-offset: 2px; }
+
+/* save bar */
+.sw-bar {
+  position: relative; z-index: 5 !important;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 16px; border-radius: 18px; background: rgba(255, 255, 255, .92); backdrop-filter: blur(16px);
+  border: 1px solid var(--ac-line); box-shadow: 0 12px 30px rgba(15, 23, 42, .06);
+}
+/* with unsaved changes the bar rides along at the bottom so Save is always in reach */
+.sw-bar.dirty { position: sticky; bottom: 12px; border-color: var(--v); box-shadow: 0 14px 34px var(--v-soft), 0 0 0 3px var(--v-soft); }
+.sw-bar.bad { border-color: #fca5a5; background: rgba(254, 242, 242, .95); box-shadow: 0 14px 34px rgba(239, 68, 68, .1); }
+.sw-bar-copy { min-width: 0; flex: 1; }
+.sw-bar-copy strong { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.sw-bar.bad .sw-bar-copy strong { color: #b91c1c; }
+.sw-bar-copy ul { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.sw-bar-copy li { padding: 3px 9px; border-radius: 8px; font: 600 11.5px var(--ac-mono); color: var(--v-deep); background: var(--v-soft); border: 1px solid var(--v-edge); }
+.sw-bar.bad .sw-bar-copy li { color: #b91c1c; background: #fff; border-color: #fecaca; font-family: var(--font-display); }
+.sw-bar-copy p { margin: 6px 0 0 !important; font-size: 12.5px; color: var(--ac-muted); }
+.sw-bar-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* window map */
+.sw-map { display: grid; gap: 6px; overflow-x: auto; }
+.sw-map-row { display: grid; grid-template-columns: 96px repeat(7, minmax(52px, 1fr)); gap: 6px; align-items: center; }
+.sw-map-row > span { display: grid; place-items: center; height: 34px; border-radius: 10px; font: 650 12.5px var(--ac-mono); color: var(--ac-ink); background: rgba(255, 255, 255, .85); border: 1px solid var(--ac-line); transition: background .2s ease, border-color .2s ease; }
+.sw-map-row > span:first-child { justify-items: start; background: none; border: 0; }
+.sw-map-row.head > span { background: none; border: 0; height: 30px; }
+.sw-map-row > span.cap { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.sw-map-row > span.changed { box-shadow: 0 0 0 2px var(--v); }
+.sw-key { background: #fef2f2; border: 1px solid #fecaca; }
+.sw-key.changed { background: #fff; border: 2px solid var(--v); }
+
+@media (max-width: 640px) {
+  .sw-row { grid-template-columns: 1fr; }
+  .sw-cap { justify-content: space-between; }
+  .sw-bar { position: static; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sw-step > span { animation: none; }
+}
+
+/* ==================================================================
+   Live lenses (KPI tiles, window-map cells), watch list, HUD touches
+   ================================================================== */
+@keyframes swIn { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
+@keyframes swPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, .45); } 50% { box-shadow: 0 0 0 8px rgba(124, 58, 237, 0); } }
+@keyframes swScan { 0% { transform: translateY(-100%); } 100% { transform: translateY(700%); } }
+
+/* the row behind the fastest window pulses while that lens is on */
+.sw-row.fastest { border-color: var(--v); animation: swPulse 1.6s ease-in-out infinite; }
+
+/* window map: a HUD grid; cells are lenses, with a crosshair on hover */
+.sw-map { padding: 6px 2px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.sw-map-row { grid-template-columns: 92px repeat(7, minmax(54px, 1fr)); }
+.sw-map-row > button {
+  position: relative; width: 100%; min-width: 0; height: 40px; padding: 0; border-radius: 11px; cursor: pointer;
+  display: grid; place-items: center; font: 700 13px var(--ac-mono); color: var(--ac-ink);
+  background: linear-gradient(180deg, #fff, rgba(248, 250, 255, .9)); border: 1px solid var(--ac-line);
+  transition: background .15s ease, border-color .15s ease, transform .15s var(--ac-ease), box-shadow .2s ease;
+}
+.sw-map-row > button.cap { color: #b91c1c; background: linear-gradient(180deg, #fff5f5, #fef2f2); border-color: #fecaca; }
+.sw-map-row > button.changed { box-shadow: 0 0 0 2px var(--v); }
+.sw-map-row > button.live::before { content: ""; position: absolute; left: 7px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--v); box-shadow: 0 0 6px var(--v); }
+.sw-map-row > button:hover { transform: translateY(-1px); border-color: var(--v); box-shadow: 0 8px 18px rgba(124, 58, 237, .18); z-index: 1; }
+.sw-map-row > button.on { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--v), var(--v-deep)); box-shadow: 0 10px 22px rgba(124, 58, 237, .35); }
+.sw-map-row > button.on::before { background: #fff; box-shadow: none; }
+/* open-issue count: inside the cell's corner, never clipped */
+.sw-map-row > button em { position: absolute; right: 4px; bottom: 3px; font: 700 9px var(--ac-mono); font-style: normal; color: var(--v-deep); }
+.sw-map-row > button.cap em { color: #b91c1c; }
+.sw-map-row > button.on em { color: #fff; }
+/* crosshair: the hovered cell's row label and column head light up */
+.sw-map-row:has(> button:hover) > span:first-child .ac-pri, .sw-map-row:has(> button:hover) > span:first-child > * { box-shadow: 0 0 0 2px rgba(124, 58, 237, .35); border-radius: 8px; }
+.sw-key.live { position: relative; background: #fff; border: 1px solid var(--ac-line); } .sw-key.live::after { content: ""; position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; background: var(--v); box-shadow: 0 0 6px var(--v); }
+
+/* change log entries open their file */
+button.sw-log { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; border-radius: 12px; transition: background .15s ease; }
+button.sw-log:hover { background: rgba(124, 58, 237, .06); }
+button.sw-log .when { display: inline-flex; align-items: center; gap: 3px; }
+
+@media (prefers-reduced-motion: reduce) { .sw-row.fastest { animation: none !important; } }

@@ -1,0 +1,270 @@
+/* ==================================================================
+   App shell HUD: sidebar, top bar and profile menu in the same glass /
+   corner-bracket language as Issue Management. One accent per role:
+   citizen cyan, staff teal, admin violet. Loaded after layout.css.
+   ================================================================== */
+.app-shell { --h: #0ea5e9; --h2: #0369a1; --h-rgb: 14 165 233; --h-soft: #e0f2fe; }
+.app-shell.tone-staff { --h: #14b8a6; --h2: #0f766e; --h-rgb: 20 184 166; --h-soft: #ccfbf1; }
+.app-shell.tone-admin { --h: #7c3aed; --h2: #5b21b6; --h-rgb: 124 58 237; --h-soft: #ede9fe; }
+
+/* the eight-tick lock-on bracket, reused by the active nav item and the open profile chip */
+.app-shell .sidebar nav a.active::after,
+.app-shell .profile-menu.open .profile::after {
+  content: ""; position: absolute; inset: -5px; pointer-events: none;
+  background:
+    linear-gradient(var(--h) 0 0) top left / 10px 2px no-repeat, linear-gradient(var(--h) 0 0) top left / 2px 10px no-repeat,
+    linear-gradient(var(--h) 0 0) top right / 10px 2px no-repeat, linear-gradient(var(--h) 0 0) top right / 2px 10px no-repeat,
+    linear-gradient(var(--h) 0 0) bottom left / 10px 2px no-repeat, linear-gradient(var(--h) 0 0) bottom left / 2px 10px no-repeat,
+    linear-gradient(var(--h) 0 0) bottom right / 10px 2px no-repeat, linear-gradient(var(--h) 0 0) bottom right / 2px 10px no-repeat;
+}
+
+/* ---------- sidebar ---------- */
+.app-shell .sidebar {
+  height: calc(100dvh - 24px); margin: 12px 0 12px 12px; padding: 20px 14px 16px; border-radius: 24px; overflow: visible;
+  border: 0;
+  background:
+    radial-gradient(rgb(var(--h-rgb) / .07) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(248, 252, 255, .94));
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .26), 0 24px 50px rgb(var(--h-rgb) / .12);
+}
+.app-shell .sidebar::before {
+  content: ""; position: absolute; inset: -1px; border-radius: 25px; padding: 1px; pointer-events: none;
+  background: linear-gradient(160deg, var(--h), rgba(148, 163, 184, .2) 25%, rgba(148, 163, 184, .15) 80%, var(--h));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.app-shell .side-edge { display: none; }
+.side-frame { position: absolute; inset: 0; pointer-events: none; }
+.side-frame i { position: absolute; width: 22px; height: 22px; border: 2.5px solid var(--h); filter: drop-shadow(0 0 5px rgb(var(--h-rgb) / .45)); }
+.side-frame .tl { top: -6px; left: -6px; border-right: 0; border-bottom: 0; border-radius: 11px 0 0 0; }
+.side-frame .tr { top: -6px; right: -6px; border-left: 0; border-bottom: 0; border-radius: 0 11px 0 0; }
+.side-frame .bl { bottom: -6px; left: -6px; border-right: 0; border-top: 0; border-radius: 0 0 0 11px; }
+.side-frame .br { bottom: -6px; right: -6px; border-left: 0; border-top: 0; border-radius: 0 0 11px 0; }
+
+.app-shell .brand { padding: 4px 6px 16px; margin-bottom: 12px; border-bottom: 1px dashed rgb(var(--h-rgb) / .25); }
+.app-shell .brand-mark { background: linear-gradient(145deg, var(--h), var(--h2)); box-shadow: 0 10px 24px rgb(var(--h-rgb) / .35); }
+.app-shell .brand > div > span { font-family: "JetBrains Mono", ui-monospace, monospace; letter-spacing: .16em; color: var(--h); }
+.app-shell .layer { font-family: "JetBrains Mono", ui-monospace, monospace; letter-spacing: .2em; font-size: 9.5px; color: #94a3b8; }
+
+.app-shell .sidebar nav { gap: 6px; padding: 6px 6px 8px; margin: 0 -6px; }
+.app-shell .sidebar nav a { position: relative; height: 44px; gap: 11px; padding: 0 10px; border-radius: 13px; font-weight: 500; color: #475569; overflow: visible; transition: background-color .14s ease, color .14s ease, box-shadow .14s ease; }
+.app-shell .sidebar nav a .nav-ic { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; color: #64748b; background: #f1f5f9; transition: background .2s ease, color .2s ease; }
+.app-shell .sidebar nav a:hover { background: rgb(var(--h-rgb) / .06); color: var(--h2); }
+.app-shell .sidebar nav a:hover .nav-ic { color: var(--h2); background: rgb(var(--h-rgb) / .12); }
+.app-shell .sidebar nav a.active {
+  color: #0f172a; font-weight: 600;
+  background: linear-gradient(135deg, var(--h-soft), #fff 80%);
+  box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .35), 0 10px 22px rgb(var(--h-rgb) / .16);
+}
+.app-shell .sidebar nav a.active .nav-ic { color: #fff; background: linear-gradient(135deg, var(--h), var(--h2)); box-shadow: 0 6px 14px rgb(var(--h-rgb) / .35); }
+.app-shell .sidebar nav a.active::before { content: ""; position: absolute; left: -14px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--h); box-shadow: 0 0 10px var(--h); }
+.app-shell .sys-card { border-radius: 16px; border: 0; box-shadow: 0 0 0 1px rgba(148, 163, 184, .25), 0 10px 24px rgba(15, 23, 42, .05); }
+.app-shell .leave-desk { display: none; }
+
+/* ---------- top bar ---------- */
+.app-shell .topbar {
+  position: relative; z-index: 1500;
+  height: 62px; margin: 0 6px 12px; padding: 0 8px 0 14px; border-radius: 18px;
+  background: rgba(255, 255, 255, .92); backdrop-filter: blur(16px);
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, .25), 0 12px 30px rgb(var(--h-rgb) / .08);
+}
+.app-shell .loc svg:first-child { color: var(--h); }
+.app-shell .topbar .zone-list { border-radius: 16px; box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .3), 0 18px 40px rgba(15, 23, 42, .14); }
+.app-shell .topbar .zone-list button.on { background: var(--h-soft); color: var(--h2); }
+
+/* profile chip */
+.app-shell .profile { position: relative; padding: 5px 10px 5px 5px; border-radius: 14px; transition: background .2s ease, box-shadow .2s ease; }
+.app-shell .profile:hover { background: #fff; box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .3); }
+.app-shell .profile .avatar { border-radius: 11px; width: 38px; height: 38px; color: #fff !important; background: linear-gradient(135deg, var(--h), var(--h2)); }
+.app-shell .profile > svg { width: 22px; height: 22px; padding: 4px; border-radius: 7px; color: var(--h2); background: rgb(var(--h-rgb) / .1); transition: transform .2s ease, background .2s ease, color .2s ease; }
+.app-shell .profile-menu.open .profile { background: linear-gradient(135deg, var(--h-soft), #fff 80%); box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .45), 0 10px 22px rgb(var(--h-rgb) / .18); }
+.app-shell .profile-menu.open .profile > svg { color: #fff; background: var(--h); }
+
+/* profile dropdown */
+@keyframes hudDrop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+.app-shell .profile-drop {
+  z-index: 1600; width: 272px; top: calc(100% + 10px); padding: 12px; border: 0; border-radius: 20px; overflow: visible;
+  background: radial-gradient(rgb(var(--h-rgb) / .07) 1px, transparent 1px) 0 0 / 16px 16px, linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(248, 252, 255, .96));
+  box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .35), 0 26px 60px rgb(var(--h-rgb) / .22); animation: hudDrop .2s ease-out both;
+}
+.app-shell .profile-drop::before, .app-shell .profile-drop::after { content: ""; position: absolute; width: 18px; height: 18px; border: 2.5px solid var(--h); pointer-events: none; filter: drop-shadow(0 0 5px rgb(var(--h-rgb) / .45)); }
+.app-shell .profile-drop::before { top: -5px; left: -5px; border-right: 0; border-bottom: 0; border-radius: 9px 0 0 0; }
+.app-shell .profile-drop::after { bottom: -5px; right: -5px; border-left: 0; border-top: 0; border-radius: 0 0 9px 0; }
+.app-shell .profile-head { padding: 4px 4px 14px; gap: 12px; border-bottom: 1px dashed rgb(var(--h-rgb) / .25); }
+.app-shell .profile-head .avatar.sm { width: 44px; height: 44px; border-radius: 14px; color: #fff !important; background: linear-gradient(135deg, var(--h), var(--h2)); }
+.app-shell .profile-head strong { font-size: 14.5px; }
+.profile-mail { display: block; margin-top: 2px; font-size: 11.5px; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.profile-role { display: inline-block; margin-top: 6px; padding: 3px 8px; border-radius: 7px; font: 700 9px "JetBrains Mono", ui-monospace, monospace; font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: var(--h2); background: var(--h-soft); border: 1px solid rgb(var(--h-rgb) / .3); }
+.app-shell .profile-list { padding: 8px 0 0; gap: 4px; }
+.app-shell .profile-item { height: 42px; padding: 0 10px; border-radius: 12px; gap: 11px; font-weight: 600; color: #334155; }
+.app-shell .profile-item svg { width: 28px; height: 28px; padding: 6px; border-radius: 9px; color: #475569; background: #f1f5f9; flex-shrink: 0; }
+.app-shell .profile-item:hover { background: linear-gradient(135deg, var(--h-soft), #fff); box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .3); }
+.app-shell .profile-item:hover svg { color: #fff; background: var(--h); }
+.profile-sep { display: block; height: 1px; margin: 10px 4px 6px; background: linear-gradient(90deg, transparent, rgba(239, 68, 68, .35), transparent); }
+.app-shell .profile-item.logout { margin: 0; color: #b91c1c; }
+.app-shell .profile-item.logout svg { color: #dc2626; background: #fef2f2; }
+.app-shell .profile-item.logout:hover { background: #fef2f2; box-shadow: 0 0 0 1px rgba(239, 68, 68, .3); }
+.app-shell .profile-item.logout:hover svg { color: #fff; background: #dc2626; }
+
+@media (prefers-reduced-motion: reduce) { .app-shell .profile-drop { animation: none; } }
+
+/* ---------- top bar: frame, zone glyph, sync + clock, avatar ring ---------- */
+.top-frame { position: absolute; inset: 0; pointer-events: none; }
+.top-frame i { position: absolute; width: 18px; height: 18px; border: 2.5px solid var(--h); filter: drop-shadow(0 0 5px rgb(var(--h-rgb) / .4)); }
+.top-frame .tl { top: -6px; left: -6px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.top-frame .tr { top: -6px; right: -6px; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.top-frame .bl { bottom: -6px; left: -6px; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.top-frame .br { bottom: -6px; right: -6px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+
+.app-shell .topbar .loc { padding: 5px 12px 5px 5px; border-radius: 14px; transition: background .2s ease, box-shadow .2s ease; }
+.app-shell .topbar .loc:hover, .app-shell .topbar .loc[aria-expanded="true"] { background: #fff; box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .3); }
+.loc-glyph { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; color: var(--h); background: linear-gradient(135deg, var(--h-soft), #fff); box-shadow: inset 0 0 0 1px rgb(var(--h-rgb) / .28); }
+.app-shell .topbar .loc strong { font-size: 15.5px; }
+.app-shell .topbar .loc span { font-size: 11.5px; white-space: nowrap; }
+
+.app-shell .topbar .zone-list {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 1600; width: 300px; max-height: min(70vh, 520px); overflow: auto; padding: 10px;
+  list-style: none; background: radial-gradient(rgb(var(--h-rgb) / .06) 1px, transparent 1px) 0 0 / 16px 16px, linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(248, 252, 255, .97));
+  animation: hudDrop .2s ease-out both;
+}
+.zone-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.zone-group { margin: 6px 8px 6px !important; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--h2); }
+.zone-group:not(:first-child) { margin-top: 12px !important; padding-top: 10px; border-top: 1px dashed rgb(var(--h-rgb) / .25); color: #94a3b8; }
+.app-shell .topbar .zone-list button { display: flex; align-items: center; gap: 10px; }
+.app-shell .topbar .zone-list button > span { flex: 1; min-width: 0; text-align: left; }
+.app-shell .topbar .zone-list button small { font: 600 10.5px "JetBrains Mono", ui-monospace, monospace; color: #64748b; white-space: nowrap; }
+.app-shell .topbar .zone-list button small.hot { color: #dc2626; }
+
+.top-mid { display: flex; align-items: center; gap: 10px; }
+.app-shell .feed-badge { height: 34px; padding: 0 14px; box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .18); border: 0; }
+.app-shell .feed-badge i { background: #10b981; box-shadow: 0 0 0 3px rgb(16 185 129 / .16); }
+.app-shell .feed-badge i.beat { animation: syncBeat .9s ease-out 1; }
+.app-shell .feed-badge[data-mode="offline"] i { background: #f59e0b; box-shadow: 0 0 0 3px rgb(245 158 11 / .2); }
+.app-shell .feed-badge[data-mode="offline"] { color: #b45309; }
+@keyframes syncBeat { 0% { box-shadow: 0 0 0 0 rgb(16 185 129 / .55); } 100% { box-shadow: 0 0 0 9px rgb(16 185 129 / 0); } }
+
+.clock-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 999px; background: #fff;
+  box-shadow: 0 0 0 1px rgb(var(--h-rgb) / .18); white-space: nowrap;
+}
+.clock-pill b { font: 700 13px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .04em; color: #0f172a; font-variant-numeric: tabular-nums; }
+.clock-pill span { font: 600 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .16em; color: #94a3b8; }
+.clock-pill i { width: 1px; height: 14px; background: rgb(var(--h-rgb) / .25); }
+.clock-pill em { font-style: normal; font-size: 12px; color: #64748b; }
+
+.avatar-ring { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; margin: 0 !important; }
+.avatar-ring::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--h) 0 74%, rgb(var(--h-rgb) / .2) 74% 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+.app-shell .profile .avatar-ring .avatar { width: 36px; height: 36px; border-radius: 50%; }
+.avatar-ring > i { position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%; background: #10b981; border: 2px solid #fff; }
+.app-shell .profile .role-tag {
+  display: inline-block !important; margin-top: 4px !important; padding: 2px 8px; border-radius: 6px; width: max-content;
+  font: 700 9px "JetBrains Mono", ui-monospace, monospace !important; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--h2) !important; background: var(--h-soft); border: 1px solid rgb(var(--h-rgb) / .3);
+}
+
+/* system status caption */
+.sys-cap { display: block; margin-top: 2px; font: 600 9px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; color: #94a3b8; }
+.app-shell .sys-card .live.down { background: #f59e0b; }
+
+@media (max-width: 1280px) { .clock-pill em { display: none; } }
+@media (max-width: 1120px) { .clock-pill { display: none; } .app-shell .topbar .loc span { display: none; } }
+@media (prefers-reduced-motion: reduce) { .app-shell .feed-badge i.beat, .app-shell .topbar .zone-list { animation: none; } }
+.app-shell .topbar .zone-list button:disabled { cursor: default; opacity: .6; } .app-shell .topbar .zone-list button:disabled:hover { background: none; }
+
+/* an open drawer or dialog sits above the shell: the top bar drops behind its veil */
+body:has([aria-modal="true"]) .app-shell .topbar { z-index: 1; }
+
+
+/* ---------- the frame: one top bar, the page below it ----------
+   The sidebar and the top bar share the same top edge (12px). The page
+   scrolls under a top bar that never moves, with the same 16px gap on
+   every route. Pages no longer draw their own top bar. */
+.app-shell .sidebar { backdrop-filter: none; } /* an opaque panel: the blur cost frames for nothing */
+.app-shell .sidebar nav a .nav-ic { transition: background-color .14s ease, color .14s ease; }
+.shell-main { display: flex; flex-direction: column; height: 100dvh; min-width: 0; padding-top: 12px; }
+.app-shell .shell-main > .topbar { flex-shrink: 0; margin: 0 20px 16px 10px; }
+.shell-view { position: relative; flex: 1; min-height: 0; display: flex; }
+.shell-view > .page { flex: 1; height: auto; min-height: 0; padding: 0 20px 22px 10px; }
+.shell-view > .page.dash { padding: 0 20px 14px 10px; }
+.shell-view > .page.city-map-page { padding: 0 20px 14px 10px; }
+.shell-wait { background: transparent; }
+
+/* layout.css styles every span in .loc / .profile as a text line (block + 3px top margin):
+   the icon tile and the avatar ring are not text lines */
+.app-shell .topbar .loc .loc-glyph, .app-shell .topbar .profile .avatar-ring { display: grid !important; margin: 0 !important; font-size: inherit; color: inherit; }
+.app-shell .topbar .loc .loc-glyph { color: var(--h) !important; }
+.app-shell .topbar .profile .avatar-ring > i { display: block; }
+
+/* ---------- K1a: slimmer, page-aware top bar ---------- */
+.app-shell .shell-main > .topbar { height: 56px; margin: 0 20px 16px 16px; }
+.shell-view > .page, .shell-view > .page.dash, .shell-view > .page.city-map-page { padding-left: 16px; }
+/* brackets only on the frame's outer corners: the sidebar owns the left */
+.top-frame .tl, .top-frame .bl { display: none; }
+.app-shell .topbar .loc-glyph { width: 34px; height: 34px; }
+
+/* where you are */
+.app-shell .topbar .loc.place { cursor: default; }
+.app-shell .topbar .loc.place:hover { background: none; box-shadow: none; }
+.app-shell .topbar .place-desk { display: block !important; margin: 0 0 1px !important; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace !important; letter-spacing: .16em; text-transform: uppercase; color: var(--h2) !important; }
+.app-shell .topbar .loc.place strong { font-size: 15px; }
+.place-tag {
+  margin-left: 8px; padding: 2px 8px; border-radius: 7px; font: 700 10px "JetBrains Mono", ui-monospace, monospace; font-style: normal; letter-spacing: .08em;
+  color: var(--h2); background: var(--h-soft); border: 1px solid rgb(var(--h-rgb) / .3); animation: hudDrop .2s ease-out both;
+}
+.duty-chip {
+  display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px; flex-shrink: 0;
+  font: 700 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0;
+}
+.duty-chip i { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; }
+.duty-chip.on { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+.duty-chip.on i { background: #10b981; box-shadow: 0 0 0 3px rgb(16 185 129 / .18); }
+
+/* solid ring in the role colour: no fake progress arc */
+.avatar-ring::before { display: none; }
+.app-shell .topbar .profile .avatar-ring { width: 42px; height: 42px; border-radius: 50%; box-shadow: 0 0 0 2.5px var(--h), 0 0 12px rgb(var(--h-rgb) / .35); }
+.app-shell .profile .avatar-ring .avatar { width: 36px; height: 36px; }
+.avatar-ring > i { right: -2px; bottom: -1px; }
+
+/* the logo block needs no rule under it: spacing separates it from the menu */
+.app-shell .brand { border-bottom: 0; margin-bottom: 14px; padding-bottom: 10px; }
+.app-shell .topbar .loc.place { display: flex; flex-direction: row; align-items: center; gap: 12px; padding: 5px 12px 5px 5px; }
+.app-shell .topbar .loc.place > div { min-width: 0; }
+.app-shell .topbar .loc.place strong { display: flex; align-items: center; line-height: 1.15; }
+.app-shell .topbar .loc.locked { cursor: default; }
+.app-shell .topbar .loc.locked .loc-glyph { color: var(--h2) !important; }
+.app-shell .topbar .loc.locked { display: flex; align-items: center; gap: 12px; padding: 5px 12px 5px 5px; }
+.app-shell .topbar .loc.locked strong { line-height: 1.15; }
+
+/* sidebar count badges (Notifications: unread, Assigned Work: new files), in the role accent */
+.sidebar .nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font: 700 10.5px "JetBrains Mono", ui-monospace, monospace; color: #fff; }
+.sidebar .nav-badge.inbox { background: linear-gradient(135deg, var(--nb, #7c3aed), var(--nb2, #5b21b6)); box-shadow: 0 0 0 3px rgb(var(--nbr, 124 58 237) / .16); animation: nbIn .3s ease both; }
+.tone-staff .sidebar .nav-badge.inbox { --nb: #14b8a6; --nb2: #0f766e; --nbr: 20 184 166; }
+.tone-user .sidebar .nav-badge.inbox, .tone-citizen .sidebar .nav-badge.inbox { --nb: #0ea5e9; --nb2: #0369a1; --nbr: 14 165 233; }
+@keyframes nbIn { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------------
+   Server notice (components/layout/ServerNotice.jsx): the server's
+   "no" to a change, shown once, bottom centre, above everything.
+------------------------------------------------------------------- */
+.srv-note {
+  position: fixed; z-index: 9000; left: 50%; bottom: 22px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; max-width: min(560px, calc(100vw - 32px));
+  padding: 11px 12px 11px 16px; border-radius: 14px;
+  background: rgba(15, 23, 42, .92); color: #f8fafc; font: 500 13px/1.4 "IBM Plex Sans", system-ui, sans-serif;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, .45), 0 18px 40px -12px rgba(2, 6, 23, .55);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  animation: srvIn .22s cubic-bezier(.2, .8, .2, 1) both;
+}
+.srv-note > svg { flex: none; color: #fbbf24; }
+.srv-note span { min-width: 0; }
+.srv-note button {
+  flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
+  border: 0; background: rgba(255, 255, 255, .08); color: #cbd5e1; cursor: pointer;
+}
+.srv-note button:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+@keyframes srvIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { .srv-note { animation: none; } }

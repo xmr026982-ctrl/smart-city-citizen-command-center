@@ -1,0 +1,150 @@
+/* ==================================================================
+   Field Command: staff Issue Management (teal).
+   The field desk is built from the same parts as Civic Command (admin
+   violet, admin-command.css): every colour there is a variable with the
+   violet value as its fallback. `.fld` swaps those variables to teal,
+   so both desks share one layout, one motion language and one set of
+   controls, and admin stays exactly as it was.
+   Field-only parts below are prefixed .fc-.
+   ================================================================== */
+
+.fld {
+  /* the base tokens .ac sets, repeated so portals (close request) have them too */
+  --ac-ink: #0f172a;
+  --ac-muted: #64748b;
+  --ac-faint: #94a3b8;
+  --ac-line: #e6e8f0;
+  --ac-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --ac-ease: cubic-bezier(.22, 1, .36, 1);
+
+  /* violet -> teal */
+  --tk-7c3aed: #14b8a6;
+  --tk-a78bfa: #2dd4bf;
+  --tk-5b21b6: #0f766e;
+  --tk-6d28d9: #0d9488;
+  --tk-8b5cf6: #0d9488;
+  --tk-c4b5fd: #5eead4;
+  --tk-d6d3e8: #cfe5e1;
+  --tk-e7e3f7: #d5f3ee;
+  --tk-ece7fb: #e2f7f3;
+  --tk-efe9ff: #e5faf5;
+  --tk-efeaff: #e6faf5;
+  --tk-f1edff: #e6fbf7;
+  --tk-f1f0f7: #f0f7f6;
+  --tk-f1f0fb: #eef8f6;
+  --tk-f3efff: #ebfbf7;
+  --tk-f4f2fb: #f0f9f7;
+  --tk-f4f3fb: #f1f9f8;
+  --tk-f5f0ff: #effcf9;
+  --tk-f5f3ff: #f0fdfa;
+  --tk-f6f5fb: #f3faf9;
+  --tk-f7f5ff: #f2fcfa;
+  --tk-faf8ff: #f7fdfc;
+  --tk-124-58-237: 20 184 166;
+  --tk-139-92-246: 13 148 136;
+  --tk-167-139-250: 45 212 191;
+  --tk-245-243-255: 240 253 250;
+  --tk-248-245-255: 245 253 251;
+  --tk-76-29-149: 19 78 74;
+}
+/* .ac sets these from the tokens above; on the same element they must be re-read */
+.ac.fld {
+  --v: #14b8a6;
+  --v2: #2dd4bf;
+  --v-deep: #0f766e;
+  --v-soft: rgba(20, 184, 166, .08);
+  --v-edge: rgba(20, 184, 166, .22);
+}
+.fld .ac-aurora {
+  background:
+    radial-gradient(460px 240px at 88% 0%, rgba(20, 184, 166, .13), transparent 70%),
+    radial-gradient(380px 220px at 30% 6%, rgba(14, 165, 233, .07), transparent 70%);
+}
+.fld .ac-ring .fg { stroke: url(#fcRingGrad); }
+
+/* ---------- head: duty + clock ---------- */
+.fc-duty {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px;
+  font: 700 10px var(--ac-mono); letter-spacing: .16em; text-transform: uppercase;
+  color: #64748b; background: rgba(255, 255, 255, .92); border: 1px solid var(--ac-line);
+}
+.fc-duty i { width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; }
+.fc-duty.on { color: #047857; border-color: rgba(16, 185, 129, .35); }
+.fc-duty.on i { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, .18); }
+
+/* ---------- field moves ---------- */
+.ac-btn.fc-close { border: 0; color: #fff; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 10px 22px rgba(217, 119, 6, .26); }
+.ac-btn.fc-close:hover { color: #fff; box-shadow: 0 14px 28px rgba(217, 119, 6, .34); }
+.ac-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.fc-wait {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; white-space: nowrap;
+  font: 700 9.5px var(--ac-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: #0e7490; background: #ecfeff; border: 1px solid rgba(6, 182, 212, .3);
+}
+.fc-wait i { width: 6px; height: 6px; border-radius: 50%; background: #06b6d4; animation: acBlink 1.4s ease-in-out infinite; }
+.fc-done {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; white-space: nowrap;
+  font: 700 9.5px var(--ac-mono); letter-spacing: .12em; text-transform: uppercase; color: #047857; background: #ecfdf5;
+}
+.fc-hint { font-size: 11.5px; color: var(--ac-faint); white-space: nowrap; }
+
+/* command / trace lines that wrap stay left-aligned (they are buttons) */
+.fld .ac-trace-row p .ac-link { text-align: left; }
+
+/* ---------- next up (operations) ---------- */
+.fc-next { display: grid; gap: 8px; }
+.fc-next-row {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .86); border: 1px solid var(--ac-line);
+  transition: border-color .18s ease, transform .18s var(--ac-ease), box-shadow .2s ease; animation: acRise .4s var(--ac-ease) both;
+}
+.fc-next-row:hover { border-color: var(--v-edge); transform: translateY(-1px); box-shadow: 0 12px 26px rgba(20, 184, 166, .1); }
+.fc-next-row.over { border-color: rgba(239, 68, 68, .35); background: linear-gradient(90deg, rgba(254, 242, 242, .9), rgba(255, 255, 255, .9) 45%); }
+.fc-next-main { min-width: 0; cursor: pointer; background: none; border: 0; padding: 0; text-align: left; font: inherit; color: inherit; }
+.fc-next-main strong { display: block; font-size: 13.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-next-main small { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 3px; font-size: 11.5px; color: var(--ac-muted); }
+.fc-next-side { display: flex; align-items: center; gap: 8px; }
+
+/* ---------- capacity reactor readout (operations, field load) ---------- */
+.fc-cap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+
+/* ---------- identity card (field load) ---------- */
+.fc-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; align-items: center; }
+.fc-id-copy strong { display: flex; align-items: center; gap: 6px; font: 650 18px var(--font-display); letter-spacing: -.01em; }
+.fc-id-copy em { display: block; margin-top: 2px; font-style: normal; font-size: 13px; color: var(--v-deep); font-weight: 600; }
+.fc-id-copy small { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 12px; color: var(--ac-muted); }
+.fc-ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin-top: 14px; }
+.fc-ladder span {
+  display: grid; gap: 5px; justify-items: center; padding: 8px 4px 7px; border-radius: 11px; text-align: center;
+  font: 700 9px var(--ac-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ac-faint);
+  background: rgba(255, 255, 255, .8); border: 1px solid var(--ac-line);
+}
+.fc-ladder span i { width: 18px; border-radius: 4px 4px 2px 2px; background: #e2f7f3; }
+.fc-ladder span.past i { background: linear-gradient(180deg, #5eead4, #2dd4bf); }
+.fc-ladder span.on { color: #fff; border-color: transparent; background: linear-gradient(160deg, #14b8a6, #0f766e); box-shadow: 0 10px 22px rgba(20, 184, 166, .3); }
+.fc-ladder span.on i { background: linear-gradient(180deg, #fff, #ccfbf1); }
+.fc-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.fc-facts div { padding: 8px 10px; border-radius: 11px; background: var(--v-soft); border: 1px solid var(--v-edge); min-width: 0; }
+.fc-facts em { display: block; font: 700 8.5px var(--ac-mono); font-style: normal; letter-spacing: .13em; text-transform: uppercase; color: var(--ac-muted); }
+.fc-facts b { display: block; margin-top: 3px; font-size: 12.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- field load: career total vs files on this board ---------- */
+.fc-career { margin: -8px 0 0 !important; padding: 9px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.5; color: var(--ac-muted); background: var(--v-soft); border: 1px dashed var(--v-edge); }
+.fc-career b { color: var(--v-deep); }
+
+/* ---------- returned by command (row tag + file banner) ---------- */
+.ac-tag.fc-returned { background: #fef2f2; color: #b91c1c; }
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 900px) {
+  .fc-cap { grid-template-columns: 1fr; justify-items: start; }
+}
+@media (max-width: 640px) {
+  .fc-next-row { grid-template-columns: auto minmax(0, 1fr); }
+  .fc-next-side { grid-column: 1 / -1; justify-content: flex-start; }
+  .fc-facts { grid-template-columns: 1fr 1fr; }
+  .fc-ladder b { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fc-next-row, .fc-wait i { animation: none !important; }
+}

@@ -1,311 +1,320 @@
-import { useEffect, useState } from "react";
-import { Activity, CheckCircle2, ChevronLeft, ChevronRight, FolderOpen, Timer, Zap } from "lucide-react";
-import PageHeader from "../../components/layout/PageHeader";
-import GlassCard from "../../components/ui/GlassCard";
-import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
-import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  FolderOpen, CheckCircle2, Timer, AlertTriangle, ClipboardCheck, BadgeCheck, MapPin, Zap, Gauge, ShieldCheck,
+  Activity, RotateCcw, FileSearch, ArrowUpRight, Calendar, Contact,
+} from "lucide-react";
+import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
+import {
+  LensDeck, Panel, ResultLine, Pager, CatGlyph, StatusPill, PriorityPill, SlaMeter, Avatar, Empty, CAT_META,
+  SortBar, SortChip, RankBadge, useGlide, useHoverFx, FxLayer, ago,
+} from "../../components/issues/admin/CommandKit";
+import { Field, FieldHead, LoadReactor, useFieldDesk } from "../../components/issues/staff/FieldKit";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
-import { useAuth } from "../../store/authStore";
-import { useIssues } from "../../store/issueStore";
+import { PRIORITY_LABEL } from "../../constants/issuePriorities";
+import { expertiseLabel } from "../../config/expertise";
+import { RANKS } from "../../store/staffDeskStore";
+import { CAPACITY } from "../../store/fieldRoster";
+import { slaOf, span, fieldCloseHours, PRIORITY_RANK } from "../../utils/sla";
 import { formatDate } from "../../utils/formatDate";
+import { nameFor, useNames } from "../../store/profileStore";
 
-const PER_PAGE = 6;
+/* ------------------------------------------------------------------
+   Field Load: your record. Times here run on the field's clock: from the
+   report to your last close request, not to command's confirm
+   (utils/sla fieldCloseHours), so a slow confirm never makes you late.
+   Who you are on the field (rank ladder,
+   expertise, zone, badge), how you close (close rate, inside-window
+   rate, average time to close), your capacity and category mix, and
+   the trace of every issue that was ever on you on this board.
+   The tile deck locks one lens on the trace: everything (home), open,
+   closed, closed inside the window, closed late.
+------------------------------------------------------------------- */
+
+const SORTS = [
+  { id: "updatedAt", label: "Updated", dir: "desc", desc: "Recently moved first", asc: "Longest untouched first" },
+  { id: "createdAt", label: "Reported", dir: "desc", desc: "Newest reports first", asc: "Oldest reports first" },
+  { id: "took", label: "Time to close", dir: "asc", desc: "Slowest close first", asc: "Fastest close first" },
+  { id: "priority", label: "Priority", dir: "desc", desc: "Critical first", asc: "Low first" },
+];
+const SORT_DIR = Object.fromEntries(SORTS.map((o) => [o.id, o.dir]));
+
+// closed inside its service window? null = still open or no window set
+function inWindow(issue) {
+  const took = fieldCloseHours(issue);
+  if (took === null || !Number(issue.slaHours)) return null;
+  return took <= Number(issue.slaHours);
+}
+
+function readout(key, issue) {
+  if (key === "updatedAt") return ["Moved", ago(issue.updatedAt)];
+  if (key === "createdAt") return ["Filed", ago(issue.createdAt)];
+  if (key === "took") { const t = fieldCloseHours(issue); return ["Closed in", t === null ? "Open" : span(t)]; }
+  return ["Priority", PRIORITY_LABEL[issue.priority] || issue.priority];
+}
 
 function StaffPerformance() {
-  const user = useAuth();
-  const mine = useIssues().filter((issue) => issue.assignedTo === user.name);
-  const [chip, setChip] = useState("all");
+  useNames(); // names follow each person's current display name
+  const { issues, me, mine, tick } = useFieldDesk();
+  const [lens, setLens] = useState("all"); // all | open | closed | inside | late
+  const [sortKey, setSortKey] = useState("updatedAt");
+  const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState(6);
+  const [fileId, setFileId] = useState(null);
 
-  const open = mine.filter((i) => i.status !== "resolved").length;
-  const resolved = mine.filter((i) => i.status === "resolved").length;
-  const inProgress = mine.filter((i) => i.status === "in_progress").length;
-  const pending = mine.filter((i) => i.status === "pending_review").length;
-  const critical = mine.filter((i) => i.priority === "critical" || i.priority === "high").length;
-  const ratio = mine.length ? Math.round((resolved / mine.length) * 100) : 0;
+  const rec = useMemo(() => {
+    const open = mine.filter((i) => i.status !== "resolved");
+    const closed = mine.filter((i) => i.status === "resolved");
+    const timed = closed.filter((i) => inWindow(i) !== null);
+    const inside = timed.filter((i) => inWindow(i));
+    const took = closed.map(fieldCloseHours).filter((h) => h !== null);
+    const closedAt = (i) => [...(i.timeline || [])].reverse().find((t) => t.status === "resolved")?.at;
+    return {
+      open: open.length,
+      closed: closed.length,
+      // career total: every confirmed close, including history from before this board's records
+      career: me ? Math.max(me.closed, closed.length) : closed.length,
+      week: closed.filter((i) => closedAt(i) && Date.now() - new Date(closedAt(i)) <= 7 * 864e5).length,
+      inside: inside.length,
+      late: timed.length - inside.length,
+      timed: timed.length,
+      breachedOpen: open.filter((i) => slaOf(i).state === "over").length,
+      closeRate: mine.length ? Math.round((closed.length / mine.length) * 100) : 0,
+      insideRate: timed.length ? Math.round((inside.length / timed.length) * 100) : 0,
+      avg: took.length ? took.reduce((s, h) => s + h, 0) / took.length : null,
+      fastest: took.length ? Math.min(...took) : null,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, me, tick]);
+  const earlier = rec.career - rec.closed; // closes from before this board kept records (no files here)
 
-  const cards = [
-    { label: "Load", value: mine.length, icon: FolderOpen, color: "#0ea5e9" },
-    { label: "Open", value: open, icon: Timer, color: "#f59e0b" },
-    { label: "On site", value: inProgress, icon: Activity, color: "#8b5cf6" },
-    { label: "Closed", value: resolved, icon: CheckCircle2, color: "#10b981" },
-  ];
+  const cats = useMemo(() => {
+    const rows = Object.keys(CATEGORY_LABEL).map((key) => ({
+      key, label: CATEGORY_LABEL[key],
+      n: mine.filter((i) => i.category === key).length,
+      closed: mine.filter((i) => i.category === key && i.status === "resolved").length,
+    })).filter((r) => r.n);
+    const max = Math.max(1, ...rows.map((r) => r.n));
+    return rows.map((r) => ({ ...r, w: (r.n / max) * 100 })).sort((a, b) => b.n - a.n);
+  }, [mine]);
 
-  const byCategory = Object.entries(
-    mine.reduce((acc, issue) => {
-      const key = issue.category || "other";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]);
-  const maxCat = Math.max(1, ...byCategory.map(([, n]) => n));
+  const list = useMemo(() => {
+    const out = mine.filter((i) => {
+      if (lens === "open") return i.status !== "resolved";
+      if (lens === "closed") return i.status === "resolved";
+      if (lens === "inside") return inWindow(i) === true;
+      if (lens === "late") return inWindow(i) === false;
+      return true;
+    });
+    const flip = sortDir === SORT_DIR[sortKey] ? 1 : -1;
+    out.sort((a, b) => {
+      let d;
+      if (sortKey === "took") {
+        const ta = fieldCloseHours(a); const tb = fieldCloseHours(b);
+        d = (ta === null ? Infinity : ta) - (tb === null ? Infinity : tb);
+        if (Number.isNaN(d)) d = 0; // both open
+      } else if (sortKey === "priority") d = (PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0);
+      else d = new Date(b[sortKey]) - new Date(a[sortKey]);
+      return d * flip || a.id.localeCompare(b.id);
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, lens, sortKey, sortDir, tick]);
 
-  const marks = [
-    resolved > 0 && { id: "closed", label: "Closer", detail: `${resolved} verified close${resolved === 1 ? "" : "s"}` },
-    inProgress > 0 && { id: "site", label: "On site", detail: `${inProgress} live crew job${inProgress === 1 ? "" : "s"}` },
-    pending > 0 && { id: "gate", label: "Awaiting command", detail: `${pending} close request${pending === 1 ? "" : "s"}` },
-    critical > 0 && { id: "pressure", label: "High pressure", detail: `${critical} high or critical` },
-    mine.length > 0 && { id: "all", label: "Field load", detail: `${mine.length} tickets on you` },
-  ].filter(Boolean);
+  useEffect(() => { setPage(1); }, [lens, sortKey, sortDir, size]);
+  const pages = Math.max(1, Math.ceil(list.length / size));
+  const safePage = Math.min(page, pages);
+  const slice = list.slice((safePage - 1) * size, safePage * size);
+  const fileIssue = issues.find((i) => i.id === fileId) || null;
 
-  const traced = mine.filter((issue) => {
-    if (chip === "closed") return issue.status === "resolved";
-    if (chip === "site") return issue.status === "in_progress";
-    if (chip === "gate") return issue.status === "pending_review";
-    if (chip === "pressure") return issue.priority === "critical" || issue.priority === "high";
-    return true;
-  });
+  const listRef = useRef(null);
+  useGlide(listRef, `${sortKey}-${sortDir}`);
+  useHoverFx(listRef);
 
-  const totalPages = Math.max(1, Math.ceil(traced.length / PER_PAGE));
-  const paginated = traced.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  // a closed lens brings "time to close" with it
+  const pickLens = (id) => {
+    setLens(id);
+    if (["closed", "inside", "late"].includes(id)) { setSortKey("took"); setSortDir("asc"); }
+    else if (sortKey === "took") { setSortKey("updatedAt"); setSortDir("desc"); }
+  };
+  const filters = lens !== "all" || sortKey !== "updatedAt" || sortDir !== "desc";
+  const reset = () => { setLens("all"); setSortKey("updatedAt"); setSortDir("desc"); };
+  const rankAt = me ? RANKS.indexOf(me.rank) : -1;
 
-  useEffect(() => {
-    setPage(1);
-  }, [chip]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+  const EMPTY = {
+    all: [ClipboardCheck, "Nothing on your record yet", "Issues show here once command dispatches work to you."],
+    open: [CheckCircle2, "Nothing open on you", "Everything on your record is closed."],
+    closed: [Timer, "No closed work yet", "Issues show here once command confirms your close."],
+    inside: [Timer, "No close inside its window yet", "Closes that beat the service window show here."],
+    late: [CheckCircle2, "No late closes", "Every close on your record was inside its window."],
+  };
+  const empty = EMPTY[lens] || EMPTY.all;
+  const EmptyIcon = empty[0];
 
   return (
-    <main className="page-wrap">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <PageHeader
-          eyebrow="Field Layer · Load"
-          title="Field Load"
-          description="Your contribution snapshot. Tap a mark to filter the trace."
-        />
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          padding: "7px 14px", borderRadius: 999,
-          background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)",
-          fontSize: 12.5, fontWeight: 600, color: "#059669",
-        }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: "50%", background: "#10b981",
-            boxShadow: "0 0 0 3px rgba(16,185,129,0.25)", animation: "livePulse 1.8s ease infinite",
-          }} />
-          Live load
-        </div>
-      </div>
+    <Field>
+      <FieldHead crumb="FIELD LOAD" title="Field Load" sub="Your record on the field: how you close, how fast, and against which windows. Lock a tile to trace it." me={me} tick={tick} />
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-        gap: 12,
-        marginTop: 24,
-      }}>
-        {cards.map((s, i) => (
-          <GlassCard key={s.label} delay={i * 50}>
-            <div style={{ padding: 16, display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: `${s.color}18`, display: "grid", placeItems: "center",
-              }}>
-                <s.icon size={16} color={s.color} />
-              </div>
-              <div>
-                <p style={{ fontSize: 11, color: "var(--subtle)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</p>
-                <p style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700 }}>{s.value}</p>
-              </div>
-            </div>
-          </GlassCard>
-        ))}
-      </div>
+      <LensDeck
+        value={lens}
+        onChange={pickLens}
+        readout={`${list.length} of ${mine.length} on your record`}
+        tiles={[
+          { id: "all", icon: FolderOpen, label: "On your record", lens: "Everything", value: mine.length, sub: `${rec.closeRate}% closed`, meter: rec.closeRate },
+          { id: "open", icon: ClipboardCheck, label: "Open", value: rec.open, sub: rec.breachedOpen ? `${rec.breachedOpen} breached` : "None breached", meter: mine.length ? (rec.open / mine.length) * 100 : 0, tone: rec.breachedOpen ? "red" : "amber" },
+          { id: "closed", icon: CheckCircle2, label: "Closed", lens: "Closed files", value: rec.career, sub: `${rec.week} this week · career total`, meter: rec.closeRate, tone: "green" },
+          { id: "inside", icon: Timer, label: "Inside window", value: `${rec.insideRate}%`, lens: "Closed inside window", sub: `${rec.inside} of ${rec.timed} timed closes`, meter: rec.insideRate, tone: "cyan" },
+          { id: "late", icon: AlertTriangle, label: "Closed late", value: rec.late, sub: rec.avg === null ? "No closes yet" : `Avg close ${span(rec.avg)}`, meter: rec.timed ? (rec.late / rec.timed) * 100 : 0, tone: rec.late ? "red" : "green" },
+        ]}
+      />
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-        gap: 14,
-        marginTop: 18,
-      }}>
-        <GlassCard>
-          <div style={{ padding: 18, display: "flex", gap: 18, alignItems: "center" }}>
-            <div style={{
-              width: 112, height: 112, borderRadius: "50%", flexShrink: 0,
-              background: `conic-gradient(#0ea5e9 ${ratio * 3.6}deg, rgba(14,165,233,0.12) 0)`,
-              display: "grid", placeItems: "center",
-            }}>
-              <div style={{
-                width: 78, height: 78, borderRadius: "50%",
-                background: "rgba(255,255,255,0.92)",
-                display: "grid", placeItems: "center",
-              }}>
-                <div style={{ textAlign: "center" }}>
-                  <p style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 750 }}>{ratio}%</p>
-                  <p style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)" }}>Closed</p>
+      <div className="ac-row3">
+        <Panel kicker="Field identity" icon={Contact} title={me ? me.rank : "Not on the roster"}>
+          {me ? (
+            <>
+              <div className="fc-id">
+                <Avatar name={nameFor(me.name)} size={52} dot={me.onDuty} />
+                <div className="fc-id-copy">
+                  <strong>{nameFor(me.name)}{me.verified ? <BadgeCheck size={15} color="#14b8a6" /> : null}</strong>
+                  <em>{expertiseLabel(me.expertise)}</em>
+                  <small><MapPin size={11} /> {me.zone}</small>
                 </div>
               </div>
+              <div className="fc-ladder" role="img" aria-label={`Rank ${rankAt + 1} of ${RANKS.length}: ${me.rank}`}>
+                {RANKS.map((r, i) => (
+                  <span key={r} className={`${i < rankAt ? "past" : ""}${i === rankAt ? " on" : ""}`} title={r}>
+                    <i style={{ height: 8 + i * 4 }} />
+                    <b>{String(i + 1).padStart(2, "0")}</b>
+                  </span>
+                ))}
+              </div>
+              <div className="fc-facts">
+                <div><em>Badge</em><b>{me.verified ? "Verified" : "Unverified"}</b></div>
+                <div><em>Experience</em><b>{me.experience || "—"}</b></div>
+                <div><em>Since</em><b>{me.uplinkedAt ? formatDate(me.uplinkedAt) : "—"}</b></div>
+              </div>
+            </>
+          ) : (
+            <Empty icon={Contact} title="No roster record" sub="Your rank and zone show once command adds you to the field." />
+          )}
+        </Panel>
+
+        <Panel kicker="Service record" icon={ShieldCheck} title={rec.timed ? `${rec.insideRate}% closed inside the window` : "No timed closes yet"}>
+          <div className="ac-gauge">
+            <div className="ac-ring" style={{ width: 128, height: 128 }}>
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <defs>
+                  <linearGradient id="fcRingGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#14b8a6" />
+                    <stop offset="100%" stopColor="#34d399" />
+                  </linearGradient>
+                </defs>
+                <circle className="bg" cx="60" cy="60" r="50" fill="none" strokeWidth="11" />
+                <circle className="fg" cx="60" cy="60" r="50" fill="none" strokeWidth="11" strokeLinecap="round" strokeDasharray={`${(rec.insideRate / 100) * 314} 314`} />
+              </svg>
+              <div><strong>{rec.insideRate}%</strong><em>in window</em></div>
             </div>
-            <div>
-              <p style={{ fontSize: 11, fontWeight: 650, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>
-                Closure signal
-              </p>
-              <p style={{ marginTop: 6, fontSize: 15, fontWeight: 650 }}>{resolved} closed of {mine.length}</p>
-              <p style={{ marginTop: 6, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-                {pending ? `${pending} waiting on Admin confirm.` : "No close requests in the gate."}
-              </p>
+            <div className="ac-gauge-stats">
+              <div><div><span>Close rate</span><b>{rec.closeRate}%</b></div><span className="bar green"><i style={{ width: `${rec.closeRate}%` }} /></span></div>
+              <div><div><span>Closed late</span><b>{rec.late} of {rec.timed}</b></div><span className="bar amber"><i style={{ width: `${rec.timed ? (rec.late / rec.timed) * 100 : 0}%` }} /></span></div>
+              <div><div><span>Fastest close</span><b>{rec.fastest === null ? "—" : span(rec.fastest)}</b></div></div>
             </div>
           </div>
-        </GlassCard>
+        </Panel>
 
-        <GlassCard>
-          <div style={{ padding: 18 }}>
-            <p style={{ fontSize: 11, fontWeight: 650, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)", marginBottom: 12 }}>
-              Category pressure
-            </p>
-            {byCategory.length === 0 && (
-              <p style={{ color: "var(--subtle)", fontSize: 13 }}>No assigned work yet.</p>
-            )}
-            {byCategory.map(([key, count]) => (
-              <div key={key} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                  <span>{CATEGORY_LABEL[key] || key}</span>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{count}</span>
+        <Panel kicker="Capacity" icon={Gauge} title={`${rec.open} of ${CAPACITY} slots in use`}>
+          <div className="fc-cap">
+            <LoadReactor load={rec.open} label="In use" />
+            <div className="ac-readout">
+              <div><span>Open</span><b>{rec.open}</b></div>
+              <div className={rec.breachedOpen ? "amber" : ""}><span>Breached</span><b>{rec.breachedOpen}</b></div>
+              <div><span>Closed · career</span><b>{rec.career}</b></div>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel kicker="Category pressure" icon={Activity} title="What you work on">
+        {!cats.length ? (
+          <Empty icon={Activity} title="No work yet" sub="Your work by category shows here." />
+        ) : (
+          <div className="ac-catbars">
+            {cats.map((c) => (
+              <div key={c.key} className="ac-catbar" style={{ "--c": (CAT_META[c.key] || CAT_META.other).color }}>
+                <CatGlyph category={c.key} size={30} />
+                <div>
+                  <b>{c.label}</b>
+                  <span className="bar"><i style={{ width: `${Math.max(2, c.w)}%` }} /></span>
                 </div>
-                <div style={{ height: 7, borderRadius: 999, background: "rgba(14,165,233,0.1)", overflow: "hidden" }}>
-                  <div style={{
-                    width: `${(count / maxCat) * 100}%`,
-                    height: "100%",
-                    borderRadius: 999,
-                    background: "linear-gradient(90deg, #0ea5e9, #22d3ee)",
-                  }} />
-                </div>
+                <span className="n">{c.closed}/{c.n} closed</span>
               </div>
             ))}
           </div>
-        </GlassCard>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
-        {marks.map((mark) => {
-          const active = chip === mark.id;
-          return (
-            <button
-              key={mark.id}
-              type="button"
-              onClick={() => setChip(active && mark.id !== "all" ? "all" : mark.id)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                borderRadius: 999,
-                cursor: "pointer",
-                border: active ? "none" : "1px solid rgba(14,165,233,0.16)",
-                background: active
-                  ? "linear-gradient(135deg, #0ea5e9, #0284c7)"
-                  : "rgba(255,255,255,0.75)",
-                color: active ? "white" : "var(--fg)",
-                boxShadow: active ? "0 8px 18px rgba(14,165,233,0.28)" : "none",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <Zap size={13} color={active ? "white" : "#0ea5e9"} />
-              <span style={{ fontSize: 12.5, fontWeight: 650 }}>{mark.label}</span>
-              <span style={{ fontSize: 12, color: active ? "rgba(255,255,255,0.85)" : "var(--muted)" }}>
-                {mark.detail}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <p style={{
-        marginTop: 22, marginBottom: 10,
-        fontSize: 11, fontWeight: 650, letterSpacing: "0.1em",
-        textTransform: "uppercase", color: "var(--subtle)",
-      }}>
-        Field trace · {traced.length}
-      </p>
-      <div style={{ display: "grid", gap: 10 }}>
-        {paginated.length === 0 && (
-          <GlassCard>
-            <p style={{ padding: 28, textAlign: "center", color: "var(--subtle)" }}>Nothing in this mark.</p>
-          </GlassCard>
         )}
-        {paginated.map((issue, idx) => (
-          <GlassCard key={issue.id} delay={idx * 35}>
-            <div style={{
-              padding: "14px 16px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-            }}>
-              <div>
-                <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</p>
-                <p style={{ fontWeight: 600, marginTop: 3 }}>{issue.title}</p>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <IssueStatusBadge status={issue.status} />
-                <IssuePriorityBadge priority={issue.priority} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>
-                  {formatDate(issue.updatedAt)}
-                </span>
-              </div>
-            </div>
-          </GlassCard>
-        ))}
+      </Panel>
+
+      <div className="ac-filterline">
+        <SortBar options={SORTS} value={sortKey} dir={sortDir} onChange={(id, dir) => { setSortKey(id); setSortDir(dir); }} />
+        {filters ? <button type="button" className="ac-btn sm" onClick={reset}><RotateCcw size={12} /> Reset</button> : null}
       </div>
 
-      {totalPages > 1 && (
-        <div style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          gap: 10,
-          marginTop: 16,
-        }}>
-          <button
-            type="button"
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: page === 1 ? "var(--subtle)" : "var(--primary-deep)",
-              cursor: page === 1 ? "default" : "pointer",
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            letterSpacing: "0.08em",
-            color: "var(--subtle)",
-          }}>
-            {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page === totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            style={{
-              border: "none",
-              background: "transparent",
-              color: page === totalPages ? "var(--subtle)" : "var(--primary-deep)",
-              cursor: page === totalPages ? "default" : "pointer",
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            <ChevronRight size={16} />
-          </button>
+      <ResultLine total={list.length} of={mine.length} page={safePage} size={size} noun="issues on your record" />
+      {["closed", "inside", "late"].includes(lens) && earlier > 0 ? (
+        <p className="fc-career">
+          {rec.closed} closed file{rec.closed === 1 ? "" : "s"} on this board · <b>{rec.career} in your career</b>. {earlier} earlier close{earlier === 1 ? "" : "s"} count in the total but have no files here, so they aren't in this list or the timing figures.
+        </p>
+      ) : null}
+
+      {!slice.length ? (
+        <Empty icon={lens === "all" ? EmptyIcon : FileSearch} title={empty[1]} sub={empty[2]} />
+      ) : (
+        <div className="ac-list" ref={listRef} key={`${safePage}-${size}-${lens}`}>
+          {slice.map((issue, i) => {
+            const win = inWindow(issue);
+            const [rl, rv] = readout(sortKey, issue);
+            return (
+              <button
+                key={issue.id}
+                data-glide={issue.id}
+                data-fx
+                type="button"
+                className={`ac-row click r-${issue.status}${slaOf(issue).state === "over" ? " breach" : ""}`}
+                style={{ animationDelay: `${i * 30}ms` }}
+                onClick={() => setFileId(issue.id)}
+              >
+                <FxLayer brackets />
+                <CatGlyph category={issue.category} size={40} />
+                <div className="ac-row-main">
+                  <div className="ac-row-top">
+                    <RankBadge n={(safePage - 1) * size + i + 1} />
+                    <span className="ac-id">{issue.id}</span>
+                    <span className="ac-dot">·</span>
+                    <span><MapPin size={11} style={{ verticalAlign: -1 }} /> {issue.ward}</span>
+                    <span className="ac-row-go">Open file <ArrowUpRight size={11} /></span>
+                  </div>
+                  <h4>{issue.title}</h4>
+                  <div className="ac-row-meta">
+                    <StatusPill status={issue.status} />
+                    <PriorityPill priority={issue.priority} />
+                    <SlaMeter issue={issue} />
+                    {win === true ? <span className="ac-tag green"><Zap size={9} /> Inside window</span> : null}
+                    {win === false ? <span className="ac-tag red"><AlertTriangle size={9} /> Closed late</span> : null}
+                  </div>
+                </div>
+                <div className="ac-row-side">
+                  <SortChip key={sortKey} label={rl} value={rv} tone={win === false && sortKey === "took" ? "over" : win && sortKey === "took" ? "closed" : ""} />
+                  <span className="ac-when"><Calendar size={10} style={{ verticalAlign: -1 }} /> <b>{formatDate(issue.createdAt)}</b> · moved {ago(issue.updatedAt)}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <style>{`
-        @keyframes livePulse {
-          0%, 100% { box-shadow: 0 0 0 3px rgba(16,185,129,0.25); }
-          50% { box-shadow: 0 0 0 6px rgba(16,185,129,0.1); }
-        }
-      `}</style>
-    </main>
+      <Pager page={safePage} pages={pages} total={list.length} size={size} onPage={setPage} onSize={setSize} sizes={[6, 9, 12]} />
+
+      <IssueDetailsDrawer issue={fileIssue} onClose={() => setFileId(null)} />
+    </Field>
   );
 }
 

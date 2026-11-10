@@ -1,73 +1,124 @@
 import { useSyncExternalStore } from "react";
-import { getRole } from "./authStore";
-import { defaultsFor } from "../config/settingsSchema";
+import { getRole, getUser, getAccount, subscribeRole, updateSessionUser } from "./authStore";
+import { api } from "../lib/api";
+import { SERVER_ON } from "../config/server";
+import { registerProfile } from "./profileStore";
+import { defaultsFor, zoneIdOf } from "../config/settingsSchema";
 import { setFeedInterval } from "../services/liveFeed";
-import { deviceName } from "../services/settingsService";
 
-// Settings are stored per role in localStorage. Passwords are NEVER stored here.
-const DAY = 864e5;
-const keyOf = (role) => `sc-settings:${role}`;
-const logKeyOf = (role) => `sc-log:${role}`;
+/* ------------------------------------------------------------------
+   Settings, per person (role + account), kept in this browser.
+   Passwords and tokens are NEVER stored here.
+
+   Account fields (display name, home zone, designation, office, photo)
+   start from what the server sent at sign-in and are saved back to the
+   server by the Settings page; this copy keeps the desk quick.
+
+   Account preferences (ACCOUNT_PREFS: the away limit and the alert
+   preferences) follow the person to every device: with a server
+   sign-in they come from the account (user.prefs) and every change is
+   saved with PATCH /users/me { prefs } (docs/backend/BACKEND-HANDOVER.md · A4).
+   Screen preferences (3D, sky, motion, contrast, refresh, AQI scale,
+   dashboard zone) stay in this browser on purpose.
+------------------------------------------------------------------- */
+const ownerOf = (role) => `${role}:${getUser()?.id || "guest"}`;
+const keyOf = (role) => `sc-settings:${ownerOf(role)}`;
+const LEGACY_NAMES = ["KB Citizen", "KB Staff", "KB Admin"];
+/* keys older builds saved that no longer mean anything (fake security, sessions, ...) */
+const RETIRED = [
+  "twoFactor", "biometric", "loginAlerts", "pinOnLaunch", "sessions", "passwordChangedAt", "emailVerified", "email", "phone",
+  "emergencyName", "emergencyPhone", "employeeId", "rank", "assignedZones", "maxTasks", "shiftStart", "shiftEnd", "channels",
+  "categories", "nearbyRadius", "aqiAlert", "autoLocate", "attachGps", "defaultCategory", "mediaQuality", "locationShare",
+  "publicName", "showHistory", "personalFeed", "shareAvatar", "mapLayers", "dispatchEvents", "dispatchChannels", "slaWarn",
+  "alertSound", "alertVibrate", "shareLocation", "locInterval", "batterySaver", "offlineQueue", "quickStatus", "sessionTimeout",
+  "auditTrail", "cityName", "thAqi", "thTraffic", "thWater", "thPower", "autoApprove", "requirePhoto", "dupRadius", "profanity",
+  "aiCategorize", "slaAck", "staffCanClose", "citizenEdit", "citizenVote", "criticalChannels", "escalateAfter", "dailyDigest",
+  "digestTime", "retention", "maskPii",
+];
+/* saved to the account (user.prefs) when signed in through the server */
+export const ACCOUNT_PREFS = ["idleSignOut", "inboxMuted", "popups", "quietHours", "quietFrom", "quietTo"];
+const onServer = () => SERVER_ON && getUser()?.source === "server";
+
 const cache = {};
 const listeners = new Set();
 let savedAt = 0;
 
 const roleNow = () => getRole() || "citizen";
 
-function freshDefaults(role) {
-  const now = Date.now();
-  return {
-    ...defaultsFor(role),
-    emailVerified: true,
-    passwordChangedAt: now - 30 * DAY,
-    sessions: [
-      { id: "current", device: deviceName(), place: "Kolkata, IN", ts: now, current: true },
-      { id: "s2", device: "Android · Chrome", place: "Kolkata, IN", ts: now - 3 * 3600e3 },
-      { id: "s3", device: "Windows · Edge", place: "Howrah, IN", ts: now - 2 * DAY },
-    ],
-  };
+// a different person signed in, or the server sent a newer copy of the account: read again
+subscribeRole(() => {
+  Object.keys(cache).forEach((k) => delete cache[k]);
+  listeners.forEach((l) => l());
+});
+
+/* Duty status lives on the field roster (Staff Desk reads it). dutyStore
+   connects it here so Settings shows and changes the same value. */
+let dutyBridge = null;
+export function connectDuty(bridge) {
+  dutyBridge = bridge;
+}
+/** Something outside Settings changed a value it shows (duty on the roster): read again. */
+export function refreshSettings() {
+  delete cache[ownerOf(roleNow())];
+  listeners.forEach((l) => l());
+}
+
+/* fill what the account decides: name, zone, roster duty */
+function own(role, s) {
+  const me = getUser();
+  if (!me) return s;
+  const out = { ...s };
+  if (!out.displayName || LEGACY_NAMES.includes(out.displayName)) out.displayName = me.displayName || me.name;
+  if (role === "citizen") {
+    // the account's zone is the truth; a value picked here wins only until the server answers
+    const fromAccount = zoneIdOf(me.ward);
+    if (!out.homeWard || (fromAccount && out.homeWardFrom !== "local")) out.homeWard = fromAccount || out.homeWard;
+  }
+  // an email change is done once the account carries the new address (or after a day)
+  if (out.pendingEmail && (me.email === out.pendingEmail || Date.now() - (out.pendingEmailAt || 0) > 864e5)) {
+    out.pendingEmail = "";
+    out.pendingEmailAt = 0;
+  }
+  if (role === "staff" && !out.defaultZone) out.defaultZone = zoneIdOf(me.ward) || "central";
+  // the account's preferences win over whatever this browser kept
+  const prefs = me.source === "server" ? getAccount()?.prefs : null;
+  if (prefs && typeof prefs === "object") ACCOUNT_PREFS.forEach((k) => { if (prefs[k] !== undefined && prefs[k] !== null) out[k] = prefs[k]; });
+  registerProfile(me.id, { name: me.name, displayName: out.displayName, role });
+  const duty = dutyBridge?.read(me);
+  if (duty) out.dutyStatus = duty;
+  return out;
 }
 
 function load(role) {
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(keyOf(role)) || "null"); } catch { saved = null; }
-  const base = freshDefaults(role);
-  const merged = saved ? { ...base, ...saved } : base;
-  if (!saved) {
-    try { localStorage.setItem(keyOf(role), JSON.stringify(merged)); } catch { /* storage blocked */ }
+  try {
+    saved = JSON.parse(localStorage.getItem(keyOf(role)) || "null");
+  } catch { saved = null; }
+  const base = defaultsFor(role);
+  const merged = { ...base, ...(saved || {}) };
+  RETIRED.forEach((k) => delete merged[k]);
+  const out = own(role, merged);
+  // nobody signed in (the moment between sign-out and the next desk): nothing to save
+  if (getUser()) {
+    try { localStorage.setItem(keyOf(role), JSON.stringify(out)); } catch { /* storage blocked */ }
   }
-  return merged;
+  return out;
 }
 
 export function getSettings() {
   const role = roleNow();
-  if (!cache[role]) cache[role] = load(role);
-  return cache[role];
+  const k = ownerOf(role);
+  if (!cache[k]) cache[k] = load(role);
+  return cache[k];
 }
-export const getSetting = (k) => getSettings()[k];
 
 const subscribe = (cb) => { listeners.add(cb); return () => listeners.delete(cb); };
 export const useSettings = () => useSyncExternalStore(subscribe, getSettings);
 export const useSavedAt = () => useSyncExternalStore(subscribe, () => savedAt);
 
-const short = (key, v) => {
-  if (key === "sessions") return `${v.length} sessions`;
-  if (key === "avatar") return v ? "photo set" : "photo removed"; // never log the image itself
-  if (Array.isArray(v)) return v.join("|");
-  return v && typeof v === "object" ? "[object]" : String(v);
-};
-
-function logChange(role, key, value) {
-  try {
-    const k = logKeyOf(role);
-    const arr = JSON.parse(localStorage.getItem(k) || "[]");
-    arr.push({ ts: Date.now(), key, value: short(key, value) });
-    localStorage.setItem(k, JSON.stringify(arr.slice(-200)));
-  } catch { /* ignore */ }
-}
-
 function persist(role, next) {
-  cache[role] = next;
+  next = own(role, next);
+  cache[ownerOf(role)] = next;
   try { localStorage.setItem(keyOf(role), JSON.stringify(next)); } catch { /* ignore */ }
   savedAt = Date.now();
   listeners.forEach((l) => l());
@@ -79,8 +130,18 @@ export function setMany(patch) {
   const cur = getSettings();
   const changed = Object.keys(patch).filter((k) => JSON.stringify(cur[k]) !== JSON.stringify(patch[k]));
   if (!changed.length) return;
-  changed.forEach((k) => logChange(role, k, patch[k]));
+  if (changed.includes("dutyStatus") && dutyBridge) dutyBridge.write(getUser(), patch.dutyStatus);
   persist(role, { ...cur, ...patch });
+  const prefs = changed.filter((k) => ACCOUNT_PREFS.includes(k));
+  if (prefs.length && onServer()) saveAccountPrefs(Object.fromEntries(prefs.map((k) => [k, patch[k]])));
+}
+
+/* the account keeps them; on refusal the account's values come back */
+function saveAccountPrefs(prefs) {
+  api
+    .patch("/users/me", { prefs })
+    .then(({ data }) => { if (data?.user) updateSessionUser(data.user); })
+    .catch(() => refreshSettings());
 }
 export const setSetting = (key, value) => setMany({ [key]: value });
 
@@ -91,10 +152,11 @@ export function resetKeys(keys) {
   setMany(patch);
 }
 
+/** Back to the defaults on this device. Account fields come back from the account. */
 export function resetAll() {
   const role = roleNow();
-  try { localStorage.removeItem(keyOf(role)); localStorage.removeItem(logKeyOf(role)); } catch { /* ignore */ }
-  delete cache[role];
+  try { localStorage.removeItem(keyOf(role)); } catch { /* ignore */ }
+  delete cache[ownerOf(role)];
   savedAt = Date.now();
   listeners.forEach((l) => l());
   applySettingsEffects();
@@ -110,39 +172,14 @@ export function applySettingsEffects() {
   setFeedInterval((Number(s.feedInterval) || 2.5) * 1000);
 }
 
+/** This person's settings as a file (no passwords, no tokens, no photo data). */
 export function exportSettingsJson() {
-  return JSON.stringify({ exportedAt: new Date().toISOString(), role: roleNow(), settings: getSettings() }, null, 2);
+  const { avatar, homeWardFrom, ...rest } = getSettings();
+  void homeWardFrom;
+  return JSON.stringify({ product: "Smart Kolkata", exportedAt: new Date().toISOString(), role: roleNow(), photo: avatar ? "set" : "none", settings: rest }, null, 2);
 }
 
-export function auditCsv() {
-  let arr = [];
-  try { arr = JSON.parse(localStorage.getItem(logKeyOf(roleNow())) || "[]"); } catch { arr = []; }
-  const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
-  return ["time,setting,new_value", ...arr.map((e) => [new Date(e.ts).toISOString(), e.key, esc(e.value)].join(","))].join("\n");
-}
-
-// ------------------------------------------------------------- derived helpers
-export function securityScore(s) {
-  let n = 35;
-  if (s.twoFactor) n += 25;
-  if (s.emailVerified) n += 10;
-  if (s.passwordChangedAt && Date.now() - s.passwordChangedAt < 90 * DAY) n += 15;
-  if (s.loginAlerts) n += 5;
-  if (s.biometric) n += 5;
-  if ((s.sessions || []).length <= 2) n += 5;
-  return Math.min(100, n);
-}
-export const securityLabel = (n) => (n >= 85 ? "Hardened" : n >= 65 ? "Strong" : n >= 45 ? "Fair" : "At risk");
-
-export function securityTips(s) {
-  const t = [];
-  if (!s.twoFactor) t.push({ text: "Turn on two-step verification", pts: 25, to: "security" });
-  if (!s.passwordChangedAt || Date.now() - s.passwordChangedAt >= 90 * DAY) t.push({ text: "Change your password", pts: 15, to: "password" });
-  if (!s.biometric) t.push({ text: "Enable passkey sign-in", pts: 5, to: "security" });
-  if ((s.sessions || []).length > 2) t.push({ text: "Sign out unused devices", pts: 5, to: "security" });
-  return t;
-}
-
+/* ------------------------------------------------------------- helpers */
 export function initialsOf(name = "") {
   const p = name.trim().split(/\s+/).filter(Boolean);
   return ((p[0]?.[0] || "?") + (p[1]?.[0] || "")).toUpperCase();

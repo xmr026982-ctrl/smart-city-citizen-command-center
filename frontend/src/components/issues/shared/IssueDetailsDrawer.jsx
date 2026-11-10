@@ -1,396 +1,489 @@
-import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { AdminRemoval, StaffFlag } from "./RemovalKit";
+import { markRequestSeen } from "../../../store/issueStore";
+import { createPortal } from "react-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  X, MapPin, Calendar, Tag, User, Clock, LocateFixed, ArrowUpRight
+  X, MapPin, Calendar, Clock, User, Tag, Gauge, LocateFixed, ArrowUpRight,
+  Wrench, Shield, Check, CornerUpLeft, CheckCircle2, Send, MessageSquareText,
+  Radio, Siren, Hourglass, Activity, Lock, BadgeCheck, Camera,
 } from "lucide-react";
 import IssueStatusBadge from "./IssueStatusBadge";
 import IssuePriorityBadge from "./IssuePriorityBadge";
-import IssueSLAIndicator from "./IssueSLAIndicator";
-import IssueStatusTimeline from "./IssueStatusTimeline";
-import IssueComments from "./IssueComments";
-import AdminConfirmClose from "../admin/AdminConfirmClose";
+import CitizenReportDrawer from "../citizen/CitizenReportDrawer";
+import GateDoor from "./GateDoor";
+import { FieldMoves } from "../staff/FieldKit";
 import { CATEGORY_LABEL } from "../../../constants/issueCategories";
 import { PRIORITY_LABEL } from "../../../constants/issuePriorities";
-import { STATUS_LABEL, publicStatus } from "../../../constants/issueStatuses";
-import { formatDateTime } from "../../../utils/formatDate";
+import { ISSUE_STATUSES, STATUS_LABEL } from "../../../constants/issueStatuses";
+import { ROLE_LABEL } from "../../../constants/userRoles";
+import { addFieldNote, notesAccess, lastCloseNote, SEAL_PREFIX } from "../../../services/issueService";
 import { useAuth } from "../../../store/authStore";
+import { formatDateTime } from "../../../utils/formatDate";
+import { slaOf as windowOf, span, hoursSince, resolveHours } from "../../../utils/sla";
+import { useSeenFile } from "../../../store/notifyStore";
+import "../../../styles/issue-drawer.css";
+import { nameFor, useNames } from "../../../store/profileStore";
+import TextHint from "../../ui/TextHint";
+import { isMash } from "../../../utils/textGuard";
+
+/* ------------------------------------------------------------------
+   Issue file drawer for the two working desks.
+   STAFF  (teal)   : Field Console. Work order, SLA clock, site, notes.
+   ADMIN  (violet) : Command Console. Dispatch, confirm gate, comms log.
+   Close-gate moves that carry words (request close, recall, send back)
+   open a gate door above the file (shared/GateDoor.jsx).
+   Notes: command and the assigned crew read and write them; anyone else
+   on the field sees a locked panel (notesAccess in services/issueService).
+   A citizen who reaches this drawer gets the citizen drawer instead.
+   Rendered in a portal with its own .ix scope.
+------------------------------------------------------------------- */
+
+const DESK = {
+  staff: {
+    tone: "staff",
+    crumb: "FIELD DESK",
+    kind: "WORK ORDER",
+    icon: Wrench,
+    notePh: "Add a field note for command",
+  },
+  admin: {
+    tone: "admin",
+    crumb: "CIVIC COMMAND",
+    kind: "ISSUE FILE",
+    icon: Shield,
+    notePh: "Add a command note for the field",
+  },
+};
+
+const COPY = {
+  submitted: "Report received by command",
+  acknowledged: "Reviewed and queued",
+  in_progress: "Crew is working the site",
+  pending_review: "Field asked to close. Waiting on command",
+  resolved: "Verified closed by command",
+};
+
+// Service window: same numbers and wording as every list (utils/sla), plus a sub line for the file.
+function slaOf(issue) {
+  const s = windowOf(issue);
+  if (s.state === "closed") {
+    const took = resolveHours(issue);
+    if (took === null || !s.total) return { ...s, sub: "Closed" };
+    return took <= s.total
+      ? { ...s, sub: `Closed inside the ${span(s.total)} window` }
+      : { ...s, sub: `Closed ${span(took - s.total)} past the ${span(s.total)} window` };
+  }
+  if (s.state === "none") return { ...s, state: "ok", sub: "No service window set" };
+  if (s.state === "over") return { ...s, sub: `${span(s.total)} window breached` };
+  return { ...s, sub: `of a ${span(s.total)} window` };
+}
 
 function IssueDetailsDrawer({ issue, onClose }) {
+  useNames(); // names follow each person's current display name
   const user = useAuth();
-  const isCitizen = user?.role === "citizen";
-  const shownStatus = isCitizen ? publicStatus(issue?.status) : issue?.status;
+  const role = user?.role || "staff";
 
+  if (role === "citizen") return <CitizenReportDrawer issue={issue} onClose={onClose} />;
+  return <DeskDrawer issue={issue} onClose={onClose} user={user} role={role} />;
+}
+
+function DeskDrawer({ issue, onClose, user, role }) {
+  const desk = DESK[role] || DESK.staff;
+  useSeenFile(issue?.id); // opening the file is seeing its updates
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+  const openId = issue ? issue.id : null;
+  const [note, setNote] = useState("");
+  const [gate, setGate] = useState(null); // gate door open over the file: "close" | "recall" | "sendback"
+  const [moved, setMoved] = useState(null); // the last move made from this file, shown in Next move
+
+  const [photo, setPhoto] = useState(null); // citizen photo shown full size
+  const photoRef = useRef(null);
+  useEffect(() => { photoRef.current = photo; });
+
+  useEffect(() => { setNote(""); setGate(null); setMoved(null); setPhoto(null); }, [openId]);
+
+  // command opened the file: a waiting request shows "Seen" to whoever sent it
+  useEffect(() => { if (openId && role === "admin") markRequestSeen(openId); }, [openId, role]);
+
+  // lock page scroll and close on Escape while a file is open
   useEffect(() => {
-    if (issue) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [issue]);
+    if (!openId) return undefined;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (photoRef.current) setPhoto(null); // a full-size photo closes first
+      else closeRef.current();
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [openId]);
 
   if (!issue) return null;
 
+  const Mark = desk.icon;
+  const sla = slaOf(issue);
+  const stepIndex = Math.max(0, ISSUE_STATUSES.indexOf(issue.status));
+  const timeline = issue.timeline || [];
+  const comments = issue.comments || [];
+  const eventOf = (step) => [...timeline].reverse().find((e) => e.status === step);
   const hasCoords = Number.isFinite(issue.lat) && Number.isFinite(issue.lng);
-  const mapTo = hasCoords
-    ? `/map?lat=${issue.lat}&lng=${issue.lng}&issueId=${issue.id}`
-    : "/map";
+  const mapTo = hasCoords ? `/map?lat=${issue.lat}&lng=${issue.lng}&issueId=${issue.id}` : "/map";
+  const pinX = hasCoords ? 28 + (Math.abs(issue.lng * 100) % 44) : 56;
+  const pinY = hasCoords ? 26 + (Math.abs(issue.lat * 100) % 40) : 48;
+  const isMine = role === "staff" && issue.assignedTo === user?.name;
+  const age = span(hoursSince(issue.createdAt));
+  const access = notesAccess(issue, user);
+  const closeNote = role === "admin" && issue.status === "pending_review" ? lastCloseNote(issue) : null;
+  const returnedBanner = isMine && issue.status === "in_progress" && issue.lastReturn ? issue.lastReturn : null;
 
-  const pinX = hasCoords ? 28 + (Math.abs(issue.lng * 100) % 44) : 50;
-  const pinY = hasCoords ? 24 + (Math.abs(issue.lat * 100) % 40) : 46;
+  const post = () => {
+    const res = addFieldNote(issue.id, note, user);
+    if (res.ok) setNote("");
+  };
 
-  return (
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(8, 15, 28, 0.52)",
-          backdropFilter: "blur(14px)",
-          zIndex: 90,
-          animation: "fadeIn 0.22s ease",
-        }}
-      />
+  const gateSent = (id, mode) => setMoved({
+    id,
+    text: { close: "Close requested · waiting on command", recall: "Close request recalled · back in progress", sendback: "Sent back to the field with your reason", confirm: "Close sealed. The citizen now sees Resolved" }[mode],
+  });
 
-      <aside
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "min(540px, 100vw)",
-          height: "100dvh",
-          zIndex: 100,
-          display: "flex",
-          flexDirection: "column",
-          background: "rgba(255, 255, 255, 0.78)",
-          backdropFilter: "blur(28px) saturate(1.7)",
-          borderLeft: "1px solid rgba(14, 165, 233, 0.25)",
-          boxShadow: "-32px 0 90px rgba(14, 165, 233, 0.14)",
-          animation: "slideInCyborg 0.36s cubic-bezier(0.22, 1, 0.36, 1)",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{
-          height: 3,
-          background: "linear-gradient(90deg, transparent, #0ea5e9 15%, #22d3ee 50%, #0ea5e9 85%, transparent)",
-        }} />
+  return createPortal(
+    <div className="ix">
+      <div className="idr-veil" onClick={onClose} />
 
-        <div style={{
-          padding: "15px 22px",
-          borderBottom: "1px solid rgba(14,165,233,0.1)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "rgba(14,165,233,0.04)",
-        }}>
-          <div>
-            <p style={{
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "var(--primary)",
-              marginBottom: 3,
-            }}>
-              Issue Record · Neural File
-            </p>
-            <p style={{ fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 600 }}>
-              {issue.id}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 38, height: 38, borderRadius: 11,
-              border: "1px solid var(--line)", background: "rgba(255,255,255,0.85)",
-              display: "grid", placeItems: "center", cursor: "pointer",
-            }}
-          >
-            <X size={17} />
-          </button>
-        </div>
+      <aside className={`idr ${desk.tone}`} role="dialog" aria-modal="true" aria-label={`Issue ${issue.id}`}>
+        <span className="idr-edge" aria-hidden />
+        <span className="idr-scan" aria-hidden />
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "22px" }}>
-          <h2 style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 21,
-            fontWeight: 700,
-            lineHeight: 1.3,
-            marginBottom: 12,
-          }}>
-            {issue.title}
-          </h2>
-
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-            <IssueStatusBadge status={issue.status} citizen={isCitizen} />
-            {!isCitizen && <IssuePriorityBadge priority={issue.priority} />}
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              fontSize: 12, fontWeight: 500, padding: "4px 11px", borderRadius: 999,
-              background: "rgba(14,165,233,0.1)", color: "var(--primary-deep)",
-              border: "1px solid rgba(14,165,233,0.18)",
-            }}>
-              <Tag size={12} />
-              {CATEGORY_LABEL[issue.category] || issue.category}
-            </span>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 18 }}>
-            {!isCitizen && (
-              <GlassMeta icon={User} label="Assignee" value={issue.assignedTo || "Unassigned"} />
-            )}
-            <GlassMeta icon={MapPin} label="Zone" value={issue.ward} />
-            <GlassMeta icon={Calendar} label="Reported" value={formatDateTime(issue.createdAt)} />
-            <GlassMeta icon={Clock} label="Updated" value={formatDateTime(issue.updatedAt)} />
-          </div>
-
-          <div style={{
-            position: "relative",
-            borderRadius: 18,
-            overflow: "hidden",
-            marginBottom: 18,
-            background: "linear-gradient(145deg, rgba(14,165,233,0.08), rgba(34,211,238,0.04))",
-            border: "1px solid rgba(14,165,233,0.22)",
-            boxShadow: "0 12px 40px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.6)",
-            transform: "perspective(800px) rotateX(2deg)",
-            transformStyle: "preserve-3d",
-          }}>
-            <div style={{
-              position: "relative",
-              height: 160,
-              background: `
-                radial-gradient(circle at 30% 40%, rgba(14,165,233,0.15), transparent 50%),
-                radial-gradient(circle at 70% 60%, rgba(34,211,238,0.1), transparent 45%),
-                linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 100%)
-              `,
-              overflow: "hidden",
-            }}>
-              <div style={{
-                position: "absolute", inset: 0,
-                backgroundImage: `
-                  linear-gradient(rgba(14,165,233,0.08) 1px, transparent 1px),
-                  linear-gradient(90deg, rgba(14,165,233,0.08) 1px, transparent 1px)
-                `,
-                backgroundSize: "28px 28px",
-              }} />
-              <div style={{
-                position: "absolute",
-                left: `${pinX}%`, top: `${pinY}%`,
-                width: 70, height: 70,
-                border: "1.5px solid rgba(14,165,233,0.35)",
-                borderRadius: "50%",
-                transform: "translate(-50%, -50%)",
-                animation: "pulseRing 2.8s ease-out infinite",
-              }} />
-              <div style={{
-                position: "absolute",
-                left: `${pinX}%`, top: `${pinY}%`,
-                width: 110, height: 110,
-                border: "1px solid rgba(14,165,233,0.18)",
-                borderRadius: "50%",
-                transform: "translate(-50%, -50%)",
-                animation: "pulseRing 2.8s ease-out infinite 0.6s",
-              }} />
-              <div style={{
-                position: "absolute",
-                left: `${pinX}%`, top: `${pinY}%`,
-                transform: "translate(-50%, -50%)",
-                width: 32, height: 32,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
-                display: "grid", placeItems: "center",
-                color: "white",
-                boxShadow: "0 4px 16px rgba(14,165,233,0.5)",
-                zIndex: 2,
-              }}>
-                <LocateFixed size={15} />
-              </div>
-              <div style={{
-                position: "absolute", left: 0, right: 0, height: 2,
-                background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.6), transparent)",
-                animation: "scanLine 3.5s linear infinite",
-              }} />
+        {/* ---------- head ---------- */}
+        <header className="idr-head">
+          <div className="idr-id">
+            <span className="idr-mark"><Mark size={17} strokeWidth={1.8} /><i /></span>
+            <div>
+              <p className="idr-crumb">{desk.crumb} <b>/</b> {desk.kind}</p>
+              <p className="idr-code">{issue.id}</p>
             </div>
+          </div>
+          <div className="idr-head-right">
+            <span className={`idr-sla-chip ${sla.state}`}><Hourglass size={12} /> {sla.label}</span>
+            <button type="button" className="idr-x" onClick={onClose} aria-label="Close"><X size={16} /></button>
+          </div>
+        </header>
 
-            <div style={{ padding: "14px 16px 16px" }}>
-              <p style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 2 }}>{issue.location}</p>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
-                {issue.ward}
-                {hasCoords && (
-                  <span style={{ fontFamily: "var(--font-mono)", marginLeft: 8 }}>
-                    {issue.lat.toFixed(5)}, {issue.lng.toFixed(5)}
-                  </span>
-                )}
-              </p>
-              <Link
-                to={mapTo}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  height: 40,
-                  borderRadius: 11,
-                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-                  color: "white",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  boxShadow: "0 8px 20px rgba(14,165,233,0.3)",
-                }}
-              >
-                Open exact site on city map
-                <ArrowUpRight size={15} />
+        <div className="idr-body">
+          {/* ---------- title ---------- */}
+          <section className="idr-hero">
+            <h2>{issue.title}</h2>
+            <div className="idr-chips">
+              <IssueStatusBadge status={issue.status} />
+              <IssuePriorityBadge priority={issue.priority} />
+              <span className="idr-cat"><Tag size={12} /> {CATEGORY_LABEL[issue.category] || issue.category}</span>
+              {isMine ? <span className="idr-mine">On you</span> : null}
+              {issue.danger ? <span className="idr-flag"><Siren size={11} /> Citizen flagged danger</span> : null}
+              {(issue.supporters || []).length ? <span className="idr-affected"><User size={11} /> {1 + issue.supporters.length} citizens affected</span> : null}
+            </div>
+          </section>
+
+          {/* ---------- admin: command gate ---------- */}
+          {role === "admin" && issue.status === "pending_review" ? (
+            <section className="idr-gate">
+              <div className="idr-gate-top">
+                <span className="idr-gate-icon"><Siren size={16} /></span>
+                <div>
+                  <strong>Close request on this file{issue.returned ? <span className="idr-returns">Returned {issue.returned}×</span> : null}</strong>
+                  <p>The field asked to close it. The citizen still sees In Progress until you confirm.</p>
+                </div>
+              </div>
+              {closeNote ? (
+                <blockquote className="idr-quote">
+                  <p>{closeNote.body}</p>
+                  <cite>{nameFor(closeNote.author)} · {formatDateTime(closeNote.createdAt)}</cite>
+                </blockquote>
+              ) : null}
+              <div className="idr-gate-actions">
+                <button type="button" className="idr-ok" onClick={() => setGate("confirm")}><CheckCircle2 size={15} /> Confirm resolved</button>
+                <button type="button" className="idr-back" onClick={() => setGate("sendback")}><CornerUpLeft size={15} /> Send back to field</button>
+              </div>
+            </section>
+          ) : null}
+
+          {/* ---------- field: returned by command ---------- */}
+          {returnedBanner ? (
+            <section className="idr-returned" role="status">
+              <span className="idr-returned-ic"><CornerUpLeft size={15} /></span>
+              <div>
+                <strong>Returned by command{issue.returned > 1 ? ` · ${issue.returned}×` : ""}</strong>
+                <p>{returnedBanner.reason}</p>
+                <cite>{nameFor(returnedBanner.by)} · {formatDateTime(returnedBanner.at)}</cite>
+              </div>
+            </section>
+          ) : null}
+
+          {/* ---------- removal: dismiss / restore / decide (admin), flag (field) ---------- */}
+          {role === "admin" ? <AdminRemoval issue={issue} user={user} /> : null}
+          {role === "staff" ? <StaffFlag issue={issue} user={user} /> : null}
+
+          {/* ---------- SLA + telemetry ---------- */}
+          <section className="idr-panel idr-sla">
+            <div className={`idr-dial ${sla.state}`} style={{ "--p": sla.pct }}>
+              <span>
+                <strong>{sla.state === "closed" ? "✓" : sla.state === "off" ? "—" : sla.state === "over" ? sla.short : `${sla.pct}%`}</strong>
+                <em>{sla.state === "closed" ? "done" : sla.state === "off" ? "stopped" : sla.state === "over" ? "over" : "of window"}</em>
+              </span>
+            </div>
+            <div className="idr-sla-copy">
+              <p className="idr-label"><Gauge size={12} /> Service window</p>
+              <strong className={sla.state}>{sla.label}</strong>
+              <span>{sla.state === "off" ? "Clock stopped · off the board" : sla.sub}</span>
+              <div className="idr-tele">
+                <div><em>Since report</em><b>{age}</b></div>
+                <div><em>Status changes</em><b>{Math.max(0, timeline.length - 1)}</b></div>
+                <div><em>Notes</em><b>{access.read ? comments.length : "—"}</b></div>
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- dispatch tiles ---------- */}
+          <section className="idr-meta">
+            <Meta icon={User} label={role === "admin" ? "Assignee" : "Assigned to"} value={issue.assignedTo || "Unassigned"} warn={!issue.assignedTo} />
+            <Meta icon={Activity} label="Priority" value={PRIORITY_LABEL[issue.priority] || issue.priority} />
+            <Meta icon={MapPin} label="Zone" value={issue.ward} />
+            <Meta icon={Radio} label="Status" value={STATUS_LABEL[issue.status]} />
+            <Meta icon={Calendar} label="Reported" value={formatDateTime(issue.createdAt)} />
+            <Meta icon={Clock} label="Updated" value={formatDateTime(issue.updatedAt)} />
+          </section>
+
+          {/* ---------- next move ---------- */}
+          <NextMove role={role} issue={issue} isMine={isMine} user={user} moved={moved} onMoved={setMoved} onRequestClose={() => setGate("close")} onWithdraw={() => setGate("recall")} />
+
+          {/* ---------- brief ---------- */}
+          {issue.description ? (
+            <section className="idr-panel idr-pad">
+              <p className="idr-label">{role === "admin" ? "Citizen report" : "Field brief"}</p>
+              <p className="idr-desc">{issue.description}</p>
+              {issue.reportedBy ? <p className="idr-by">Filed by {issue.reportedBy}{(issue.supporters || []).length ? ` · ${issue.supporters.length} more citizen${issue.supporters.length === 1 ? "" : "s"} reported the same` : ""}</p> : null}
+            </section>
+          ) : null}
+
+          {/* ---------- citizen photos ---------- */}
+          {(issue.photos || []).length ? (
+            <section className="idr-panel idr-pad">
+              <p className="idr-label"><Camera size={12} /> Evidence from the citizen · {issue.photos.length}</p>
+              <div className="idr-photos">
+                {issue.photos.map((ph, i) => (
+                  <button key={ph.id} type="button" onClick={() => setPhoto(ph)} title="Open full size">
+                    <img src={ph.url} alt={`Citizen photo ${i + 1}`} />
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : issue.photosDropped ? (
+            <p className="idr-empty">The citizen attached {issue.photosDropped} photo{issue.photosDropped === 1 ? "" : "s"}, but the browser had no room to keep them.</p>
+          ) : null}
+
+          {/* ---------- site ---------- */}
+          <section className="idr-panel idr-geo">
+            <div className="idr-geo-stage">
+              <span className="idr-grid" />
+              <span className="idr-cross x" style={{ top: `${pinY}%` }} />
+              <span className="idr-cross y" style={{ left: `${pinX}%` }} />
+              <span className="idr-ring" style={{ left: `${pinX}%`, top: `${pinY}%` }} />
+              <span className="idr-ring late" style={{ left: `${pinX}%`, top: `${pinY}%` }} />
+              <span className="idr-pin" style={{ left: `${pinX}%`, top: `${pinY}%` }}><LocateFixed size={15} /></span>
+              <span className="idr-geo-scan" />
+              <span className="idr-hud tl" /><span className="idr-hud br" />
+              {hasCoords ? <span className="idr-coord">{issue.lat.toFixed(5)} N · {issue.lng.toFixed(5)} E</span> : null}
+            </div>
+            <div className="idr-geo-info">
+              <div>
+                <p className="idr-geo-name">{issue.location}</p>
+                <p className="idr-geo-sub">{issue.ward}</p>
+              </div>
+              <Link to={mapTo} className="idr-btn">
+                {role === "admin" ? "Open on command map" : "Open exact site"} <ArrowUpRight size={15} />
               </Link>
             </div>
-          </div>
+          </section>
 
-          <div style={{ marginBottom: 18 }}>
-            <p style={{
-              fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "var(--subtle)", marginBottom: 6,
-            }}>
-              Description
-            </p>
-            <p style={{ fontSize: 14, lineHeight: 1.65, color: "var(--muted)" }}>
-              {issue.description}
-            </p>
-          </div>
+          {/* ---------- timeline ---------- */}
+          <section className="idr-panel idr-pad">
+            <p className="idr-label">Status trace</p>
+            <ol className="idr-tl">
+              {ISSUE_STATUSES.map((step, i) => {
+                const ev = eventOf(step);
+                const state = i < stepIndex ? "done" : i === stepIndex ? "now" : "next";
+                const ticked = state === "done" || (state === "now" && step === "resolved");
+                return (
+                  <li key={step} className={`idr-tl-row ${state}${step === "pending_review" ? " gate" : ""}`}>
+                    <span className="idr-tl-rail">
+                      <span className="idr-tl-dot">{ticked ? <Check size={10} strokeWidth={3} /> : null}</span>
+                      {i < ISSUE_STATUSES.length - 1 ? <span className="idr-tl-line" /> : null}
+                    </span>
+                    <div className="idr-tl-copy">
+                      <div className="idr-tl-head">
+                        <strong>{STATUS_LABEL[step]}</strong>
+                        {state === "now" && step !== "resolved" ? <em>Live</em> : null}
+                      </div>
+                      <p>{state !== "next" && ev?.note ? ev.note : COPY[step]}</p>
+                      {ev && state !== "next" ? (
+                        <time>{formatDateTime(ev.at)}{ev.by ? <span> · {nameFor(ev.by)}</span> : null}</time>
+                      ) : ev ? (
+                        // reached once, then the file moved back (sent back, reassigned, owner left)
+                        <time className="wait">Earlier · {formatDateTime(ev.at)}{ev.by ? ` · ${nameFor(ev.by)}` : ""}</time>
+                      ) : (
+                        <time className="wait">Not reached</time>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
 
-          {!isCitizen && (
-            <div style={{
-              background: "rgba(255,255,255,0.55)",
-              border: "1px solid rgba(14,165,233,0.15)",
-              borderRadius: 12,
-              padding: "11px 16px",
-              marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              backdropFilter: "blur(8px)",
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>Service Window (SLA)</span>
-              <IssueSLAIndicator issue={issue} />
-            </div>
-          )}
-
-          <AdminConfirmClose issue={issue} />
-
-          {!isCitizen && (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-              marginBottom: 22,
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Status</span>
-                <div style={{
-                  height: 42, display: "flex", alignItems: "center",
-                  padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)",
-                  background: "rgba(255,255,255,0.7)", fontSize: 13.5, fontWeight: 600,
-                }}>
-                  {STATUS_LABEL[issue.status]}
-                </div>
+          {/* ---------- comms log ---------- */}
+          <section className="idr-panel idr-pad">
+            <p className="idr-label"><MessageSquareText size={12} /> {role === "admin" ? "Comms log" : "Field notes"}</p>
+            {!access.read ? (
+              <div className="idr-locked">
+                <span><Lock size={15} /></span>
+                <p>
+                  <strong>Notes are between {issue.assignedTo ? issue.assignedTo.split(" ")[0] : "the assigned crew"} and command</strong>
+                  Internal notes on a file are open only to the crew it is assigned to and to command.
+                </p>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--subtle)" }}>Priority</span>
-                <div style={{
-                  height: 42, display: "flex", alignItems: "center",
-                  padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)",
-                  background: "rgba(255,255,255,0.7)", fontSize: 13.5, fontWeight: 600,
-                }}>
-                  {PRIORITY_LABEL[issue.priority]}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isCitizen && (
-            <div style={{
-              borderRadius: 14,
-              padding: 14,
-              marginBottom: 22,
-              background: "rgba(255,255,255,0.55)",
-              border: "1px solid rgba(14,165,233,0.14)",
-            }}>
-              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--subtle)" }}>
-                Official update
-              </p>
-              <p style={{ marginTop: 8, fontSize: 14 }}>
-                Current status: <strong>{STATUS_LABEL[shownStatus]}</strong>
-              </p>
-              <p style={{ marginTop: 6, fontSize: 12.5, color: "var(--muted)" }}>
-                City operations is handling this report.
-              </p>
-            </div>
-          )}
-
-          <div style={{ marginBottom: 22 }}>
-            <p style={{
-              fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em",
-              textTransform: "uppercase", color: "var(--subtle)", marginBottom: 12,
-            }}>
-              Status Timeline
-            </p>
-            <IssueStatusTimeline
-              current={issue.status}
-              events={issue.timeline}
-              citizen={isCitizen}
-            />
-          </div>
-
-          <IssueComments issue={issue} />
+            ) : (
+              <>
+                {comments.length === 0 ? (
+                  <p className="idr-empty">No notes on this file yet.</p>
+                ) : (
+                  <ul className="idr-notes">
+                    {comments.map((c) => {
+                      // command's closing note: the official last entry, shown as the seal
+                      const seal = c.role === "admin" && c.body.startsWith(SEAL_PREFIX);
+                      return (
+                        <li key={c.id} className={seal ? "seal" : c.role === role ? "self" : ""}>
+                          <div className="idr-note-head">
+                            <strong>{nameFor(c.author)}</strong>
+                            <span className={`idr-role ${c.role}`}>{ROLE_LABEL[c.role] || c.role}</span>
+                            {seal ? <span className="idr-role sealed"><BadgeCheck size={10} /> Closed by command</span> : c.internal ? <span className="idr-role internal">Internal</span> : null}
+                            <time>{formatDateTime(c.createdAt)}</time>
+                          </div>
+                          <p>{seal ? c.body.slice(SEAL_PREFIX.length) : c.body}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {access.write ? (
+                  <div className="idr-compose">
+                    <textarea
+                      rows={3}
+                      value={note}
+                      placeholder={desk.notePh}
+                      onChange={(e) => setNote(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) post(); }}
+                    />
+                    <TextHint text={note} />
+                    <div className="idr-compose-bar">
+                      <span>Internal. The citizen never sees this. Ctrl + Enter to send.</span>
+                      <button type="button" className="idr-btn" disabled={!note.trim() || isMash(note)} onClick={post}>
+                        <Send size={14} /> Post note
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="idr-closed-note"><Lock size={12} /> Closed by command. Notes are locked for everyone.</p>
+                )}
+              </>
+            )}
+          </section>
         </div>
       </aside>
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideInCyborg {
-          from { transform: translateX(110%); opacity: 0.4; }
-          to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes pulseRing {
-          0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.8; }
-          100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-        }
-        @keyframes scanLine {
-          0% { top: 0; }
-          100% { top: 100%; }
-        }
-      `}</style>
-    </>
+      {gate ? <GateDoor mode={gate} issue={issue} onClose={() => setGate(null)} onSent={gateSent} /> : null}
+      {photo ? (
+        <div className="idr-zoom" onClick={() => setPhoto(null)} role="dialog" aria-label="Citizen photo">
+          <img src={photo.url} alt="Citizen photo, full size" />
+          <button type="button" aria-label="Close photo"><X size={18} /></button>
+        </div>
+      ) : null}
+    </div>,
+    document.body
   );
 }
 
-function GlassMeta({ icon: Icon, label, value }) {
+/* Admin dispatch moves don't just link to Assign Issues: they carry the issue
+   there as a target. Assign Issues picks the lens and page that hold it,
+   locks onto the row and offers "Reassign now" + a way back to where you were.
+   Already on Assign Issues? The dispatch console opens straight away.
+   Field (staff): the move happens right here (Start work, Request close,
+   Recall), and "Assigned Work" carries the issue there as a locked
+   target, the same way. */
+function NextMove({ role, issue, isMine, user, moved, onMoved, onRequestClose, onWithdraw }) {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  let text = "";
+  let cta = "";
+  let target = false;
+
+  if (role === "admin") {
+    if (issue.status === "resolved") text = "Closed and confirmed. Nothing waits on command.";
+    else if (issue.status === "pending_review") text = "Use the gate above to confirm or send this back.";
+    else if (!issue.assignedTo) { text = "No one is on this file. Dispatch a field operative."; cta = "Open dispatch"; target = true; }
+    else { text = `${nameFor(issue.assignedTo)} is on this file. Watch the service window.`; cta = "Reassign"; target = true; }
+  } else {
+    if (issue.status === "resolved") text = isMine ? "Command confirmed your close. The file is done." : "Closed and confirmed by command.";
+    else if (!isMine) text = issue.assignedTo ? `This file is on ${nameFor(issue.assignedTo)}. Read only.` : "No owner yet. Command dispatches it. Read only.";
+    else if (issue.status === "pending_review") text = "Your close request is with command. Recall it, with a reason, if the work is not finished.";
+    else if (issue.status === "in_progress") text = "Crew on site. When the work is done, ask command to close.";
+    else text = "On you, not started. Start work when the crew reaches the site.";
+  }
+  if (moved?.id === issue.id && moved.tone !== "warn") text = `${moved.text}.`;
+  const lockable = role === "staff" && isMine && issue.status !== "resolved" && pathname !== "/staff/assigned";
+
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.55)",
-      border: "1px solid rgba(14,165,233,0.14)",
-      borderRadius: 12,
-      padding: "11px 13px",
-      display: "flex",
-      gap: 10,
-      alignItems: "flex-start",
-      backdropFilter: "blur(8px)",
-    }}>
-      <div style={{
-        width: 30, height: 30, borderRadius: 8,
-        background: "rgba(14,165,233,0.12)",
-        display: "grid", placeItems: "center", flexShrink: 0,
-      }}>
-        <Icon size={13} color="var(--primary)" />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <p style={{ fontSize: 10.5, color: "var(--subtle)", marginBottom: 2 }}>{label}</p>
-        <p style={{
-          fontSize: 13, fontWeight: 500,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
-          {value}
-        </p>
+    <section className={`idr-next${role === "staff" ? " fld" : ""}`}>
+      <span className="idr-next-dot" />
+      <p><b>Next move</b>{moved?.tone === "warn" && moved.id === issue.id ? moved.text : text}</p>
+      {target ? (
+        <button
+          type="button"
+          className="idr-next-link"
+          style={{ fontFamily: "inherit", cursor: "pointer" }}
+          onClick={() => navigate("/admin/assignments", { state: { target: issue.id, from: pathname, open: pathname === "/admin/assignments" } })}
+        >
+          {cta} <ArrowUpRight size={14} />
+        </button>
+      ) : null}
+      {role === "staff" ? (
+        <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <FieldMoves issue={issue} user={user} onRequestClose={onRequestClose} onWithdraw={onWithdraw} onMoved={onMoved} compact />
+          {lockable ? (
+            <button
+              type="button"
+              className="idr-next-link"
+              style={{ fontFamily: "inherit", cursor: "pointer" }}
+              onClick={() => navigate("/staff/assigned", { state: { target: issue.id, from: pathname } })}
+            >
+              Assigned Work <ArrowUpRight size={14} />
+            </button>
+          ) : null}
+        </span>
+      ) : null}
+    </section>
+  );
+}
+
+function Meta({ icon: Icon, label, value, warn = false }) {
+  return (
+    <div className={`idr-meta-cell${warn ? " warn" : ""}`}>
+      <span><Icon size={14} /></span>
+      <div>
+        <p>{label}</p>
+        <strong title={value}>{value || "—"}</strong>
       </div>
     </div>
   );

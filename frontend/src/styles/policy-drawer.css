@@ -1,0 +1,28 @@
+/* Service windows event file (Audit Log), inside the gate-door frame (violet) */
+@keyframes pdIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+.ix .pd-list { display: grid; gap: 8px; }
+.ix .pd-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  background: rgba(255, 255, 255, .92); border: 1px solid rgb(var(--g-rgb) / .2); border-left: 3px solid var(--g);
+  animation: pdIn .35s var(--ac-ease) both;
+}
+.ix .pd-row.longer { border-left-color: #10b981; }
+.ix .pd-row.shorter { border-left-color: #f59e0b; }
+.ix .pd-row.removed { border-left-color: #94a3b8; }
+.ix .pd-name { display: grid; gap: 3px; min-width: 0; }
+.ix .pd-name b { font-size: 14px; }
+.ix .pd-name em { font: 700 9px var(--ac-mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--ac-faint); }
+.ix .pd-row.longer .pd-name em { color: #047857; }
+.ix .pd-row.shorter .pd-name em { color: #b45309; }
+.ix .pd-vals { display: flex; align-items: center; gap: 8px; flex-shrink: 0; color: var(--ac-faint); }
+.ix .pd-vals span { min-width: 42px; text-align: center; padding: 5px 9px; border-radius: 9px; font: 700 13px var(--ac-mono); }
+.ix .pd-vals .from { color: var(--ac-muted); background: #f1f5f9; text-decoration: line-through; text-decoration-color: rgba(100, 116, 139, .5); }
+.ix .pd-vals .to { color: #fff; background: linear-gradient(135deg, var(--g), var(--g2)); box-shadow: 0 6px 14px rgb(var(--g-rgb) / .3); }
+.ix .pd-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ix .pd-facts div { display: grid; gap: 3px; padding: 11px 12px; border-radius: 13px; background: rgba(255, 255, 255, .9); border: 1px solid rgb(var(--g-rgb) / .18); }
+.ix .pd-facts em { display: inline-flex; align-items: center; gap: 5px; font: 700 9px var(--ac-mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase; color: var(--g-deep); }
+.ix .pd-facts b { font-size: 13px; }
+.ix .pd-facts small { font-size: 11.5px; color: var(--ac-muted); }
+.ix .pd .gd-foot .gd-btn.go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .ix .pd-row { animation: none; } }
+.ac-id.windows { display: inline-flex; align-items: center; gap: 4px; }

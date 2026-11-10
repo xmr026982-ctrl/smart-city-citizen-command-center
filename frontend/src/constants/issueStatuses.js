@@ -14,8 +14,6 @@ export const STATUS_LABEL = {
   resolved: "Resolved",
 };
 
-export const STAFF_STATUSES = ["in_progress", "pending_review"];
-
 export function publicStatus(status) {
   return status === "pending_review" ? "in_progress" : status;
 }

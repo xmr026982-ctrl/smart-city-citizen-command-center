@@ -1,137 +1,173 @@
-import { useMemo, useState } from "react";
-import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
-import { Bookmark, ChevronLeft, ChevronRight, LocateFixed, MapPin, X } from "lucide-react";
-import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
-import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
-import IssueStatusTimeline from "../../components/issues/shared/IssueStatusTimeline";
-import PageHeader from "../../components/layout/PageHeader";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FileText, Activity, Siren, CheckCircle2, Plus, RotateCcw, FileSearch, Sparkles, Ban } from "lucide-react";
+import CitizenReportDrawer from "../../components/issues/citizen/CitizenReportDrawer";
+import { readFileParam } from "../../utils/fileLink";
+import { useLockOpen } from "../../hooks/useLockOpen";
+import {
+  LensDeck, SearchBox, Select, ResultLine, Pager, Empty, SortBar, useGlide, useHoverFx, ago,
+} from "../../components/issues/admin/CommandKit";
+import { Citizen, CitizenHead, ReportRow, useCitizenDesk } from "../../components/issues/citizen/CitizenKit";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
-import { publicStatus } from "../../constants/issueStatuses";
-import { useAuth } from "../../store/authStore";
-import { toggleSaved, useIssues } from "../../store/issueStore";
-import { formatDate, formatDateTime } from "../../utils/formatDate";
+import { slaOf, urgencyCompare, span } from "../../utils/sla";
 
-const PER_PAGE = 6;
+/* ------------------------------------------------------------------
+   My Reports: every report this citizen filed, with where it is in its
+   journey and whether the city is keeping its promise. The tile deck
+   locks one lens at a time: everything (home), still open, past the
+   promise, resolved. Search, category and four sorts (click again to
+   flip). A row opens the report drawer. Arriving with { open: id }
+   (Report Issue's "Track this report") opens that report straight away.
+------------------------------------------------------------------- */
+
+const SORTS = [
+  { id: "createdAt", label: "Newest", dir: "desc", desc: "Newest first", asc: "Oldest first" },
+  { id: "updatedAt", label: "Updated", dir: "desc", desc: "Recently moved first", asc: "Longest without news first" },
+  { id: "promise", label: "Promise", dir: "desc", desc: "Closest to the promise first", asc: "Most time left first" },
+  { id: "title", label: "Title", dir: "asc", desc: "Title Z–A", asc: "Title A–Z" },
+];
+const SORT_DIR = Object.fromEntries(SORTS.map((o) => [o.id, o.dir]));
+
+function readout(key, issue) {
+  const s = slaOf(issue);
+  if (key === "promise") return ["Promise", s.state === "closed" ? "Done" : s.state === "over" ? `${span(-s.left)} late` : `${span(s.left)} left`, s.state];
+  if (key === "updatedAt") return ["Moved", ago(issue.updatedAt)];
+  if (key === "title") return ["Title", (issue.title || "?").charAt(0).toUpperCase()];
+  return ["Filed", ago(issue.createdAt)];
+}
 
 function MyReports() {
-  const user = useAuth();
-  const issues = useIssues();
+  const { user, mine, offBoard, everything, tick } = useCitizenDesk();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [lens, setLens] = useState("all"); // all | open | late | resolved
+  const [sortKey, setSortKey] = useState("createdAt");
+  const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState(null);
-  const mine = issues.filter((issue) => issue.reporterId === user?.id || issue.reportedBy === user?.name);
-  const totalPages = Math.ceil(mine.length / PER_PAGE) || 1;
-  const safePage = Math.min(page, totalPages);
-  const rows = useMemo(() => mine.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE), [mine, safePage]);
-  const selected = mine.find((issue) => issue.id === selectedId) || null;
+  const [size, setSize] = useState(6);
+  const [openId, setOpenId] = useState(null);
+
+  // arrival with ?file= or { open }: clear the filters, lock onto the report, open it (hooks/useLockOpen).
+  // The state is wiped so Back / reload doesn't reopen it.
+  const [arrival, setArrival] = useState(null);
+  useEffect(() => {
+    const id = readFileParam(location.search)?.id || location.state?.open;
+    if (!id) return;
+    setQuery(""); setCategory("all"); setLens("all"); setSortKey("createdAt"); setSortDir("desc");
+    setArrival({ id, at: Date.now() });
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
+  const stats = useMemo(() => {
+    const open = mine.filter((i) => i.status !== "resolved");
+    return {
+      all: mine.length,
+      open: open.length,
+      late: open.filter((i) => slaOf(i).state === "over").length,
+      resolved: mine.length - open.length,
+      removed: offBoard.length,
+      affected: mine.reduce((s, i) => s + (i.supporters || []).length, 0),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, offBoard, tick]);
+
+  const list = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const pool = lens === "removed" ? offBoard : lens === "all" ? [...mine, ...offBoard] : mine;
+    const out = pool.filter((i) => {
+      const open = i.status !== "resolved";
+      if (lens === "open" && !open) return false;
+      if (lens === "late" && (!open || slaOf(i).state !== "over")) return false;
+      if (lens === "resolved" && open) return false;
+      if (category !== "all" && i.category !== category) return false;
+      if (!needle) return true;
+      return `${i.id} ${i.title} ${i.location} ${i.ward} ${CATEGORY_LABEL[i.category] || ""}`.toLowerCase().includes(needle);
+    });
+    const flip = sortDir === SORT_DIR[sortKey] ? 1 : -1;
+    out.sort((a, b) => {
+      let d;
+      if (sortKey === "promise") d = urgencyCompare(a, b);
+      else if (sortKey === "title") d = a.title.localeCompare(b.title);
+      else d = new Date(b[sortKey]) - new Date(a[sortKey]);
+      return d * flip || a.id.localeCompare(b.id);
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, offBoard, query, category, lens, sortKey, sortDir, tick]);
+
+  useEffect(() => { setPage(1); }, [query, category, lens, sortKey, sortDir, size]);
+  const lockOpen = useLockOpen({ list, size, setPage, open: setOpenId });
+  useEffect(() => { if (arrival) lockOpen.arm(arrival.id); }, [arrival]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pages = Math.max(1, Math.ceil(list.length / size));
+  const safePage = Math.min(page, pages);
+  const slice = list.slice((safePage - 1) * size, safePage * size);
+  const listRef = useRef(null);
+  useGlide(listRef, `${sortKey}-${sortDir}`);
+  useHoverFx(listRef);
+
+  const open = everything.find((i) => i.id === openId) || null;
+  const filters = query || category !== "all" || lens !== "all" || sortKey !== "createdAt" || sortDir !== "desc";
+  const reset = () => { setQuery(""); setCategory("all"); setLens("all"); setSortKey("createdAt"); setSortDir("desc"); };
+
+  const EMPTY = {
+    all: [Sparkles, "You haven't reported anything yet", "When you spot a problem in the city, report it and follow it here."],
+    open: [CheckCircle2, "Nothing open", "Every report you filed has been resolved."],
+    late: [CheckCircle2, "Nothing is late", "The city is inside its promise on every open report of yours."],
+    resolved: [Activity, "Nothing resolved yet", "Reports show here once the city confirms the fix."],
+    removed: [CheckCircle2, "Nothing withdrawn or dismissed", "Reports you withdraw, or the city dismisses, are kept here."],
+  };
+  const empty = query || category !== "all" ? [FileSearch, "No report matches", "Change the search or category, or release the lens."] : EMPTY[lens] || EMPTY.all;
+  const EmptyIcon = empty[0];
 
   return (
-    <main className="page-wrap">
-      <PageHeader eyebrow="Citizen Layer · Reports" title="My Reports" description="Your filed issues. Status follows the city update." />
-      <div style={{ display: "grid", gap: 12, marginTop: 20 }}>
-        {rows.length === 0 && <article style={card}><p style={{ color: "var(--subtle)" }}>No reports filed yet.</p></article>}
-        {rows.map((issue) => (
-          <article key={issue.id} onClick={() => setSelectedId(issue.id)} style={card} onMouseEnter={lift} onMouseLeave={drop}>
-            <span style={hair} />
-            <div>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id} · {issue.ward}</p>
-              <h3 style={{ margin: "6px 0", fontFamily: "var(--font-display)" }}>{issue.title}</h3>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <IssueStatusBadge status={publicStatus(issue.status)} />
-                <IssuePriorityBadge priority={issue.priority} />
-                <span style={{ fontSize: 12.5, color: "var(--primary-deep)" }}>{CATEGORY_LABEL[issue.category]}</span>
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ fontSize: 10.5, letterSpacing: "0.08em", color: "var(--subtle)" }}>REPORTED</p>
-              <p style={{ fontFamily: "var(--font-mono)", fontWeight: 650 }}>{formatDate(issue.createdAt)}</p>
-            </div>
-          </article>
-        ))}
+    <Citizen>
+      <CitizenHead crumb="MY REPORTS" title="My Reports" sub="Everything you reported, where it is now, and whether the city is keeping its promise.">
+        <Link to="/citizen/report" className="ac-btn primary"><Plus size={14} /> Report an issue</Link>
+      </CitizenHead>
+
+      <LensDeck
+        value={lens}
+        onChange={setLens}
+        readout={`${list.length} of ${mine.length + offBoard.length} reports`}
+        tiles={[
+          { id: "all", icon: FileText, label: "Your reports", lens: "Everything", value: stats.all, sub: stats.affected ? `${stats.affected} other citizen${stats.affected === 1 ? "" : "s"} joined them` : "Filed by you", meter: 100 },
+          { id: "open", icon: Activity, label: "Still open", value: stats.open, sub: "Received, queued or being fixed", meter: stats.all ? (stats.open / stats.all) * 100 : 0, tone: "amber" },
+          { id: "late", icon: Siren, label: "Past the promise", value: stats.late, sub: stats.late ? "The city is late on these" : "The city is on time", meter: stats.open ? (stats.late / stats.open) * 100 : 0, tone: stats.late ? "red" : "green" },
+          { id: "resolved", icon: CheckCircle2, label: "Resolved", value: stats.resolved, sub: "Fixed and verified by the city", meter: stats.all ? (stats.resolved / stats.all) * 100 : 0, tone: "green" },
+          { id: "removed", icon: Ban, label: "Off the board", lens: "Off the board", value: stats.removed, sub: stats.removed ? "Kept with their reasons" : "None", meter: stats.all + stats.removed ? (stats.removed / (stats.all + stats.removed)) * 100 : 0, tone: "cyan" },
+        ]}
+      />
+
+      <div className="ac-toolbar">
+        <div className="grow"><SearchBox value={query} onChange={setQuery} placeholder="Search ID, title, place or zone" /></div>
+        <Select label="Category" value={category} onChange={setCategory} options={[{ id: "all", label: "All" }, ...Object.entries(CATEGORY_LABEL).map(([id, label]) => ({ id, label }))]} />
       </div>
-      {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginTop: 16 }}>
-          <button type="button" disabled={safePage === 1} onClick={() => setPage((p) => Math.max(1, p - 1))} style={pageBtn}><ChevronLeft size={16} /></button>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--subtle)" }}>{safePage} / {totalPages}</span>
-          <button type="button" disabled={safePage === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} style={pageBtn}><ChevronRight size={16} /></button>
+
+      <div className="ac-filterline">
+        <SortBar options={SORTS} value={sortKey} dir={sortDir} onChange={(id, dir) => { setSortKey(id); setSortDir(dir); }} />
+        {filters ? <button type="button" className="ac-btn sm" onClick={reset}><RotateCcw size={12} /> Reset</button> : null}
+      </div>
+
+      <ResultLine total={list.length} of={mine.length + offBoard.length} page={safePage} size={size} noun="reports" />
+
+      {!slice.length ? (
+        <Empty icon={EmptyIcon} title={empty[1]} sub={empty[2]} />
+      ) : (
+        <div className={`ac-list${lockOpen.lockedId ? " targeting" : ""}`} ref={listRef} key={`${safePage}-${size}-${lens}`}>
+          {slice.map((issue, i) => (
+            <ReportRow key={issue.id} issue={issue} index={i} rank={(safePage - 1) * size + i + 1} readout={readout(sortKey, issue)} onOpen={setOpenId} saved={(issue.savedBy || []).includes(user?.id)} locked={lockOpen.lockedId === issue.id} />
+          ))}
         </div>
       )}
-      <CitizenReportDrawer issue={selected} onClose={() => setSelectedId(null)} />
-    </main>
+
+      <Pager page={safePage} pages={pages} total={list.length} size={size} onPage={setPage} onSize={setSize} sizes={[6, 9, 12]} />
+
+      <CitizenReportDrawer issue={open} onClose={() => { setOpenId(null); lockOpen.closed(); }} />
+    </Citizen>
   );
 }
-
-function CitizenReportDrawer({ issue, onClose, closeOnUnsave = false }) {
-  if (!issue) return null;
-  const status = publicStatus(issue.status);
-  const hasCoords = Number.isFinite(issue.lat) && Number.isFinite(issue.lng);
-  const mapTo = hasCoords ? `/map?lat=${issue.lat}&lng=${issue.lng}&zone=${encodeURIComponent(issue.ward)}` : "/map";
-
-  const onSave = () => {
-    toggleSaved(issue.id);
-    if (closeOnUnsave && issue.saved) onClose();
-  };
-
-  return createPortal(
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,15,28,0.52)", backdropFilter: "blur(14px)", zIndex: 90 }} />
-      <aside style={door}>
-        <div style={{ height: 3, background: "linear-gradient(90deg, transparent, #0ea5e9 15%, #22d3ee 50%, #0ea5e9 85%, transparent)" }} />
-        <div style={{ padding: "15px 22px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, borderBottom: "1px solid rgba(14,165,233,0.1)" }}>
-          <div>
-            <p style={{ fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--primary)" }}>Your report</p>
-            <p style={{ fontFamily: "var(--font-mono)", fontWeight: 650 }}>{issue.id}</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button type="button" onClick={onSave} style={saveChip}>
-              <Bookmark size={14} fill={issue.saved ? "currentColor" : "none"} />
-              {issue.saved ? "Unsave" : "Save"}
-            </button>
-            <button type="button" onClick={onClose} aria-label="Close" style={pageBtn}><X size={16} /></button>
-          </div>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: 22 }}>
-          <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24 }}>{issue.title}</h2>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12, alignItems: "center" }}>
-            <IssueStatusBadge status={status} />
-            <IssuePriorityBadge priority={issue.priority} />
-            <span style={{ color: "var(--primary-deep)", fontSize: 13 }}>{CATEGORY_LABEL[issue.category]}</span>
-          </div>
-          <p style={{ marginTop: 14, lineHeight: 1.65 }}>{issue.description}</p>
-          <p style={{ marginTop: 8, color: "var(--muted)", display: "flex", gap: 6 }}><MapPin size={14} /> {issue.location} · {issue.ward}</p>
-          <p style={{ marginTop: 8, fontSize: 12.5, color: "var(--subtle)" }}>Reported {formatDateTime(issue.createdAt)} · Updated {formatDateTime(issue.updatedAt)}</p>
-          <div style={{ marginTop: 16, borderRadius: 18, overflow: "hidden", border: "1px solid rgba(14,165,233,0.16)", background: "rgba(255,255,255,0.62)" }}>
-            <div style={{ position: "relative", height: 160, background: "linear-gradient(180deg, #e0f2fe, #f0f9ff)", overflow: "hidden" }}>
-              <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(14,165,233,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(14,165,233,0.08) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-              <div style={{ position: "absolute", left: "58%", top: "46%", width: 32, height: 32, borderRadius: "50%", transform: "translate(-50%, -50%)", background: "linear-gradient(135deg, #0ea5e9, #22d3ee)", display: "grid", placeItems: "center", color: "white" }}><LocateFixed size={15} /></div>
-              <div style={{ position: "absolute", left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, rgba(34,211,238,0.6), transparent)", animation: "scanLine 3.5s linear infinite" }} />
-            </div>
-            <div style={{ padding: 14 }}>
-              <p style={{ fontWeight: 650 }}>{issue.location}</p>
-              <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 12px" }}>{issue.ward}{hasCoords ? ` · ${issue.lat.toFixed(5)}, ${issue.lng.toFixed(5)}` : ""}</p>
-              <Link to={mapTo} style={mapBtn}>Open this point on the map</Link>
-            </div>
-          </div>
-          <p style={{ margin: "20px 0 8px", fontSize: 10.5, fontWeight: 650, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--subtle)" }}>Status timeline</p>
-          <IssueStatusTimeline citizen current={issue.status} events={issue.timeline || []} />
-        </div>
-      </aside>
-      <style>{`
-        @keyframes slideInCyborg { from { transform: translateX(110%); opacity: 0.4; } to { transform: none; opacity: 1; } }
-        @keyframes scanLine { 0% { top: 0; } 100% { top: 100%; } }
-      `}</style>
-    </>,
-    document.body
-  );
-}
-
-const door = { position: "fixed", top: 0, right: 0, width: "min(540px, 100vw)", height: "100dvh", zIndex: 100, display: "flex", flexDirection: "column", background: "rgba(255,255,255,0.78)", backdropFilter: "blur(28px) saturate(1.7)", borderLeft: "1px solid rgba(14,165,233,0.25)", boxShadow: "-32px 0 90px rgba(14,165,233,0.14)", animation: "slideInCyborg 0.36s cubic-bezier(0.22, 1, 0.36, 1)" };
-const card = { position: "relative", overflow: "hidden", display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center", padding: "16px 18px", borderRadius: 18, cursor: "pointer", background: "rgba(255,255,255,0.74)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 8px 28px rgba(14,165,233,0.07)", transition: "transform 220ms, box-shadow 220ms" };
-const hair = { position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)" };
-const pageBtn = { width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)", background: "white", display: "grid", placeItems: "center", cursor: "pointer" };
-const saveChip = { height: 36, padding: "0 12px", borderRadius: 999, border: "1px solid rgba(14,165,233,0.25)", background: "rgba(14,165,233,0.08)", color: "var(--primary-deep)", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 650, cursor: "pointer" };
-const mapBtn = { display: "flex", alignItems: "center", justifyContent: "center", height: 40, borderRadius: 11, background: "linear-gradient(135deg, #0ea5e9, #0284c7)", color: "white", textDecoration: "none", fontWeight: 650 };
-function lift(e) { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 18px 40px rgba(14,165,233,0.16)"; }
-function drop(e) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07)"; }
 
 export default MyReports;

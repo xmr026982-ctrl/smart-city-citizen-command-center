@@ -1,3 +1,4 @@
+import { timeSlots } from "../../utils/time";
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { Eye, EyeOff, RotateCcw } from "lucide-react";
 
@@ -75,9 +76,9 @@ export function Slider({ value, min, max, step = 1, unit = "", onChange, label }
   );
 }
 
-export function Select({ value, options, onChange, label }) {
+export function Select({ value, options, onChange, label, disabled = false }) {
   return (
-    <select className="st-select" value={value} aria-label={label} onChange={(e) => onChange(e.target.value)}>
+    <select className="st-select" value={value} aria-label={label} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
       {options.map((o) => (<option key={o.v} value={o.v}>{o.l}</option>))}
     </select>
   );
@@ -96,12 +97,19 @@ export function Chips({ value, options, onChange, label }) {
   );
 }
 
+// 24-hour picker (IST). The browser's own time box follows its locale and can show AM/PM.
+const SLOTS = timeSlots(30);
 export function TimeInput({ value, onChange, label }) {
-  return <input type="time" className="st-select st-time" value={value} aria-label={label} onChange={(e) => onChange(e.target.value)} />;
+  const list = value && !SLOTS.includes(value) ? [...SLOTS, value].sort() : SLOTS;
+  return (
+    <select className="st-select st-time" value={value || "00:00"} aria-label={label} onChange={(e) => onChange(e.target.value)}>
+      {list.map((t) => <option key={t} value={t}>{t}</option>)}
+    </select>
+  );
 }
 
 // Saves when you leave the box or press Enter. Shows an error instead of saving bad input.
-export function TextField({ value, onCommit, validate, placeholder, label }) {
+export function TextField({ value, onCommit, validate, placeholder, label, disabled = false }) {
   const id = useId();
   const [draft, setDraft] = useState(value);
   const [err, setErr] = useState("");
@@ -124,6 +132,8 @@ export function TextField({ value, onCommit, validate, placeholder, label }) {
         aria-invalid={!!err}
         value={draft}
         placeholder={placeholder}
+        disabled={disabled}
+        maxLength={60}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
@@ -165,18 +175,19 @@ export function Field({ label, type = "text", value, onChange, placeholder, erro
 }
 
 /* ------------------------------ row ------------------------------ */
-const TAGS = { live: "LIVE", sync: "NEEDS SERVER" };
+/* where a value is kept: the account (any device) or this browser */
+const SCOPE = { account: "ACCOUNT", device: "THIS DEVICE" };
 
-export function Row({ row, value, onChange, onAction, validators }) {
+export function Row({ row, value, onChange, onAction, validators, busy = false }) {
   let control = null;
   switch (row.type) {
     case "toggle": control = <Toggle checked={!!value} onChange={onChange} label={row.label} />; break;
     case "segmented": control = <Segmented value={value} options={row.options} onChange={onChange} label={row.label} />; break;
-    case "select": control = <Select value={value} options={row.options} onChange={onChange} label={row.label} />; break;
+    case "select": control = <Select value={value} options={row.options} onChange={onChange} label={row.label} disabled={busy} />; break;
     case "slider": control = <Slider value={value} min={row.min} max={row.max} step={row.step} unit={row.unit} onChange={onChange} label={row.label} />; break;
     case "chips": control = <Chips value={value || []} options={row.options} onChange={onChange} label={row.label} />; break;
     case "time": control = <TimeInput value={value} onChange={onChange} label={row.label} />; break;
-    case "text": control = <TextField value={value ?? ""} onCommit={onChange} validate={validators[row.validate]} placeholder={row.placeholder} label={row.label} />; break;
+    case "text": control = <TextField value={value ?? ""} onCommit={onChange} validate={validators[row.validate]} placeholder={row.placeholder} label={row.label} disabled={busy} />; break;
     case "readonly": {
       const nameOf = (v) => (row.options ? ((row.options.find((o) => o.v === v) || {}).l ?? v) : v);
       control = (
@@ -196,11 +207,12 @@ export function Row({ row, value, onChange, onAction, validators }) {
   }
 
   return (
-    <div className={`st-row ${row.type === "chips" ? "wide" : ""}`}>
+    <div className={`st-row ${row.type === "chips" ? "wide" : ""}${busy ? " busy" : ""}`}>
       <div className="st-info">
         <span className="st-label">
           {row.label}
-          {row.tag && <em className={`st-tag ${row.tag}`}>{TAGS[row.tag]}</em>}
+          {row.scope && <em className={`st-tag ${row.scope}`}>{SCOPE[row.scope]}</em>}
+          {busy && <em className="st-tag saving">SAVING</em>}
         </span>
         {row.hint && <p>{row.hint}</p>}
       </div>

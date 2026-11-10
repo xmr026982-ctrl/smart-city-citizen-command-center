@@ -1,352 +1,265 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { readFileParam } from "../../utils/fileLink";
+import { useLockOpen } from "../../hooks/useLockOpen";
+import LockMarks from "../../components/ui/LockMarks";
+import { useMinute } from "../../hooks/useMinute";
 import {
-  Search, MapPin, Calendar, Tag, ArrowUpDown, ArrowUp, ArrowDown,
-  ChevronLeft, ChevronRight, Layers, Activity, AlertTriangle
+  Layers, Inbox, Siren, AlertTriangle, MapPin, Calendar, RotateCcw, FileSearch, UserX, Flame, ArrowUpRight,
 } from "lucide-react";
 import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
-import IssuePriorityBadge from "../../components/issues/shared/IssuePriorityBadge";
-import IssueStatusBadge from "../../components/issues/shared/IssueStatusBadge";
-import PageHeader from "../../components/layout/PageHeader";
+import {
+  Command, CommandHead, LensDeck, SearchBox, Select, Chips, ResultLine, Pager, CatGlyph,
+  StatusPill, PriorityPill, SlaMeter, Avatar, Empty, ago, SortBar, SortChip, RankBadge, useGlide, useHoverFx, FxLayer,
+} from "../../components/issues/admin/CommandKit";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
-import { STATUS_LABEL } from "../../constants/issueStatuses";
-import { useIssues } from "../../store/issueStore";
+import { STATUS_LABEL, ISSUE_STATUSES } from "../../constants/issueStatuses";
+import { PRIORITY_LABEL } from "../../constants/issuePriorities";
+import { WARDS } from "../../constants/issueConstants";
+import { useIssues, useAllIssues } from "../../store/issueStore";
+import { useFieldRoster, mismatchOf } from "../../store/fieldRoster";
+import { slaOf, PRIORITY_RANK, urgencyCompare } from "../../utils/sla";
 import { formatDate } from "../../utils/formatDate";
+import { nameFor, useNames } from "../../store/profileStore";
 
-const PER_PAGE = 8;
+/* ------------------------------------------------------------------
+   All Issues: the full ledger. The tile deck locks one lens at a time
+   (everything / no owner / breached / critical open). Search, zone,
+   category, priority and status filters stack on top of the lens.
+   Seven sorts (click the active one again to flip it; every row shows
+   its rank and the value it is sorted by, and rows glide into place),
+   pager, and the issue file drawer on click. Hover scan: a light follows
+   the cursor, the status rail glows, brackets close in, "Open file" shows.
+------------------------------------------------------------------- */
+
+const SORTS = [
+  { id: "urgency", label: "Urgency", dir: "desc", desc: "Most urgent first", asc: "Least urgent first" },
+  { id: "createdAt", label: "Reported", dir: "desc", desc: "Newest reports first", asc: "Oldest reports first" },
+  { id: "updatedAt", label: "Updated", dir: "desc", desc: "Recently updated first", asc: "Longest untouched first" },
+  { id: "priority", label: "Priority", dir: "desc", desc: "Critical first", asc: "Low first" },
+  { id: "category", label: "Category", dir: "asc", desc: "Category Z–A", asc: "Category A–Z" },
+  { id: "title", label: "Title", dir: "asc", desc: "Title Z–A", asc: "Title A–Z" },
+  { id: "status", label: "Status", dir: "desc", desc: "Furthest along first", asc: "Newest stage first" },
+];
+
+// the value each row is ranked by, shown on the row
+function readout(key, issue) {
+  if (key === "urgency") return ["Window", slaOf(issue).label];
+  if (key === "createdAt") return ["Filed", ago(issue.createdAt)];
+  if (key === "updatedAt") return ["Touched", ago(issue.updatedAt)];
+  if (key === "priority") return ["Priority", PRIORITY_LABEL[issue.priority] || issue.priority];
+  if (key === "category") return ["Category", CATEGORY_LABEL[issue.category] || issue.category];
+  if (key === "status") return ["Stage", STATUS_LABEL[issue.status] || issue.status];
+  return ["Title", (issue.title || "?").charAt(0).toUpperCase()];
+}
 
 function AllIssues() {
+  useNames(); // names follow each person's current display name
   const issues = useIssues();
+  const everything = useAllIssues(); // a link can point at a removed file (merged, dismissed); it still opens
+  const { roster } = useFieldRoster();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tick = useMinute();
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [wardFilter, setWardFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [sortKey, setSortKey] = useState("createdAt");
+  const [status, setStatus] = useState(["submitted", "acknowledged", "in_progress", "pending_review", "resolved"].includes(location.state?.status) ? location.state.status : "all");
+  const [ward, setWard] = useState(location.state?.ward || "all");
+  const [category, setCategory] = useState("all");
+  const [priority, setPriorityFilter] = useState("all");
+  const [lens, setLens] = useState(["unowned", "breached", "critical"].includes(location.state?.lens) ? location.state.lens : "all"); // all | unowned | breached | critical
+  const [sortKey, setSortKey] = useState("urgency");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState(10);
   const [selectedId, setSelectedId] = useState(null);
 
-  const wards = [...new Set(issues.map((i) => i.ward))];
+  // arrivals: a zone tile on Issue Command ({ ward }) or an old /admin/issues/:id link ({ open }).
+  // Applied once, then the state is wiped so a reload or Back doesn't re-apply it.
+  // a file link clears the filters, then locks onto the row and opens it (hooks/useLockOpen)
+  const [arrival, setArrival] = useState(null);
+  useEffect(() => {
+    const file = readFileParam(location.search);
+    const st = location.state;
+    const id = file?.id || st?.open || null;
+    if (!id && !st?.ward) return;
+    if (id) {
+      setQuery(""); setStatus("all"); setWard("all"); setCategory("all"); setPriorityFilter("all"); setLens("all");
+      setSortKey("urgency"); setSortDir("desc");
+      setArrival({ id, at: Date.now() });
+    } else if (st.ward) setWard(st.ward);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
+  const stats = useMemo(() => {
+    const open = issues.filter((i) => i.status !== "resolved");
+    return {
+      total: issues.length,
+      open: open.length,
+      unowned: open.filter((i) => !i.assignedTo).length,
+      breached: open.filter((i) => slaOf(i).state === "over").length,
+      critical: open.filter((i) => i.priority === "critical").length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issues, tick]);
+
+  const statusCounts = useMemo(() => {
+    const c = { all: issues.length };
+    ISSUE_STATUSES.forEach((s) => { c[s] = issues.filter((i) => i.status === s).length; });
+    return c;
+  }, [issues]);
 
   const filtered = useMemo(() => {
-    let list = issues.filter((issue) => {
-      const haystack = `${issue.id} ${issue.title} ${issue.location} ${issue.ward} ${CATEGORY_LABEL[issue.category] || ""} ${issue.assignedTo || ""}`.toLowerCase();
-      if (query && !haystack.includes(query.toLowerCase())) return false;
-      if (statusFilter !== "all" && issue.status !== statusFilter) return false;
-      if (wardFilter !== "all" && issue.ward !== wardFilter) return false;
-      if (categoryFilter !== "all" && issue.category !== categoryFilter) return false;
-      return true;
+    const needle = query.trim().toLowerCase();
+    const list = issues.filter((issue) => {
+      const open = issue.status !== "resolved";
+      if (lens === "unowned" && (issue.assignedTo || !open)) return false;
+      if (lens === "breached" && slaOf(issue).state !== "over") return false;
+      if (lens === "critical" && (issue.priority !== "critical" || !open)) return false;
+      if (status !== "all" && issue.status !== status) return false;
+      if (ward !== "all" && issue.ward !== ward) return false;
+      if (category !== "all" && issue.category !== category) return false;
+      if (priority !== "all" && issue.priority !== priority) return false;
+      if (!needle) return true;
+      const hay = `${issue.id} ${issue.title} ${issue.location} ${issue.ward} ${CATEGORY_LABEL[issue.category] || ""} ${issue.assignedTo || ""} ${issue.reportedBy || ""}`.toLowerCase();
+      return hay.includes(needle);
     });
-
+    const dir = sortDir === "asc" ? 1 : -1;
     list.sort((a, b) => {
-      let valA = a[sortKey];
-      let valB = b[sortKey];
-      if (sortKey === "createdAt" || sortKey === "updatedAt") {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
-      }
-      if (sortKey === "category") {
-        valA = CATEGORY_LABEL[a.category] || "";
-        valB = CATEGORY_LABEL[b.category] || "";
-      }
-      if (sortKey === "priority") {
-        const order = { critical: 4, high: 3, medium: 2, low: 1 };
-        valA = order[a.priority] || 0;
-        valB = order[b.priority] || 0;
-      }
-      if (typeof valA === "string") {
-        return sortDir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
-      }
-      return sortDir === "asc" ? valA - valB : valB - valA;
+      if (sortKey === "urgency") return sortDir === "desc" ? urgencyCompare(a, b) : urgencyCompare(b, a);
+      if (sortKey === "createdAt" || sortKey === "updatedAt") return (new Date(a[sortKey]) - new Date(b[sortKey])) * dir;
+      if (sortKey === "priority") return ((PRIORITY_RANK[a.priority] || 0) - (PRIORITY_RANK[b.priority] || 0)) * dir;
+      if (sortKey === "category") return (CATEGORY_LABEL[a.category] || "").localeCompare(CATEGORY_LABEL[b.category] || "") * dir;
+      if (sortKey === "status") return (ISSUE_STATUSES.indexOf(a.status) - ISSUE_STATUSES.indexOf(b.status)) * dir;
+      return a.title.localeCompare(b.title) * dir;
     });
-
     return list;
-  }, [issues, query, statusFilter, wardFilter, categoryFilter, sortKey, sortDir]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issues, query, status, ward, category, priority, lens, sortKey, sortDir, tick]);
 
-  const totalPages = Math.ceil(filtered.length / PER_PAGE) || 1;
-  const safePage = Math.min(page, totalPages);
-  const paginated = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
-  const selected = issues.find((i) => i.id === selectedId) || null;
+  useEffect(() => { setPage(1); }, [query, status, ward, category, priority, lens, sortKey, sortDir, size]);
 
-  const stats = {
-    total: issues.length,
-    open: issues.filter((i) => i.status !== "resolved").length,
-    unassigned: issues.filter((i) => !i.assignedTo && i.status !== "resolved").length,
-    critical: issues.filter((i) => i.priority === "critical").length,
-  };
+  const lockOpen = useLockOpen({ list: filtered, size, setPage, open: setSelectedId });
+  useEffect(() => { if (arrival) lockOpen.arm(arrival.id); }, [arrival]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleSort = (key) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-    setPage(1);
-  };
+  const pages = Math.max(1, Math.ceil(filtered.length / size));
+  const safePage = Math.min(page, pages);
+  const slice = filtered.slice((safePage - 1) * size, safePage * size);
+  const selected = everything.find((i) => i.id === selectedId) || null;
 
-  const SortBtn = ({ label, k, icon: Icon }) => {
-    const active = sortKey === k;
-    return (
-      <button
-        onClick={() => toggleSort(k)}
-        style={{
-          height: 36, padding: "0 12px", borderRadius: 10,
-          border: active ? "1.5px solid var(--primary)" : "1px solid var(--line)",
-          background: active ? "rgba(14,165,233,0.12)" : "rgba(255,255,255,0.88)",
-          color: active ? "var(--primary-deep)" : "var(--fg)",
-          display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
-          fontSize: 12.5, fontWeight: active ? 600 : 500,
-        }}
-      >
-        {Icon && <Icon size={13} />}
-        {label}
-        {active ? (sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : (
-          <ArrowUpDown size={12} style={{ opacity: 0.4 }} />
-        )}
-      </button>
-    );
-  };
+  const pickSort = (id, dir) => { setSortKey(id); setSortDir(dir); };
+  const listRef = useRef(null);
+  useGlide(listRef, `${sortKey}-${sortDir}`);
+  useHoverFx(listRef);
+
+  const filtered_ = status !== "all" || ward !== "all" || category !== "all" || priority !== "all" || lens !== "all" || query || sortKey !== "urgency" || sortDir !== "desc";
+  const reset = () => { setStatus("all"); setWard("all"); setCategory("all"); setPriorityFilter("all"); setLens("all"); setQuery(""); setSortKey("urgency"); setSortDir("desc"); };
 
   return (
-    <main className="page-wrap">
-      <PageHeader
-        eyebrow="Work Queue · Neural Ledger"
-        title="City Ledger"
-        description="Every civic issue currently on the board. Real-time command view."
+    <Command>
+      <CommandHead crumb="ALL ISSUES" title="All Issues" sub="Every civic issue on the board, most urgent first. Lock a tile to focus the ledger. Open any row for the full issue file.">
+      </CommandHead>
+
+      <LensDeck
+        value={lens}
+        onChange={setLens}
+        readout={`${filtered.length} of ${issues.length} issues`}
+        tiles={[
+          { id: "all", icon: Layers, label: "On record", lens: "Everything", value: stats.total, sub: `${stats.open} still open`, meter: stats.total ? (stats.open / stats.total) * 100 : 0 },
+          { id: "unowned", icon: Inbox, label: "No owner", value: stats.unowned, sub: "Waiting for dispatch", meter: stats.open ? (stats.unowned / stats.open) * 100 : 0, tone: "amber" },
+          { id: "breached", icon: Siren, label: "SLA breached", value: stats.breached, sub: "Past their service window", meter: stats.open ? (stats.breached / stats.open) * 100 : 0, tone: "red" },
+          { id: "critical", icon: AlertTriangle, label: "Critical open", value: stats.critical, sub: "Highest priority, still open", meter: stats.open ? (stats.critical / stats.open) * 100 : 0, tone: "red" },
+        ]}
       />
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-        gap: 12,
-        margin: "24px 0 20px",
-      }}>
-        {[
-          { label: "Total Issues", value: stats.total, icon: Layers, color: "#0ea5e9" },
-          { label: "Open", value: stats.open, icon: Activity, color: "#f59e0b" },
-          { label: "Unassigned", value: stats.unassigned, icon: MapPin, color: "#ef4444" },
-          { label: "Critical", value: stats.critical, icon: AlertTriangle, color: "#dc2626" },
-        ].map((s) => (
-          <div
-            key={s.label}
-            style={{
-              borderRadius: 16,
-              padding: "14px 16px",
-              background: "rgba(255,255,255,0.75)",
-              backdropFilter: "blur(16px) saturate(1.4)",
-              border: "1px solid rgba(255,255,255,0.8)",
-              boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
-              transform: "perspective(900px) rotateX(2deg)",
-              transition: "transform 220ms, box-shadow 220ms",
-              position: "relative",
-              overflow: "hidden",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
-              e.currentTarget.style.boxShadow = `0 18px 40px ${s.color}25, inset 0 1px 0 rgba(255,255,255,0.9)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
-              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
-            }}
-          >
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: 2,
-              background: `linear-gradient(90deg, transparent, ${s.color}55, transparent)`,
-            }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: `${s.color}18`, display: "grid", placeItems: "center",
-              }}>
-                <s.icon size={16} color={s.color} />
-              </div>
-              <div>
-                <p style={{ fontSize: 11, color: "var(--subtle)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{s.label}</p>
-                <p style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-display)" }}>{s.value}</p>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="ac-toolbar">
+        <div className="grow"><SearchBox value={query} onChange={setQuery} placeholder="Search ID, title, place, zone, owner or reporter" /></div>
+        <Select label="Zone" value={ward} onChange={setWard} options={[{ id: "all", label: "All zones" }, ...WARDS.map((w) => ({ id: w.name, label: w.name }))]} />
+        <Select label="Category" value={category} onChange={setCategory} options={[{ id: "all", label: "All" }, ...Object.entries(CATEGORY_LABEL).map(([id, label]) => ({ id, label }))]} />
+        <Select label="Priority" value={priority} onChange={setPriorityFilter} options={[{ id: "all", label: "All" }, { id: "critical", label: "Critical" }, { id: "high", label: "High" }, { id: "medium", label: "Medium" }, { id: "low", label: "Low" }]} />
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
-          <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--subtle)" }} />
-          <input
-            type="text"
-            placeholder="Search ID, title, location, zone, category…"
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            style={{
-              width: "100%", height: 42, paddingLeft: 38, paddingRight: 14,
-              borderRadius: 12, border: "1px solid var(--line)",
-              background: "rgba(255,255,255,0.92)", fontSize: 13.5, outline: "none",
-            }}
-          />
-        </div>
-        <select
-          value={wardFilter}
-          onChange={(e) => { setWardFilter(e.target.value); setPage(1); }}
-          style={{ height: 42, padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)", background: "white", fontSize: 13 }}
-        >
-          <option value="all">All zones</option>
-          {wards.map((w) => <option key={w} value={w}>{w}</option>)}
-        </select>
-        <select
-          value={categoryFilter}
-          onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-          style={{ height: 42, padding: "0 12px", borderRadius: 12, border: "1px solid var(--line)", background: "white", fontSize: 13 }}
-        >
-          <option value="all">All Categories</option>
-          {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
+      <div className="ac-filterline">
+        <Chips
+          value={status}
+          onChange={setStatus}
+          items={[{ id: "all", label: "All", count: statusCounts.all }, ...ISSUE_STATUSES.map((s) => ({ id: s, label: STATUS_LABEL[s], count: statusCounts[s] }))]}
+        />
+        <Chips
+          value={lens}
+          onChange={(v) => setLens(v === lens ? "all" : v)}
+          items={[
+            { id: "unowned", label: "No owner", icon: UserX, tone: "amber", count: stats.unowned },
+            { id: "breached", label: "Breached", icon: Flame, tone: "red", count: stats.breached },
+          ]}
+        />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-        {["all", "submitted", "acknowledged", "in_progress", "resolved"].map((s) => (
-          <button
-            key={s}
-            onClick={() => { setStatusFilter(s); setPage(1); }}
-            style={{
-              height: 34, padding: "0 14px", borderRadius: 999,
-              border: statusFilter === s ? "none" : "1px solid var(--line)",
-              background: statusFilter === s ? "linear-gradient(135deg, #0ea5e9, #0284c7)" : "rgba(255,255,255,0.9)",
-              color: statusFilter === s ? "white" : "var(--muted)",
-              fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-              boxShadow: statusFilter === s ? "0 6px 14px rgba(14,165,233,0.28)" : "none",
-            }}
-          >
-            {s === "all" ? "All" : STATUS_LABEL[s]}
-          </button>
-        ))}
+      <div className="ac-filterline">
+        <SortBar options={SORTS} value={sortKey} dir={sortDir} onChange={pickSort} />
+        {filtered_ ? <button type="button" className="ac-btn sm" onClick={reset}><RotateCcw size={12} /> Reset filters</button> : null}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <SortBtn label="Reported" k="createdAt" icon={Calendar} />
-        <SortBtn label="Updated" k="updatedAt" icon={Calendar} />
-        <SortBtn label="Priority" k="priority" icon={ArrowUpDown} />
-        <SortBtn label="Category" k="category" icon={Tag} />
-        <SortBtn label="Title" k="title" />
-        <SortBtn label="Status" k="status" />
-      </div>
+      <ResultLine total={filtered.length} of={issues.length} page={safePage} size={size} noun="issues" />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {paginated.length === 0 && (
-          <div style={{
-            borderRadius: 18, padding: 48, textAlign: "center", color: "var(--subtle)",
-            background: "rgba(255,255,255,0.7)", border: "1px solid rgba(14,165,233,0.12)",
-          }}>
-            No issues match your filters
-          </div>
-        )}
-
-        {paginated.map((issue) => (
-          <article
-            key={issue.id}
-            onClick={() => setSelectedId(issue.id)}
-            style={{
-              borderRadius: 18,
-              padding: "16px 18px",
-              background: "rgba(255,255,255,0.74)",
-              backdropFilter: "blur(16px) saturate(1.4)",
-              border: "1px solid rgba(255,255,255,0.75)",
-              boxShadow: "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: 16,
-              alignItems: "center",
-              position: "relative",
-              overflow: "hidden",
-              transform: "perspective(900px) rotateX(2deg)",
-              transition: "transform 220ms, box-shadow 220ms",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "perspective(900px) rotateX(0deg) translateY(-4px)";
-              e.currentTarget.style.boxShadow = "0 18px 40px rgba(14,165,233,0.16), inset 0 1px 0 rgba(255,255,255,0.9)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "perspective(900px) rotateX(2deg)";
-              e.currentTarget.style.boxShadow = "0 8px 28px rgba(14,165,233,0.07), inset 0 1px 0 rgba(255,255,255,0.85)";
-            }}
-          >
-            <div style={{
-              position: "absolute", top: 0, left: 0, right: 0, height: 2,
-              background: "linear-gradient(90deg, transparent, rgba(14,165,233,0.55), transparent)",
-            }} />
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--subtle)" }}>{issue.id}</span>
-                <span style={{ fontSize: 12, color: "var(--subtle)" }}>{issue.ward}</span>
-                <span style={{ fontSize: 12, color: "var(--primary-deep)", fontWeight: 500 }}>
-                  {CATEGORY_LABEL[issue.category] || issue.category}
-                </span>
-              </div>
-              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 650, margin: 0, lineHeight: 1.3 }}>
-                {issue.title}
-              </h3>
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <IssueStatusBadge status={issue.status} />
-                <IssuePriorityBadge priority={issue.priority} />
-                <span style={{ fontSize: 12.5, color: issue.assignedTo ? "var(--fg)" : "var(--subtle)" }}>
-                  {issue.assignedTo || "Unassigned"}
-                </span>
-              </div>
-            </div>
-            <div style={{ textAlign: "right", minWidth: 132 }}>
-              <p style={{
-                fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em",
-                textTransform: "uppercase", color: "var(--subtle)", marginBottom: 4,
-              }}>
-                Reported
-              </p>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap" }}>
-                {formatDate(issue.createdAt)}
-              </p>
-              <p style={{ fontSize: 11, color: "var(--subtle)", marginTop: 6, whiteSpace: "nowrap" }}>
-                Updated {formatDate(issue.updatedAt)}
-              </p>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 22 }}>
-          <button
-            type="button"
-            disabled={safePage === 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            style={{
-              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
-              background: "white", display: "grid", placeItems: "center",
-              cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? 0.4 : 1,
-            }}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span style={{ fontSize: 13, color: "var(--muted)" }}>
-            Page {safePage} of {totalPages} · {filtered.length} issues
-          </span>
-          <button
-            type="button"
-            disabled={safePage === totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            style={{
-              width: 36, height: 36, borderRadius: 10, border: "1px solid var(--line)",
-              background: "white", display: "grid", placeItems: "center",
-              cursor: safePage === totalPages ? "not-allowed" : "pointer", opacity: safePage === totalPages ? 0.4 : 1,
-            }}
-          >
-            <ChevronRight size={16} />
-          </button>
+      {!slice.length ? (
+        <Empty icon={FileSearch} title="No issue matches" sub="Change a filter, release the lens or clear the search." />
+      ) : (
+        <div className={`ac-list${lockOpen.lockedId ? " targeting" : ""}`} ref={listRef} key={`${safePage}-${size}-${lens}`}>
+          {slice.map((issue, i) => {
+            const sla = slaOf(issue);
+            const off = mismatchOf(issue, roster);
+            const [rl, rv] = readout(sortKey, issue);
+            return (
+              <button
+                key={issue.id}
+                data-glide={issue.id}
+                data-fx
+                type="button"
+                className={`ac-row click r-${issue.status}${sla.state === "over" ? " breach" : ""}${off ? " offx" : ""}${lockOpen.lockedId === issue.id ? " target" : ""}`}
+                style={{ animationDelay: `${i * 30}ms` }}
+                onClick={() => setSelectedId(issue.id)}
+              >
+                {lockOpen.lockedId === issue.id ? <LockMarks /> : null}
+                <FxLayer brackets />
+                <CatGlyph category={issue.category} size={40} />
+                <div className="ac-row-main">
+                  <div className="ac-row-top">
+                    <RankBadge n={(safePage - 1) * size + i + 1} />
+                    <span className="ac-id">{issue.id}</span>
+                    <span className="ac-dot">·</span>
+                    <span><MapPin size={11} style={{ verticalAlign: -1 }} /> {issue.ward}</span>
+                    <span className="ac-dot">·</span>
+                    <span>{CATEGORY_LABEL[issue.category] || issue.category}</span>
+                    <span className="ac-row-go">Open file <ArrowUpRight size={11} /></span>
+                  </div>
+                  <h4>{issue.title}</h4>
+                  <div className="ac-row-meta">
+                    <StatusPill status={issue.status} />
+                    <PriorityPill priority={issue.priority} />
+                    <SlaMeter issue={issue} />
+                    {off ? <span className="ac-tag red" title={`${issue.assignedTo} is ${off.hasLabel}; this issue needs ${off.needLabel}`}><AlertTriangle size={9} /> Off-expertise · {off.hasLabel}</span> : null}
+                  </div>
+                </div>
+                <div className="ac-row-side">
+                  <SortChip key={sortKey} label={rl} value={rv} tone={sortKey === "urgency" ? sla.state : ""} />
+                  {issue.assignedTo ? (
+                    <span className="ac-owner"><Avatar name={nameFor(issue.assignedTo)} size={26} /> {nameFor(issue.assignedTo)}</span>
+                  ) : (
+                    <span className="ac-owner none">{issue.status === "resolved" ? "Closed" : "No owner"}</span>
+                  )}
+                  <span className="ac-when"><Calendar size={10} style={{ verticalAlign: -1 }} /> <b>{formatDate(issue.createdAt)}</b> · updated {ago(issue.updatedAt)}</span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <IssueDetailsDrawer issue={selected} onClose={() => setSelectedId(null)} />
-    </main>
+      <Pager page={safePage} pages={pages} total={filtered.length} size={size} onPage={setPage} onSize={setSize} sizes={[6, 10, 15]} />
+
+      <IssueDetailsDrawer issue={selected} onClose={() => { setSelectedId(null); lockOpen.closed(); }} />
+    </Command>
   );
 }
 

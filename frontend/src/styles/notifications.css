@@ -1,0 +1,133 @@
+/* ------------------------------------------------------------------
+   Notifications page (all roles). One accent per role.
+------------------------------------------------------------------- */
+.nx {
+  /* the shared lens deck (CommandKit) takes this page's role colour */
+  --tk-7c3aed: var(--a); --tk-a78bfa: color-mix(in srgb, var(--a) 55%, white); --tk-5b21b6: var(--a2); --tk-124-58-237: var(--ar); --tk-f4f3fb: rgb(var(--ar) / .07);
+  --ac-ink: #0f172a; --ac-muted: #64748b; --ac-faint: #94a3b8; --ac-line: #e6e8f0;
+  --ac-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace; --ac-ease: cubic-bezier(.22, 1, .36, 1);
+}
+.nx { --a: #7c3aed; --a2: #5b21b6; --ar: 124 58 237; gap: 14px; font-family: "IBM Plex Sans", Inter, system-ui, sans-serif; color: #0f172a; }
+.nx.tone-staff { --a: #0d9488; --a2: #0f766e; --ar: 13 148 136; }
+.nx.tone-citizen { --a: #0284c7; --a2: #0369a1; --ar: 2 132 199; }
+.nx .m, .nx time { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+.nx-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding-top: 6px; }
+.nx-kick { margin: 0 0 5px; display: flex; align-items: center; gap: 8px; font: 700 10px "JetBrains Mono", monospace; letter-spacing: .16em; text-transform: uppercase; color: var(--a); }
+.nx-kick i { width: 6px; height: 6px; border-radius: 50%; background: var(--a); box-shadow: 0 0 0 4px rgb(var(--ar) / .15); }
+.nx-kick.sm { margin: 0; font-size: 9.5px; }
+.nx h1 { margin: 0; font: 650 30px/1.05 "IBM Plex Sans", Inter, sans-serif; letter-spacing: -.02em; }
+.nx-sub { margin: 6px 0 0; font-size: 13px; color: #64748b; max-width: 720px; }
+.nx-acts { display: flex; gap: 8px; flex: none; }
+.nx-btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 14px; border-radius: 11px; white-space: nowrap; cursor: pointer;
+  border: 1px solid rgb(var(--ar) / .28); background: #fff; font: 600 12.5px Inter, sans-serif; color: #0f172a;
+  box-shadow: 0 6px 16px -10px rgb(var(--ar) / .6); transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.nx-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.nx-btn:disabled { opacity: .5; cursor: default; }
+.nx-btn.go { background: linear-gradient(135deg, var(--a), var(--a2)); color: #fff; border: 0; box-shadow: 0 12px 24px -12px var(--a); }
+.nx-btn.go.on { box-shadow: 0 0 0 3px rgb(var(--ar) / .25), 0 12px 24px -12px var(--a); }
+
+/* tiles */
+
+/* chips */
+.nx-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.nx-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; cursor: pointer;
+  background: #fff; border: 1px solid #e2e8f0; font: 600 12px Inter, sans-serif; color: #334155; transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.nx-chip b { font: 700 10px "JetBrains Mono", monospace; padding: 1px 6px; border-radius: 999px; background: rgba(15, 23, 42, .06); }
+.nx-chip:hover { border-color: rgb(var(--ar) / .4); }
+.nx-chip.on { background: var(--a); border-color: var(--a); color: #fff; }
+.nx-chip.on b { background: rgba(255, 255, 255, .22); }
+
+/* columns */
+.nx-cols { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 14px; align-items: start; }
+.nx-list, .nx-card { background: #fff; border-radius: 18px; box-shadow: 0 0 0 1px rgba(148, 163, 184, .22), 0 18px 40px -30px rgba(15, 23, 42, .55); }
+.nx-list { overflow: hidden; padding-bottom: 4px; }
+.nx-sec { margin: 0; padding: 12px 16px 8px; display: flex; justify-content: space-between; font: 700 9.5px "JetBrains Mono", monospace; letter-spacing: .16em; text-transform: uppercase; color: #94a3b8; }
+.nx-day + .nx-day .nx-sec { border-top: 1px solid #eef2f7; padding-top: 14px; }
+.nx-list ul { margin: 0; padding: 0; list-style: none; }
+
+/* rows */
+.nx-row { position: relative; border-top: 1px solid #f1f5f9; --c: var(--a); --soft: rgb(var(--ar) / .1); animation: nxIn .28s ease both; }
+.nx-row.t-alert { --c: #ef4444; --soft: #fef2f2; }
+.nx-row.t-warn { --c: #d97706; --soft: #fffbeb; }
+.nx-row.t-ok { --c: #059669; --soft: #ecfdf5; }
+@keyframes nxIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.nx-hit {
+  width: 100%; display: grid; grid-template-columns: 4px 34px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 11px 44px 11px 0; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; color: inherit; transition: background .15s ease;
+}
+.nx-hit:hover { background: linear-gradient(90deg, rgb(var(--ar) / .05), transparent 70%); }
+.nx-u { height: 34px; border-radius: 0 4px 4px 0; background: transparent; }
+.nx-row.new .nx-u { background: var(--a); box-shadow: 0 0 10px var(--a); }
+.nx-ic { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: var(--soft); color: var(--c); }
+.nx-body { min-width: 0; display: grid; gap: 2px; }
+.nx-title { display: flex; align-items: center; gap: 8px; font: 550 13.5px Inter, sans-serif; color: #334155; min-width: 0; }
+.nx-row.new .nx-title { font-weight: 650; color: #0f172a; }
+.nx-line { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nx-tag { flex: none; font: 700 9.5px "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; font-style: normal; padding: 2px 7px; border-radius: 999px; }
+.nx-tag.amber { background: #fffbeb; color: #b45309; }
+.nx-tag.red { background: #fef2f2; color: #b91c1c; }
+.nx-side { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.nx-side time { font-size: 10.5px; font-weight: 600; color: #94a3b8; }
+.nx-go { display: inline-flex; align-items: center; gap: 4px; font: 600 11.5px Inter, sans-serif; color: var(--a); white-space: nowrap; }
+.nx-go.locked { color: #94a3b8; }
+.nx-dot {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 8px; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: transparent; color: #cbd5e1; opacity: 0; transition: opacity .15s ease, background .15s ease, color .15s ease;
+}
+.nx-row:hover .nx-dot, .nx-dot:focus-visible { opacity: 1; }
+.nx-row.new .nx-dot { color: var(--a); }
+.nx-row.new .nx-dot svg { fill: var(--a); }
+.nx-dot:hover { background: rgb(var(--ar) / .08); }
+
+.nx-empty { display: grid; justify-items: center; gap: 8px; padding: 46px 20px; color: #94a3b8; text-align: center; }
+.nx-empty p { margin: 0; font-size: 13px; color: #64748b; }
+.nx-more { display: block; width: calc(100% - 24px); margin: 6px 12px 8px; height: 34px; border-radius: 10px; border: 1px dashed rgb(var(--ar) / .35); background: rgb(var(--ar) / .03); font: 600 12px Inter, sans-serif; color: var(--a); cursor: pointer; }
+
+/* rail */
+.nx-rail { display: grid; gap: 14px; position: sticky; top: 0; }
+.nx-zbar { display: grid; grid-template-columns: 100px 1fr 24px; gap: 10px; align-items: center; padding: 5px 16px; font-size: 12px; color: #334155; }
+.nx-zbar span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nx-zbar i { height: 6px; border-radius: 6px; background: #eef2f7; overflow: hidden; }
+.nx-zbar i b { display: block; height: 100%; border-radius: 6px; background: var(--a); transition: width .3s ease; }
+.nx-zbar .m { font-size: 11px; text-align: right; color: #64748b; }
+.nx-card > :last-child { margin-bottom: 10px; }
+.nx-quiet { margin: 0 16px 12px; font-size: 12px; color: #94a3b8; }
+.nx-live { padding: 14px 16px; display: grid; gap: 9px; }
+.nx-live > :last-child { margin-bottom: 0; }
+.nx-kv { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: #334155; }
+.nx-kv span { display: inline-flex; align-items: center; gap: 7px; }
+.nx-kv span svg { color: #94a3b8; }
+.nx-kv em { font: 700 9.5px "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; font-style: normal; padding: 2px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; }
+.nx-kv em.ok { background: #ecfdf5; color: #047857; }
+.nx-kv em.acc { background: rgb(var(--ar) / .1); color: var(--a); }
+
+@media (max-width: 1100px) { .nx-cols { grid-template-columns: 1fr; } .nx-rail { position: static; grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) {
+  .nx-head { flex-direction: column; align-items: flex-start; }
+  .nx-rail { grid-template-columns: 1fr; }
+}
+/* phones: the time and the link sit under the text, the line gets two rows, and
+   mark read / unread stays visible (there is no hover on a touch screen) */
+@media (max-width: 640px) {
+  .nx-hit { grid-template-columns: 4px 34px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 12px 44px 12px 0; }
+  .nx-ic { grid-row: span 2; }
+  .nx-title { flex-wrap: wrap; row-gap: 3px; }
+  .nx-line { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .nx-side { grid-column: 3; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .nx-dot { opacity: 1; }
+  .nx-acts { width: 100%; }
+  .nx-zbar { grid-template-columns: 96px 1fr 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .nx-row, .nx-btn { animation: none; transition: none; } }
+
+/* Delivery card: the way to Settings · Alerts */
+.nx-set { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 32px; margin-top: 2px; border-radius: 10px; border: 1px solid rgb(var(--ar) / .28); background: rgb(var(--ar) / .06); color: var(--a); font: 600 12.5px var(--font-display, inherit); cursor: pointer; transition: background .15s, border-color .15s; }
+.nx-set:hover { background: rgb(var(--ar) / .12); border-color: var(--a); }
+
+/* the shared lens deck and its bar keep their height in this column */
+.nx > .ac-kpis, .nx > .ac-lensbar { flex-shrink: 0; }

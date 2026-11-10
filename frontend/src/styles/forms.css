@@ -1,23 +1,23 @@
-.field {
+.ix .field {
   display: flex;
   flex-direction: column;
 }
 
-.field-label {
+.ix .field-label {
   margin-bottom: 8px;
   font-size: 14px;
   font-weight: 500;
 }
 
-.req {
+.ix .req {
   color: var(--danger);
   font-weight: 700;
   margin-left: 4px;
 }
 
-.input,
-.select,
-.textarea {
+.ix .input,
+.ix .select,
+.ix .textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -28,34 +28,34 @@
   transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
 }
 
-.input,
-.select {
+.ix .input,
+.ix .select {
   height: 44px;
   padding: 0 14px;
 }
 
-.textarea {
+.ix .textarea {
   min-height: 140px;
   padding: 12px 14px;
   resize: vertical;
 }
 
-.input:focus,
-.select:focus,
-.textarea:focus {
+.ix .input:focus,
+.ix .select:focus,
+.ix .textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(30, 58, 95, 0.1);
 }
 
-.input.invalid,
-.select.invalid,
-.textarea.invalid {
+.ix .input.invalid,
+.ix .select.invalid,
+.ix .textarea.invalid {
   border-color: var(--danger);
   background: var(--danger-soft);
   box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.1);
 }
 
-.field-error {
+.ix .field-error {
   margin-top: 10px;
   border: 1px solid color-mix(in oklab, var(--danger) 25%, white);
   background: var(--danger-soft);
@@ -66,7 +66,7 @@
   font-weight: 600;
 }
 
-.btn {
+.ix .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -81,16 +81,16 @@
   transition: transform 150ms var(--ease), background 150ms var(--ease);
 }
 
-.btn:active {
+.ix .btn:active {
   transform: scale(0.98);
 }
 
-.btn-primary {
+.ix .btn-primary {
   background: var(--primary);
   color: var(--primary-fg);
 }
 
-.btn-secondary {
+.ix .btn-secondary {
   background: var(--card);
   color: var(--fg);
   border-color: var(--border);

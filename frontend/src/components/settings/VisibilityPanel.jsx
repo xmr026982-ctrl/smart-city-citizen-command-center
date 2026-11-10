@@ -1,6 +1,7 @@
 import ContactCard from "../people/ContactCard";
 import { WARDS } from "../../config/settingsSchema";
 import { aliasFor } from "../../config/visibility";
+import { rosterEntryOf } from "../../store/dutyStore";
 
 const VIEWERS = [
   { role: "citizen", label: "Citizens", same: "Other citizens" },
@@ -8,40 +9,42 @@ const VIEWERS = [
   { role: "admin", label: "Admins", same: "Other admins" },
 ];
 
-function personFrom(role, s) {
-  const zones = (s.assignedZones || []).map((id) => WARDS.find((w) => w.v === id)?.l || id).join(", ");
+function personFrom(role, s, me) {
+  const roster = role === "staff" ? rosterEntryOf(me) : null;
+  const zone = role === "staff" ? roster?.zone || me.ward : WARDS.find((w) => w.v === s.homeWard)?.l || me.ward;
   return {
     role,
-    name: s.displayName,
+    name: s.displayName || me.name,
     photo: s.avatar,
-    alias: aliasFor(s.displayName),
-    email: s.email,
+    alias: aliasFor(s.displayName || me.name),
+    email: me.email,
     designation: s.designation,
     office: s.office,
-    rank: s.rank,
-    employeeId: s.employeeId,
+    rank: roster?.rank,
+    employeeId: roster?.id ? roster.id.toUpperCase() : "",
     dutyStatus: { on: "On duty", break: "On break", off: "Off duty" }[s.dutyStatus],
-    zones,
-    tasks: s.maxTasks ? `Up to ${s.maxTasks} open` : "",
+    zones: zone,
+    tasks: "",
     workContact: role === "admin" ? "Control-room queue" : "In-app message",
   };
 }
 
-function VisibilityPanel({ role, s }) {
-  const person = personFrom(role, s);
+function VisibilityPanel({ role, s, me }) {
+  const person = personFrom(role, s, me);
+  // what others see on an ordinary report: named, no photo shared
   const ctx = {
     openCase: true,
-    anonymous: s.publicName === "anon",
-    sharePhoto: !!s.shareAvatar,
+    anonymous: false,
+    sharePhoto: false,
     onDuty: s.dutyStatus === "on",
-    showHistory: s.showHistory !== false,
+    showHistory: true,
   };
 
   return (
     <div className="vis">
       <p className="st-note">
-        This is exactly what each group can see about you. Email addresses and phone numbers are never shown to anyone.
-        People reach each other through in-app messages, and the server delivers the email copy.
+        What each group sees about you. Your email and devices are never shown to other citizens or crews;
+        people reach each other through in-app messages.
       </p>
       <div className="vis-grid">
         {VIEWERS.map((v) => (
@@ -52,10 +55,10 @@ function VisibilityPanel({ role, s }) {
         ))}
       </div>
       {role === "citizen" && (
-        <p className="st-note">Shown for an open issue you reported. Your photo stays hidden unless you switch on “Show my photo to city staff”, and anonymous reports always hide your name and photo.</p>
+        <p className="st-note">Shown for an open report of yours. Your photo is never shared with crews or other citizens.</p>
       )}
       {role === "staff" && (
-        <p className="st-note">Your live location is visible to admin only while you are on duty. Your emergency contact is visible only to you.</p>
+        <p className="st-note">Command also sees your work email on the Staff Desk, to contact you. Your location is shared with command only while you're on duty.</p>
       )}
     </div>
   );

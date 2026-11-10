@@ -1,0 +1,385 @@
+/* Issue file drawer for the working desks.
+   .idr.staff  = Field Console (teal)    .idr.admin = Command Console (violet)
+   Scoped to .ix (the drawer renders its own .ix wrapper in a portal). */
+@keyframes idrIn { from { transform: translateX(110%); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes idrFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes idrRise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes idrScan { 0% { top: -2px; } 100% { top: 100%; } }
+@keyframes idrRing { 0% { transform: translate(-50%, -50%) scale(.6); opacity: .8; } 100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } }
+@keyframes idrPulse { 0%, 100% { box-shadow: 0 0 0 4px var(--c-ring), 0 0 14px var(--c-glow); } 50% { box-shadow: 0 0 0 8px var(--c-ring-2), 0 0 22px var(--c-glow); } }
+@keyframes idrBlink { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@keyframes idrGate { 0%, 100% { border-color: rgba(245, 158, 11, .35); } 50% { border-color: rgba(245, 158, 11, .85); } }
+
+.ix .idr-veil {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(8, 15, 28, .52); backdrop-filter: blur(14px);
+  animation: idrFade .22s ease;
+}
+
+/* ---------- desk tones ---------- */
+.ix .idr.staff {
+  --c: #14b8a6; --c2: #2dd4bf; --c-deep: #0f766e;
+  --c-soft: rgba(20, 184, 166, .09); --c-edge: rgba(20, 184, 166, .24);
+  --c-ring: rgba(20, 184, 166, .2); --c-ring-2: rgba(20, 184, 166, .06); --c-glow: rgba(45, 212, 191, .6);
+  --c-bg: #e6fbf7; --c-bg2: #f0fdfa;
+}
+.ix .idr.admin {
+  --c: #7c3aed; --c2: #a78bfa; --c-deep: #5b21b6;
+  --c-soft: rgba(124, 58, 237, .08); --c-edge: rgba(124, 58, 237, .22);
+  --c-ring: rgba(124, 58, 237, .18); --c-ring-2: rgba(124, 58, 237, .05); --c-glow: rgba(167, 139, 250, .6);
+  --c-bg: #f1ebff; --c-bg2: #f8f5ff;
+}
+
+.ix .idr {
+  position: fixed; top: 0; right: 0; z-index: 100;
+  width: min(580px, 100vw); height: 100dvh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background:
+    radial-gradient(color-mix(in srgb, var(--c) 9%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(180deg, rgba(255, 255, 255, .92), color-mix(in srgb, var(--c-bg2) 88%, transparent));
+  backdrop-filter: blur(28px) saturate(1.7);
+  border-left: 1px solid var(--c-edge);
+  box-shadow: -32px 0 90px color-mix(in srgb, var(--c) 16%, transparent);
+  animation: idrIn .36s cubic-bezier(.22, 1, .36, 1);
+}
+.ix .idr-edge {
+  position: absolute; top: 0; left: 0; right: 0; height: 3px; z-index: 3;
+  background: linear-gradient(90deg, transparent, var(--c) 15%, var(--c2) 50%, var(--c) 85%, transparent);
+}
+.ix .idr-scan {
+  position: absolute; left: 0; right: 0; height: 90px; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--c2) 9%, transparent), transparent);
+  animation: idrScan 7s linear infinite;
+}
+
+/* ---------- head ---------- */
+.ix .idr-head {
+  position: relative; z-index: 2; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 22px 16px; border-bottom: 1px solid var(--c-edge);
+  background: rgba(255, 255, 255, .62);
+}
+.ix .idr-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ix .idr-mark {
+  position: relative; width: 40px; height: 40px; border-radius: 13px; flex-shrink: 0;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(145deg, var(--c), var(--c-deep));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--c) 34%, transparent);
+}
+.ix .idr-mark i { position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--c2); box-shadow: 0 0 8px var(--c2); }
+.ix .idr-crumb { font: 700 10px var(--font-mono); letter-spacing: .18em; color: var(--c); }
+.ix .idr-crumb b { color: #94a3b8; margin: 0 4px; }
+.ix .idr-code { margin-top: 4px; font: 650 17px var(--font-mono); letter-spacing: .02em; color: var(--fg); }
+.ix .idr-head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ix .idr-sla-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px;
+  font: 700 11px var(--font-mono); letter-spacing: .04em; white-space: nowrap;
+  color: var(--c-deep); background: var(--c-soft); border: 1px solid var(--c-edge);
+}
+.ix .idr-sla-chip.warn { color: #b45309; background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .3); }
+.ix .idr-sla-chip.over { color: #dc2626; background: rgba(239, 68, 68, .08); border-color: rgba(239, 68, 68, .28); animation: idrBlink 2s ease-in-out infinite; }
+.ix .idr-sla-chip.closed { color: #047857; background: rgba(16, 185, 129, .1); border-color: rgba(16, 185, 129, .3); }
+.ix .idr-x {
+  width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .92); color: var(--fg); transition: all .18s ease;
+}
+.ix .idr-x:hover { border-color: var(--c-edge); color: var(--c); }
+
+/* ---------- body ---------- */
+.ix .idr-body {
+  position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; padding: 22px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ix .idr-body > * { flex-shrink: 0; animation: idrRise .45s ease both; }
+.ix .idr-body > *:nth-child(2) { animation-delay: .04s; }
+.ix .idr-body > *:nth-child(3) { animation-delay: .08s; }
+.ix .idr-body > *:nth-child(4) { animation-delay: .12s; }
+.ix .idr-body > *:nth-child(5) { animation-delay: .16s; }
+.ix .idr-body > *:nth-child(6) { animation-delay: .2s; }
+.ix .idr-body > *:nth-child(n+7) { animation-delay: .24s; }
+
+.ix .idr-hero h2 { font-size: 23px; font-weight: 700; line-height: 1.25; }
+.ix .idr-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.ix .idr-cat {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--c-deep); background: var(--c-soft); border: 1px solid var(--c-edge);
+}
+.ix .idr-mine {
+  padding: 4px 10px; border-radius: 999px; font: 700 10px var(--font-mono); letter-spacing: .14em; text-transform: uppercase;
+  color: #fff; background: linear-gradient(135deg, var(--c), var(--c-deep));
+}
+
+/* ---------- glass panels ---------- */
+.ix .idr-panel {
+  position: relative; overflow: hidden; border-radius: 18px;
+  background: rgba(255, 255, 255, .8); border: 1px solid rgba(255, 255, 255, .92);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--c) 9%, transparent), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+.ix .idr-panel::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 60%, transparent), transparent);
+}
+.ix .idr-pad { padding: 16px 18px; }
+.ix .idr-label {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+  font: 700 10.5px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: #8a94a3;
+}
+.ix .idr-label svg { color: var(--c); }
+
+/* ---------- admin gate ---------- */
+.ix .idr-gate {
+  padding: 16px 18px; border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255, 251, 235, .95), rgba(255, 255, 255, .9));
+  border: 1.5px solid rgba(245, 158, 11, .5); box-shadow: 0 10px 30px rgba(245, 158, 11, .14);
+  animation: idrRise .45s ease both, idrGate 2.2s ease-in-out infinite !important;
+}
+.ix .idr-gate-top { display: flex; gap: 12px; }
+.ix .idr-gate-icon {
+  width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 8px 18px rgba(245, 158, 11, .3);
+}
+.ix .idr-gate-top strong { font-size: 14.5px; }
+.ix .idr-gate-top p { margin-top: 3px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.ix .idr-gate-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.ix .idr-ok, .ix .idr-back {
+  height: 38px; padding: 0 14px; border-radius: 11px; display: inline-flex; align-items: center; gap: 7px;
+  font: 650 13px var(--font-sans); transition: transform .15s ease;
+}
+.ix .idr-ok { border: 0; color: #fff; background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 8px 18px rgba(16, 185, 129, .28); }
+.ix .idr-back { border: 1px solid var(--line); color: var(--fg); background: #fff; }
+.ix .idr-ok:hover, .ix .idr-back:hover { transform: translateY(-1px); }
+.ix .idr-returns {
+  display: inline-flex; align-items: center; height: 20px; margin-left: 8px; padding: 0 8px; border-radius: 999px; vertical-align: 1px;
+  font: 700 9.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca;
+}
+/* the field's close note, read at the gate */
+.ix .idr-quote { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .85); border: 1px solid rgba(245, 158, 11, .3); border-left: 3px solid #f59e0b; }
+.ix .idr-quote p { font-size: 13.5px; line-height: 1.5; color: #334155; }
+.ix .idr-quote cite { display: block; margin-top: 4px; font: 600 10.5px var(--font-mono); font-style: normal; color: #94a3b8; }
+
+/* ---------- field: returned by command ---------- */
+.ix .idr-returned {
+  display: flex; gap: 12px; padding: 14px 16px; border-radius: 16px;
+  background: linear-gradient(135deg, rgba(254, 242, 242, .96), rgba(255, 255, 255, .9));
+  border: 1.5px solid rgba(239, 68, 68, .4); box-shadow: 0 10px 26px rgba(239, 68, 68, .1);
+  animation: idrRise .45s ease both;
+}
+.ix .idr-returned-ic { width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 8px 18px rgba(239, 68, 68, .28); }
+.ix .idr-returned strong { font-size: 14px; color: #991b1b; }
+.ix .idr-returned p { margin-top: 3px; font-size: 13.5px; line-height: 1.5; color: #334155; }
+.ix .idr-returned cite { display: block; margin-top: 4px; font: 600 10.5px var(--font-mono); font-style: normal; color: #94a3b8; }
+
+/* ---------- SLA dial ---------- */
+.ix .idr-sla { display: grid; grid-template-columns: 112px 1fr; gap: 18px; align-items: center; padding: 16px 18px; }
+.ix .idr-dial {
+  --tone: var(--c);
+  width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center;
+  background:
+    conic-gradient(var(--tone) calc(var(--p) * 1%), #e7edf4 0);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--tone) 22%, transparent);
+}
+.ix .idr-dial.warn { --tone: #f59e0b; }
+.ix .idr-dial.over { --tone: #ef4444; }
+.ix .idr-dial.closed { --tone: #10b981; }
+.ix .idr-dial > span {
+  width: 86px; height: 86px; border-radius: 50%; display: grid; place-items: center; align-content: center;
+  background: #fff; box-shadow: inset 0 0 0 1px #eef2f7;
+}
+.ix .idr-dial strong { font: 650 22px var(--font-display); line-height: 1; color: var(--fg); }
+.ix .idr-dial em { margin-top: 3px; font: 700 9.5px var(--font-mono); font-style: normal; letter-spacing: .16em; text-transform: uppercase; color: #94a3b8; }
+.ix .idr-sla-copy { min-width: 0; }
+.ix .idr-sla-copy .idr-label { margin-bottom: 6px; }
+.ix .idr-sla-copy > strong { display: block; font: 650 22px var(--font-display); color: var(--fg); }
+.ix .idr-sla-copy > strong.warn { color: #b45309; }
+.ix .idr-sla-copy > strong.over { color: #dc2626; }
+.ix .idr-sla-copy > strong.closed { color: #047857; }
+.ix .idr-sla-copy > span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--muted); }
+.ix .idr-tele { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.ix .idr-tele div { padding: 7px 10px; border-radius: 10px; background: var(--c-soft); border: 1px solid var(--c-edge); }
+.ix .idr-tele em { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font: 700 9px var(--font-mono); font-style: normal; letter-spacing: .09em; text-transform: uppercase; color: #8a94a3; }
+.ix .idr-tele b { font: 650 15px var(--font-display); color: var(--fg); }
+
+/* ---------- dispatch tiles ---------- */
+.ix .idr-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ix .idr-meta-cell {
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 14px; min-width: 0;
+  background: rgba(255, 255, 255, .8); border: 1px solid var(--c-edge);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--c) 6%, transparent);
+}
+.ix .idr-meta-cell > span {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center;
+  color: var(--c); background: var(--c-soft);
+}
+.ix .idr-meta-cell > div { min-width: 0; }
+.ix .idr-meta-cell p { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #8a94a3; }
+.ix .idr-meta-cell strong {
+  display: block; margin-top: 2px; font-size: 13px; font-weight: 600; color: var(--fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ix .idr-meta-cell.warn { border-color: rgba(239, 68, 68, .3); }
+.ix .idr-meta-cell.warn > span { color: #dc2626; background: rgba(239, 68, 68, .08); }
+.ix .idr-meta-cell.warn strong { color: #dc2626; }
+
+/* ---------- next move ---------- */
+.ix .idr-next {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--c-soft), rgba(255, 255, 255, .85));
+  border: 1px dashed var(--c-edge);
+}
+.ix .idr-next-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--c2); animation: idrPulse 2s ease-in-out infinite; }
+.ix .idr-next p { flex: 1; font-size: 13px; color: #334155; line-height: 1.45; }
+.ix .idr-next p b { display: block; font: 700 9.5px var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--c-deep); margin-bottom: 2px; }
+.ix .idr-next-link {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 10px;
+  font-size: 12.5px; font-weight: 650; text-decoration: none; color: var(--c-deep); background: #fff; border: 1px solid var(--c-edge);
+}
+.ix .idr-next-link:hover { background: var(--c-soft); }
+
+/* ---------- brief ---------- */
+.ix .idr-desc { font-size: 14px; line-height: 1.65; color: #334155; }
+.ix .idr-by { margin-top: 8px; font: 500 12px var(--font-mono); color: #8a94a3; }
+
+/* ---------- site ---------- */
+.ix .idr-geo-stage {
+  position: relative; height: 176px; overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--c) 16%, transparent), transparent 50%),
+    radial-gradient(circle at 72% 62%, color-mix(in srgb, var(--c2) 14%, transparent), transparent 45%),
+    linear-gradient(180deg, var(--c-bg), var(--c-bg2));
+}
+.ix .idr-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--c) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--c) 10%, transparent) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+.ix .idr-cross { position: absolute; background: color-mix(in srgb, var(--c) 30%, transparent); }
+.ix .idr-cross.x { left: 0; right: 0; height: 1px; }
+.ix .idr-cross.y { top: 0; bottom: 0; width: 1px; }
+.ix .idr-ring {
+  position: absolute; width: 74px; height: 74px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--c) 45%, transparent); transform: translate(-50%, -50%);
+  animation: idrRing 2.8s ease-out infinite;
+}
+.ix .idr-ring.late { animation-delay: 1.1s; }
+.ix .idr-pin {
+  position: absolute; z-index: 2; width: 34px; height: 34px; border-radius: 50%; transform: translate(-50%, -50%);
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--c), var(--c2)); box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 50%, transparent);
+}
+.ix .idr-geo-scan {
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c2) 75%, transparent), transparent);
+  animation: idrScan 3.4s linear infinite;
+}
+.ix .idr-hud { position: absolute; width: 16px; height: 16px; border: 2px solid color-mix(in srgb, var(--c) 60%, transparent); }
+.ix .idr-hud.tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; border-top-left-radius: 6px; }
+.ix .idr-hud.br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; border-bottom-right-radius: 6px; }
+.ix .idr-coord {
+  position: absolute; left: 12px; bottom: 10px; padding: 3px 8px; border-radius: 7px;
+  font: 600 10.5px var(--font-mono); color: var(--c-deep); background: rgba(255, 255, 255, .85); border: 1px solid var(--c-edge);
+}
+.ix .idr-geo-info { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
+.ix .idr-geo-name { font-size: 14px; font-weight: 650; }
+.ix .idr-geo-sub { margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+
+.ix .idr-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px; padding: 0 16px; border-radius: 11px;
+  border: 0; color: #fff; font: 650 13px var(--font-sans); text-decoration: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--c), var(--c-deep));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--c) 30%, transparent);
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+.ix .idr-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 24px color-mix(in srgb, var(--c) 36%, transparent); }
+.ix .idr-btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+
+/* ---------- status trace ---------- */
+.ix .idr-tl { list-style: none; margin: 4px 0 0; padding: 0; }
+.ix .idr-tl-row { display: grid; grid-template-columns: 22px 1fr; gap: 14px; }
+.ix .idr-tl-rail { display: flex; flex-direction: column; align-items: center; }
+.ix .idr-tl-dot {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: #fff;
+  background: #fff; border: 2px solid #cfdceb;
+}
+.ix .idr-tl-line { width: 2px; flex: 1; min-height: 24px; margin: 4px 0; border-radius: 2px; background: #e3edf6; }
+.ix .idr-tl-row.done .idr-tl-dot { background: var(--c); border-color: var(--c); }
+.ix .idr-tl-row.done .idr-tl-line { background: linear-gradient(180deg, var(--c), var(--c2)); }
+.ix .idr-tl-row.now .idr-tl-dot { background: var(--c2); border-color: #fff; animation: idrPulse 2s ease-in-out infinite; }
+.ix .idr-tl-row.gate.now .idr-tl-dot { background: #f59e0b; }
+.ix .idr-tl-copy { padding-bottom: 16px; min-width: 0; }
+.ix .idr-tl-row:last-child .idr-tl-copy { padding-bottom: 2px; }
+.ix .idr-tl-head { display: flex; align-items: center; gap: 8px; }
+.ix .idr-tl-head strong { font-size: 14px; font-weight: 650; color: var(--fg); }
+.ix .idr-tl-row.next .idr-tl-head strong { color: #94a3b8; }
+.ix .idr-tl-head em {
+  font: 700 9.5px var(--font-mono); font-style: normal; letter-spacing: .14em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; color: var(--c-deep); background: var(--c-soft);
+  animation: idrBlink 1.8s ease-in-out infinite;
+}
+.ix .idr-tl-copy p { margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+.ix .idr-tl-copy time { display: block; margin-top: 4px; font: 500 11.5px var(--font-mono); color: #475569; }
+.ix .idr-tl-copy time span { color: var(--c-deep); }
+.ix .idr-tl-copy time.wait { color: #a3afbf; }
+
+/* ---------- notes ---------- */
+.ix .idr-empty { font-size: 13px; color: #94a3b8; }
+.ix .idr-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ix .idr-notes li {
+  padding: 11px 13px; border-radius: 13px; background: #f8fafc; border: 1px solid #edf1f6;
+  border-left: 3px solid #cbd5e1;
+}
+.ix .idr-notes li.self { background: var(--c-soft); border-color: var(--c-edge); border-left-color: var(--c); }
+.ix .idr-note-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ix .idr-note-head strong { font-size: 13px; }
+.ix .idr-note-head time { margin-left: auto; font: 500 11px var(--font-mono); color: #94a3b8; }
+.ix .idr-role {
+  padding: 1px 7px; border-radius: 999px; font: 700 9px var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: #475569; background: #eef2f7;
+}
+.ix .idr-role.staff { color: #0f766e; background: rgba(20, 184, 166, .12); }
+.ix .idr-role.admin { color: #5b21b6; background: rgba(124, 58, 237, .1); }
+.ix .idr-role.citizen { color: #0369a1; background: rgba(14, 165, 233, .1); }
+.ix .idr-role.internal { color: #b45309; background: rgba(245, 158, 11, .12); }
+.ix .idr-notes p { margin-top: 5px; font-size: 13.5px; line-height: 1.55; color: #334155; }
+
+.ix .idr-compose { margin-top: 12px; }
+/* notes closed to this viewer */
+.ix .idr-locked { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: rgba(248, 250, 252, .9); border: 1px dashed #cbd5e1; }
+.ix .idr-locked > span { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; color: #64748b; background: #f1f5f9; }
+.ix .idr-locked p { font-size: 12.5px; line-height: 1.5; color: #64748b; }
+.ix .idr-locked strong { display: block; font-size: 13.5px; color: #334155; margin-bottom: 2px; }
+/* command's closing note: the seal on a closed file */
+.ix .idr-notes li.seal { background: linear-gradient(135deg, #ecfdf5, rgba(255, 255, 255, .92)); border-color: rgba(16, 185, 129, .35); border-left: 3px solid #10b981; box-shadow: 0 8px 20px rgba(16, 185, 129, .1); }
+.ix .idr-role.sealed { display: inline-flex; align-items: center; gap: 4px; color: #047857; background: #d1fae5; }
+.ix .idr-closed-note { display: flex; align-items: center; gap: 6px; margin-top: 12px; font: 600 11.5px var(--font-mono); color: #94a3b8; }
+.ix .idr-compose textarea {
+  width: 100%; min-height: 84px; resize: vertical; padding: 12px 14px; border-radius: 13px;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .95); color: var(--fg);
+  font: 400 13.5px/1.5 var(--font-sans); outline: none; transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ix .idr-compose textarea:focus { border-color: var(--c); box-shadow: 0 0 0 4px var(--c-soft); }
+.ix .idr-compose-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.ix .idr-compose-bar span { font-size: 11.5px; color: #94a3b8; }
+
+@media (max-width: 580px) {
+  .ix .idr-meta { grid-template-columns: 1fr; }
+  .ix .idr-sla { grid-template-columns: 1fr; justify-items: start; }
+  .ix .idr-head, .ix .idr-body { padding: 16px; }
+  .ix .idr-sla-chip { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ix .idr, .ix .idr-veil, .ix .idr-scan, .ix .idr-ring, .ix .idr-geo-scan, .ix .idr-tl-row.now .idr-tl-dot,
+  .ix .idr-tl-head em, .ix .idr-next-dot, .ix .idr-sla-chip.over, .ix .idr-gate, .ix .idr-body > * { animation: none !important; }
+}
+
+/* ---------- citizen signals: danger flag, people affected, photos ---------- */
+.ix .idr-flag { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; }
+.ix .idr-affected { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: #0369a1; background: #f0f9ff; border: 1px solid rgba(14, 165, 233, .3); }
+.ix .idr-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-top: 8px; }
+.ix .idr-photos button { display: block; padding: 0; cursor: zoom-in; overflow: hidden; border-radius: 12px; aspect-ratio: 4 / 3; border: 1px solid var(--c-edge); background: #f1f5f9; }
+.ix .idr-photos img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.ix .idr-photos button:hover img { transform: scale(1.05); }
+.ix .idr-zoom { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 24px; background: rgba(8, 15, 28, .82); backdrop-filter: blur(6px); cursor: zoom-out; animation: idrFade .2s ease; }
+.ix .idr-zoom img { max-width: min(1100px, 100%); max-height: 86vh; border-radius: 14px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+.ix .idr-zoom button { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 12px; border: 0; display: grid; place-items: center; color: #fff; background: rgba(255, 255, 255, .15); cursor: pointer; }

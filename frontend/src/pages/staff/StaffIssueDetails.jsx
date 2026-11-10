@@ -1,36 +1,17 @@
-import { Link, useParams } from "react-router-dom";
-import IssueDetails from "../../components/issues/shared/IssueDetails";
-import PageHeader from "../../components/layout/PageHeader";
+import { Navigate, useParams } from "react-router-dom";
+import { useAuth } from "../../store/authStore";
 import { useIssues } from "../../store/issueStore";
 
+/* Old /staff/issues/:id links. The issue file is a drawer now: an issue on
+   you opens locked on Assigned Work, anything else opens on City Intake. */
 function StaffIssueDetails() {
   const { id } = useParams();
+  const user = useAuth();
   const issue = useIssues().find((item) => item.id === id);
-
-  if (!issue) {
-    return (
-      <main className="page-wrap">
-        <div className="empty-state">
-          <h2>Issue not found</h2>
-          <Link to="/staff/assigned">Back to assigned work</Link>
-        </div>
-      </main>
-    );
+  if (issue && issue.assignedTo === user?.name) {
+    return <Navigate to="/staff/assigned" replace state={{ target: issue.id }} />;
   }
-
-  return (
-    <main className="page-wrap">
-      <PageHeader
-        eyebrow="Field Layer · Record"
-        title={issue.id}
-        description="Read-only neural file. Change status from Assigned to Me."
-      />
-      <Link to="/staff/assigned" className="mono" style={{ display: "inline-block", margin: "8px 0 16px" }}>
-        ← Back to assigned work
-      </Link>
-      <IssueDetails issue={issue} />
-    </main>
-  );
+  return <Navigate to="/staff/queue" replace state={issue ? { open: issue.id } : null} />;
 }
 
 export default StaffIssueDetails;

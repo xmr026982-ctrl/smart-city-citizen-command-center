@@ -18,6 +18,7 @@ export const ZONES = [
   { id: "behala", name: "Behala", lat: 22.501, lng: 88.31, aqi: 82, traffic: "Slow", water: "Watch", power: "Hold" },
   { id: "bbdbagh", name: "B.B.D. Bagh", lat: 22.5726, lng: 88.3512, aqi: 76, traffic: "Heavy", water: "Watch", power: "Live" },
   { id: "dharmatala", name: "Dharmatala", lat: 22.561, lng: 88.352, aqi: 78, traffic: "Slow", water: "Stable", power: "Live" },
+  { id: "bptownship", name: "B.P. Township", lat: 22.4722, lng: 88.3878, aqi: 72, traffic: "Clear", water: "Watch", power: "Live" },
 ];
 
 export const DEFAULT_ZONE_ID = "central";
