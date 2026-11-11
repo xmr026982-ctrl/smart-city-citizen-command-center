@@ -61,7 +61,7 @@ function AppContent() {
     }
   }, [location.pathname, location.search, navigate])
 
-  // Preserve the onNavigate interface used by your components.
+  // Preserve the onNavigate interface used by components.
   const handleNavigate = (nextPage) => {
     const nextRoute = routeMap[nextPage]
 
@@ -70,17 +70,19 @@ function AppContent() {
     }
   }
 
+  // Shared Navbar appears only on these pages.
   const showNavigation = [
     'home',
     'about',
     'contact',
   ].includes(page)
 
-  const hideFooter = [
-    'auth',
-    'signup',
-    'staff-password',
-    'reset-password',
+  // Shared Footer appears only on these pages.
+  // Preview, Login and Register will use their own footers.
+  const showSharedFooter = [
+    'home',
+    'about',
+    'contact',
   ].includes(page)
 
   return (
@@ -95,13 +97,17 @@ function AppContent() {
       <Routes>
         <Route
           path="/"
-          element={<Home onNavigate={handleNavigate} />}
+          element={
+            <Home onNavigate={handleNavigate} />
+          }
         />
 
         <Route
           path="/preview"
           element={
-            <PlatformPreview onNavigate={handleNavigate} />
+            <PlatformPreview
+              onNavigate={handleNavigate}
+            />
           }
         />
 
@@ -117,12 +123,22 @@ function AppContent() {
 
         <Route
           path="/login"
-          element={<Auth key="login" initialMode="login" />}
+          element={
+            <Auth
+              key="login"
+              initialMode="login"
+            />
+          }
         />
 
         <Route
           path="/register"
-          element={<Auth key="signup" initialMode="signup" />}
+          element={
+            <Auth
+              key="signup"
+              initialMode="signup"
+            />
+          }
         />
 
         <Route
@@ -138,11 +154,15 @@ function AppContent() {
         {/* Unknown URLs return to Home. */}
         <Route
           path="*"
-          element={<Navigate to="/" replace />}
+          element={
+            <Navigate to="/" replace />
+          }
         />
       </Routes>
 
-      {!hideFooter && <Footer page={page} />}
+      {showSharedFooter && (
+        <Footer page={page} />
+      )}
     </>
   )
 }

@@ -1185,3 +1185,40 @@ button { font: inherit; cursor: pointer; }
   left: 30px;
   z-index: 20;
 }
+
+.preview-footer {
+  width: 100%;
+  margin-top: 40px;
+  padding: 24px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #aab8b5;
+  font-size: 0.9rem;
+  text-align: center;
+}.preview-footer {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  right: auto;
+
+  width: 100%;
+  min-height: 65px;
+  margin-top: auto;
+  padding: 20px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  flex-shrink: 0;
+  box-sizing: border-box;
+
+  background: linear-gradient(135deg,  #23865c,  #23865c);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+
+  color: #ffffff;
+  font-size: 14px;
+  text-align: center;
+}

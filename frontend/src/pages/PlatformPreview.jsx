@@ -485,8 +485,13 @@ function PlatformPreview({ onNavigate }) {
           shape the place you call home.
         </p>
 
+
       </section>
 
+
+<footer className="preview-footer">
+  <span>© 2026 Smart City</span>
+</footer>
     </main>
   )
 }
