@@ -2,6 +2,9 @@ import { useSyncExternalStore } from "react";
 import { isExpertiseId, expertiseLabel } from "../config/expertise";
 import { logEvent, releaseIssuesOf, getIssues } from "./issueStore";
 import { getUser } from "./authStore";
+import { SERVER_ON } from "../config/server";
+import { fetchStaffRequests } from "../services/staffRequestService";
+import { fetchStaffRoster } from "../services/staffService";
 
 /* ------------------------------------------------------------------
    Staff Desk roster + clearance queue.
@@ -306,4 +309,105 @@ export function setVerified(id, on) {
   patch(id, { verified: on });
   desk("verify", person, on ? `Gave ${person.name} the Verified badge` : `Removed the Verified badge from ${person.name}`);
   return true;
+}
+
+function normalizeServerRequest(request) {
+  return {
+    id: request._id,
+    serverId: request._id,
+    name: request.name || "",
+    email: request.email || "",
+    experience: request.experience ?? request.Experience ?? "",
+    expertise: request.expertise ?? request.Expertise ?? "",
+    zone: request.zone || "",
+    note: request.note || "",
+    filedAt: request.createdAt || request.filedAt || new Date().toISOString(),
+    status: request.status || "pending",
+  };
+}
+
+export async function refreshStaffRequests() {
+  if (!SERVER_ON) return;
+
+  try {
+    const serverRequests = await fetchStaffRequests();
+
+    // Only pending applications belong in the Clearance Queue.
+    const pendingRequests = serverRequests
+      .filter((request) => request.status === "pending")
+      .map(normalizeServerRequest);
+
+    state = {
+      ...state,
+      requests: pendingRequests,
+    };
+
+    emit();
+
+    return pendingRequests;
+  } catch (error) {
+    console.error("Could not load staff applications:", error);
+    throw error;
+  }
+}
+
+
+export async function refreshStaffRoster() {
+  if (!SERVER_ON) return [];
+
+  try {
+    const serverStaff = await fetchStaffRoster();
+
+    const updatedRoster = serverStaff.map((staff) => {
+      // Preserve locally maintained desk information where possible.
+      const existing = state.roster.find(
+        (person) =>
+          person.email?.toLowerCase() === staff.email?.toLowerCase()
+      );
+
+      return {
+        ...existing,
+
+        // MongoDB is the source of truth for staff identity.
+        id: existing?.id || `staff-${staff._id}`,
+        userId: staff._id,
+        name: staff.name,
+        email: staff.email,
+        zone: staff.zone || "",
+        
+        // Your backend stores expertise in the department field.
+        expertise: isExpertiseId(staff.department)
+          ? staff.department
+          : "civic",
+
+        // These fields are not currently stored in your User schema.
+        rank: existing?.rank || "Field Operative",
+        experience: existing?.experience || "",
+        verified: existing?.verified || false,
+        closedPrior: existing?.closedPrior || 0,
+
+        onDuty: existing?.onDuty ?? true,
+
+        // These users already have staff accounts in MongoDB.
+        uplink: "live",
+        dispatch: "sent",
+        requestedAt: existing?.requestedAt || staff.createdAt,
+        acceptedAt: existing?.acceptedAt || staff.createdAt,
+        uplinkedAt: existing?.uplinkedAt || staff.createdAt || null,
+      };
+    });
+
+    // Replace the demo/local roster with actual MongoDB staff.
+    state = {
+      ...state,
+      roster: updatedRoster,
+    };
+
+    emit();
+
+    return updatedRoster;
+  } catch (error) {
+    console.error("Could not load staff roster:", error);
+    throw error;
+  }
 }

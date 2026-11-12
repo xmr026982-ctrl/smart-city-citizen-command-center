@@ -79,7 +79,10 @@ function open(token) {
     wasLive = true;
   });
   socket.on("disconnect", () => setStatus("offline"));
-  socket.on("connect_error", () => setStatus("offline"));
+  socket.on("connect_error", (error) => {
+    console.error("[realtime] connection failed:", error.message);
+    setStatus("offline");
+  });
 
   REMOTE_EVENTS.forEach((name) => {
     socket.on(name, (payload = {}) => {

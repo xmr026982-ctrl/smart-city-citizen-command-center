@@ -12,8 +12,8 @@ import { onEvent, EVENTS, STREAM_RESUMED } from "../services/events";
    written in this code.
 
    What the app keeps after a sign-in:
-     localStorage.token   the server's token (JWT)
-     localStorage.user    { id, name, email, role, zone } as the server sent it
+     sessionStorage.token   the server's token (JWT)
+     sessionStorage.user    { id, name, email, role, zone } as the server sent it
 
    The role is never taken on trust from the browser. On every start the
    app asks the server who this token belongs to (GET /auth/me) and uses
@@ -59,8 +59,8 @@ function tokenExpired(token) {
 
 function clearServerKeys() {
   try {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
   } catch {
     /* ignore */
   }
@@ -90,8 +90,8 @@ function shape(u, source = "server") {
 function readServerSession() {
   if (!SERVER_ON) return null;
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const raw = localStorage.getItem(USER_KEY);
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    const raw = sessionStorage.getItem(USER_KEY);
     if (!token || !raw) return null;
     if (tokenExpired(token)) {
       clearServerKeys();
@@ -115,7 +115,7 @@ function readServerSession() {
 function readDevSession() {
   if (!DEV_DESK) return null;
   try {
-    const parsed = JSON.parse(localStorage.getItem(DEV_KEY) || "null");
+    const parsed = JSON.parse(sessionStorage.getItem(DEV_KEY) || "null");
     const desk = DEV_DESKS.find((d) => d.id === parsed?.id);
     return desk ? { ...desk, serverId: null, displayName: "", email: "", provider: "local", source: "dev" } : null;
   } catch {
@@ -180,7 +180,7 @@ export function takeSignOutNote() {
 export function sessionClock() {
   if (user?.source !== "server") return null;
   try {
-    const p = tokenPayload(localStorage.getItem(TOKEN_KEY));
+    const p = tokenPayload(sessionStorage.getItem(TOKEN_KEY));
     if (!p) return null;
     return {
       iat: typeof p.iat === "number" ? p.iat * 1000 : null,
@@ -196,7 +196,7 @@ export function replaceToken(token) {
   if (user?.source !== "server" || !token) return false;
   const p = tokenPayload(token);
   if (p?.role && (ROLE_ALIAS[p.role] || p.role) !== user.role) return false;
-  try { localStorage.setItem(TOKEN_KEY, token); } catch { return false; }
+  try { sessionStorage.setItem(TOKEN_KEY, token); } catch { return false; }
   armExpiry();
   emit();
   return true;
@@ -208,8 +208,8 @@ export function updateSessionUser(serverUser, token) {
   const next = shape(serverUser);
   if (!next || next.role !== user.role) return null;
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(serverUser));
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(serverUser));
   } catch {
     return null;
   }
@@ -220,14 +220,14 @@ export function updateSessionUser(serverUser, token) {
 /** The account object as the server last sent it (prefs and all), or null. */
 export function getAccount() {
   if (user?.source !== "server") return null;
-  try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch { return null; }
+  try { return JSON.parse(sessionStorage.getItem(USER_KEY) || "null"); } catch { return null; }
 }
 
 /** The current server token, or null */
 export function getToken() {
   if (user?.source !== "server") return null;
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
@@ -239,9 +239,9 @@ export function setServerSession({ token, user: serverUser } = {}) {
   const next = shape(serverUser);
   if (!next) return null;
   try {
-    localStorage.removeItem(DEV_KEY);
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USER_KEY, JSON.stringify(serverUser));
+    sessionStorage.removeItem(DEV_KEY);
+    sessionStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.setItem(USER_KEY, JSON.stringify(serverUser));
   } catch {
     return null;
   }
@@ -269,7 +269,7 @@ export function verifySession() {
       const account = data?.user || data;
       const next = shape(account);
       if (!next) { logout(); return null; }
-      try { localStorage.setItem(USER_KEY, JSON.stringify(account)); } catch { /* ignore */ }
+      try { sessionStorage.setItem(USER_KEY, JSON.stringify(account)); } catch { /* ignore */ }
       setUser(next, true);
       return next;
     })
@@ -294,7 +294,7 @@ export function openDevDesk(id) {
   if (!DEV_DESK) return null;
   const desk = DEV_DESKS.find((d) => d.id === id);
   if (!desk) return null;
-  try { localStorage.setItem(DEV_KEY, JSON.stringify({ id })); } catch { /* ignore */ }
+  try { sessionStorage.setItem(DEV_KEY, JSON.stringify({ id })); } catch { /* ignore */ }
   setUser(readDevSession(), true);
   return user;
 }
@@ -303,7 +303,7 @@ export function logout() {
   const wasServer = user?.source === "server";
   const token = getToken();
   clearServerKeys();
-  try { localStorage.removeItem(DEV_KEY); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(DEV_KEY); } catch { /* ignore */ }
   setUser(null, true);
   // tell the server the token is finished (it may keep a revocation list); never blocks sign-out
   if (wasServer && token && SERVER_ON) {
@@ -324,15 +324,6 @@ onSignedOut(() => {
 // the account changed on another device (name, photo, zone, preferences), or the live link came back: read it again
 onEvent(EVENTS.PROFILE_UPDATED, (e) => { if (user?.source === "server" && e?.id && String(e.id) === user.serverId) verifySession(); });
 onEvent(STREAM_RESUMED, () => { if (user?.source === "server") verifySession(); });
-
-// a sign-in or sign-out in another tab is picked up here
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", (e) => {
-    if (e.key !== null && ![TOKEN_KEY, USER_KEY, DEV_KEY].includes(e.key)) return;
-    const next = readSession();
-    if (JSON.stringify(next) !== JSON.stringify(user)) setUser(next, true);
-  });
-}
 
 export function getUser() {
   return verified ? user : null;

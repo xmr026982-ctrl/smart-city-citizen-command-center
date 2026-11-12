@@ -6,8 +6,25 @@ import { Sparkles, Vote, CheckCircle2, EyeOff, Megaphone, X, Plus, Minus, Shield
 import { useAuth } from "../../store/authStore";
 import { useAllIssues } from "../../store/issueStore";
 import {
-  useCommunity, residentsOf, answerDue, pollOpen, pollEnded, pollTotals, openPoll, closePoll, publishAnnouncement, moderate,
-  announcementLive, noticeLive, MODERATION_REASONS, POLL_HOURS,
+  useCommunity,
+  residentsOf,
+  answerDue,
+  pollOpen,
+  pollEnded,
+  pollTotals,
+  openPoll,
+  closePoll,
+  publishAnnouncement,
+  moderate,
+  announcementLive,
+  noticeLive,
+  MODERATION_REASONS,
+  POLL_HOURS,
+  isServerCommunityUser,
+  publishServerAnnouncement,
+  openServerPoll,
+  closeServerPoll,
+  withdrawServerAnnouncement,
 } from "../../store/communityStore";
 import { useLiveFeed } from "../../hooks/useLiveFeed";
 import { useMinute } from "../../hooks/useMinute";
@@ -209,7 +226,22 @@ export default function AdminCommunity() {
             c.announcements.filter((a) => zone === "all" || a.zones.includes(zone) || a.zones.includes("all")).map((a) => (
               <ModRow key={a.id} id={a.id} focused={focus === a.id} hidden={a.hidden} icon={Megaphone} kick={`${a.id} · ${a.zones.includes("all") ? "every zone" : a.zones.join(", ")} · ${[a.audience.citizens && "citizens", a.audience.staff && "field crews"].filter(Boolean).join(" + ")}`} title={a.title} body={a.body}
                 meta={announcementLive(a) ? `Live · until ${cutoff(a.until)}` : a.hidden ? `Withdrawn · ${a.hidden.reason}` : "Ended"}
-                onHide={announcementLive(a) ? (r) => moderate(me, { type: "announcement", id: a.id }, r) : null} />
+                onHide={
+  announcementLive(a)
+    ? async (reason) => {
+        try {
+          if (isServerCommunityUser(me)) {
+            await withdrawServerAnnouncement(a.id, me, reason);
+          } else {
+            moderate(me, { type: "announcement", id: a.id }, reason);
+          }
+          toast(`Announcement ${a.id} withdrawn`);
+        } catch (err) {
+          toast(err.message || "Unable to withdraw announcement");
+        }
+      }
+    : null
+} />
             ))
           ) : null}
 
@@ -258,11 +290,29 @@ function AdminPoll({ poll, me, compact = false, focused = false, proposals, onOp
   const liveNow = pollOpen(poll);
   const ended = pollEnded(poll);
   const src = poll.from?.type === "proposal" ? proposals.find((p) => p.id === poll.from.id) : null;
-  const close = () => {
-    const res = closePoll(poll.id, me, pick, note);
-    if (!res.ok) { setErr(res.reason); return; }
-    setClosing(false); toast(`Poll ${poll.id} closed · voters are notified`);
-  };
+  const close = async () => {
+  if (!pick || !note.trim()) return;
+
+  setErr("");
+
+  try {
+    if (isServerCommunityUser(me)) {
+      await closeServerPoll(poll.id, me, pick, note);
+    } else {
+      const res = closePoll(poll.id, me, pick, note);
+
+      if (!res.ok) {
+        setErr(res.reason);
+        return;
+      }
+    }
+
+    setClosing(false);
+    toast(`Poll ${poll.id} closed · voters are notified`);
+  } catch (err) {
+    setErr(err.message || "Unable to close this poll.");
+  }
+};
   return (
     <article className={`cx-post cx-apoll${focused ? " focus" : ""}`} id={compact ? undefined : `cx-${poll.id}`}>
       <div className="cx-meta">
@@ -328,12 +378,47 @@ function AnnouncementComposer({ me, innerRef, toast }) {
   const all = zones.includes("all");
   const toggle = (z) => setZones(z === "all" ? (all ? [] : ["all"]) : zones.filter((x) => x !== "all").includes(z) ? zones.filter((x) => x !== z && x !== "all") : [...zones.filter((x) => x !== "all"), z]);
   const ready = title.trim().length >= 8 && zones.length && (citizens || staff) && !isMash(title, { title: true }) && !isMash(body);
-  const publish = () => {
-    const res = publishAnnouncement(me, { title, body, zones, citizens, staff, hours });
-    if (!res.ok) { setErr(res.reason); return; }
-    setTitle(""); setBody(""); setZones([]); setErr("");
+  const publish = async () => {
+  setErr("");
+
+  try {
+    let res;
+
+    if (isServerCommunityUser(me)) {
+      res = await publishServerAnnouncement(me, {
+        title,
+        body,
+        zones,
+        citizens,
+        staff,
+        hours,
+      });
+    } else {
+      res = publishAnnouncement(me, {
+        title,
+        body,
+        zones,
+        citizens,
+        staff,
+        hours,
+      });
+    }
+
+    if (!res.ok) {
+      setErr(res.reason || "Unable to publish announcement.");
+      return;
+    }
+
+    setTitle("");
+    setBody("");
+    setZones([]);
+    setErr("");
+
     toast(`${res.id} published · the zone is notified`);
-  };
+  } catch (err) {
+    setErr(err.message || "Unable to publish announcement.");
+  }
+};
   return (
     <div className="cx-card pad cx-compose" ref={innerRef}>
       <p className="cx-kick sm"><i />Publish announcement</p>
@@ -382,12 +467,39 @@ function PollDoor({ state, me, proposals, issues, onClose, onOpened }) {
     ...proposals.filter((p) => p.status === "review" && (ward === "all" || p.ward === ward)).map((p) => ({ v: `proposal:${p.id}`, l: `${p.id} · ${p.title}` })),
     ...issues.filter((i) => !i.removed && i.status !== "resolved" && (ward === "all" || i.ward === ward)).slice(0, 20).map((i) => ({ v: `issue:${i.id}`, l: `${i.id} · ${i.title}` })),
   ];
-  const open = () => {
-    const [type, id] = from ? from.split(":") : [];
-    const res = openPoll(me, { question, ward, options, hours, from: from ? { type, id } : null });
-    if (!res.ok) { setErr(res.reason); return; }
-    onOpened(res.id);
+  const open = async () => {
+  const [type, id] = from ? from.split(":") : [];
+
+  const payload = {
+    question,
+    ward,
+    options,
+    hours,
+    from: from ? { type, id } : null,
   };
+
+  setErr("");
+
+  try {
+    let res;
+
+    if (isServerCommunityUser(me)) {
+      res = await openServerPoll(me, payload);
+    } else {
+      // Keep development-desk behaviour unchanged.
+      res = openPoll(me, payload);
+    }
+
+    if (!res.ok) {
+      setErr(res.reason || "Could not open poll.");
+      return;
+    }
+
+    onOpened(res.id);
+  } catch (error) {
+    setErr(error.message || "Could not open poll.");
+  }
+};
   return createPortal(
     <div className="cx-layer tone-admin" role="presentation">
       <div className="cx-scrim" onClick={onClose} aria-hidden />
@@ -430,4 +542,3 @@ function PollDoor({ state, me, proposals, issues, onClose, onOpened }) {
     document.body
   );
 }
-

@@ -1,10 +1,10 @@
+import { useState } from "react";
 import { weekClock } from "../../utils/time";
 import { useNavigate } from "react-router-dom";
 import { Megaphone, ShieldCheck, Wrench, Vote, CheckCircle2, AlertTriangle, Users, Flag, Sparkles, ArrowUpRight } from "lucide-react";
 import { useAuth } from "../../store/authStore";
-import {
-  PROPOSAL_STATUS, residentsOf, supportersOf, signalOf, signalProposal, pollTotals, pollOpen, votePoll,
-  issueSignalOf, issueSignalCount, signalIssue,
+import { PROPOSAL_STATUS, residentsOf, supportersOf, signalOf, signalProposal, pollTotals, pollOpen, votePoll,
+  voteServerPoll, isServerCommunityUser, issueSignalOf, issueSignalCount, signalIssue,
 } from "../../store/communityStore";
 import { CATEGORY_LABEL } from "../../constants/issueCategories";
 import { CITY_COMMAND, nameFor } from "../../store/profileStore";
@@ -132,27 +132,70 @@ export function ProposalCard({ p, ev, onOpen, focused }) {
 
 export function PollCard({ poll, focused, compact = false }) {
   const me = useAuth();
+  const [pending, setPending] = useState(false);
+  const [voteError, setVoteError] = useState("");
+
   const { counts, total } = pollTotals(poll);
   const live = pollOpen(poll);
   const mine = poll.votes?.[me?.id] || null;
   const showResults = Boolean(mine) || !live;
   const winner = poll.outcome?.optionId;
+
+  const castVote = async (optionId) => {
+    if (!me || !live || pending) return;
+
+    setPending(true);
+    setVoteError("");
+
+    try {
+      if (isServerCommunityUser(me)) {
+        await voteServerPoll(poll.id, me, optionId);
+      } else {
+        const success = votePoll(poll.id, me, optionId);
+        if (!success) {
+          setVoteError("Your vote could not be recorded.");
+        }
+      }
+    } catch (err) {
+      setVoteError(err.message || "Unable to submit your vote. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
   return (
-    <article className={`cx-poll${compact ? " compact" : ""}${focused ? " focus" : ""}`} id={`cx-${poll.id}`}>
+    <article
+      className={`cx-poll${compact ? " compact" : ""}${focused ? " focus" : ""}`}
+      id={`cx-${poll.id}`}
+    >
       <div className="cx-meta">
-        <span className={`cx-tag ${live ? "acc" : "muted"}`}><Vote size={11} /> {live ? `Poll · ${left(poll.closesAt)}` : "Poll · closed"}</span>
+        <span className={`cx-tag ${live ? "acc" : "muted"}`}>
+          <Vote size={11} />
+          {live ? `Poll · ${left(poll.closesAt)}` : "Poll · closed"}
+        </span>
         <span className="m">{total} votes</span>
       </div>
+
       <h3>{poll.question}</h3>
+
       <div className="cx-opts" role="radiogroup" aria-label={poll.question}>
         {poll.options.map((o) => {
-          const pct = total ? Math.round((counts[o.id] / total) * 100) : 0;
+          const pct = total
+            ? Math.round((counts[o.id] / total) * 100)
+            : 0;
+
           return (
             <button
-              key={o.id} type="button" role="radio" aria-checked={mine === o.id} disabled={!live}
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={mine === o.id}
+              disabled={!live || pending}
               className={`cx-opt${mine === o.id ? " mine" : ""}${winner === o.id ? " win" : ""}`}
-              style={{ "--p": showResults ? `${pct}%` : "0%" }}
-              onClick={() => votePoll(poll.id, me, o.id)}
+              style={{
+                "--p": showResults ? `${pct}%` : "0%",
+              }}
+              onClick={() => castVote(o.id)}
             >
               <i aria-hidden />
               <span>{o.label}</span>
@@ -161,10 +204,21 @@ export function PollCard({ poll, focused, compact = false }) {
           );
         })}
       </div>
+
+      {voteError ? (
+        <p className="cx-err" role="alert">{voteError}</p>
+      ) : null}
+
       <small className="cx-foot">
         {!live
-          ? poll.outcome ? <>Outcome · {poll.outcome.note}</> : "Closed · outcome to follow"
-          : mine ? "You voted · you can change it until the poll closes" : "One vote per person · results show after you vote"}
+          ? poll.outcome
+            ? <>Outcome · {poll.outcome.note}</>
+            : "Closed · outcome to follow"
+          : pending
+            ? "Saving your vote…"
+            : mine
+              ? "You voted · you can change it until the poll closes"
+              : "One vote per person · results show after you vote"}
       </small>
     </article>
   );

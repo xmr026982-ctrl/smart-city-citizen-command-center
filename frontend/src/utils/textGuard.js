@@ -34,6 +34,24 @@ const hasRun = (w) => {
   return false;
 };
 
+const DIGIT_ROWS = ["0123456789"];
+const DIGIT_RUNS = new Set();
+
+DIGIT_ROWS.forEach((row) => {
+  for (let i = 0; i + 4 <= row.length; i += 1) {
+    const run = row.slice(i, i + 4);
+    DIGIT_RUNS.add(run);
+    DIGIT_RUNS.add([...run].reverse().join(""));
+  }
+});
+
+const hasDigitRun = (value) => {
+  for (const run of DIGIT_RUNS) {
+    if (value.includes(run)) return true;
+  }
+  return false;
+};
+
 // consonant pairs that real words (English and Indian place names in Latin letters) use
 const OK_PAIRS = new Set(
   ("bb bh bl br bs bt cc ch ck cl cr ct dd dg dh dl dm dn dr ds dw ff fl fr ft gg gh gl gm gn gr gs " +
@@ -83,6 +101,9 @@ export function isMash(text = "", { title = false } = {}) {
   const latin = raw.replace(/[^A-Za-z]/g, "");
   if (latin.length < raw.replace(/[\s\d\p{P}\p{S}]/gu, "").length * 0.6) return false; // mostly another script
   const low = raw.toLowerCase();
+  // Numeric keyboard runs, including reversed runs ("1234", "4321").
+  const digits = low.replace(/\D/g, "");
+  if (hasDigitRun(digits)) return true;
   if (/(.)\1{5,}/.test(low.replace(/\s/g, ""))) return true; // !!!!!!, ......, gggggg
 
   const words = low.split(/[^a-z]+/).filter(Boolean);

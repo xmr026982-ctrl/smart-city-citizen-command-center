@@ -31,52 +31,105 @@ export const CITY = {
   uptime: 99.7,
 };
 
-export const METRIC_KEYS = ["aqi", "traffic", "water", "power"];
+export const METRIC_KEYS = ["aqi", "traffic", "rain", "heat", "feels"];
 
-const TRAFFIC = { Clear: 88, Slow: 76, Heavy: 52 };
-const WATER = { Stable: 92, Watch: 80 };
-const POWER = { Live: 98, Hold: 86 };
-
-// Starting numbers for a zone (the feed random-walks around these until real data arrives).
-export function baseMetrics(zone) {
+// City Health values come from the backend only.
+// Retain this helper for compatibility with any existing imports.
+export function baseMetrics() {
   return {
-    aqi: zone.aqi,
-    traffic: TRAFFIC[zone.traffic] ?? 75,
-    water: WATER[zone.water] ?? 90,
-    power: POWER[zone.power] ?? 95,
+    aqi: null,
+    traffic: null,
+    rain: null,
+    heat: null,
+    feels: null,
   };
 }
 
-// ---- labels ----
-// std "cpcb" = India CPCB bands, "epa" = US EPA bands (Settings -> Display -> Air-quality scale)
-export function aqiLabel(v, std = "cpcb") {
-  if (std === "epa") {
-    return v <= 50 ? "Good" : v <= 100 ? "Moderate" : v <= 150 ? "Unhealthy (sensitive)" : v <= 200 ? "Unhealthy" : v <= 300 ? "Very unhealthy" : "Hazardous";
-  }
-  return v <= 50 ? "Good" : v <= 100 ? "Satisfactory" : v <= 200 ? "Moderate" : v <= 300 ? "Poor" : v <= 400 ? "Very poor" : "Severe";
-}
-export const trafficLabel = (v) => (v >= 80 ? "Free flow" : v >= 65 ? "Moderate" : "Heavy");
-export const waterLabel = (v) => (v >= 90 ? "Optimal" : v >= 82 ? "Stable" : "Watch");
-export const powerLabel = (v) => (v >= 95 ? "Optimal" : v >= 88 ? "Stable" : "On hold");
-export const envLabel = (v) => (v >= 80 ? "Excellent" : v >= 60 ? "Good" : v >= 40 ? "Fair" : "Poor");
+export function aqiLabel(value, standard = "CPCB") {
+  if (!Number.isFinite(Number(value))) return "Unavailable";
 
-// Beacon colour in the 3D city.
-export function toneFor(m) {
-  if (!m) return "ok";
-  return m.traffic < 60 || m.water < 85 || m.power < 90 || m.aqi > 100 ? "warn" : "ok";
+  const aqi = Number(value);
+  if (aqi <= 50) return "Good";
+  if (aqi <= 100) return "Satisfactory";
+  if (aqi <= 200) return "Moderate";
+  if (aqi <= 300) return "Poor";
+  if (aqi <= 400) return "Very Poor";
+  return "Severe";
 }
 
-// Alerts are derived from live numbers, so they appear/disappear as the feed changes.
-// When the backend starts sending its own alerts, the feed's `alertsOverride` replaces this.
-export function deriveAlerts(zones) {
-  const out = [];
-  ZONES.forEach((z) => {
-    const m = zones[z.id];
-    if (!m) return;
-    if (m.traffic < 60) out.push({ id: `${z.id}-traffic`, title: "Traffic Congestion", place: z.name, note: m.traffic < 50 ? "Heavy Delay" : "Moderate Delay", tone: "warn", sev: 60 - m.traffic });
-    if (m.water < 85) out.push({ id: `${z.id}-water`, title: "Water Pressure", place: z.name, note: "Slight Variation", tone: "info", sev: (85 - m.water) * 1.2 });
-    if (m.power < 90) out.push({ id: `${z.id}-power`, title: "Power Hold", place: z.name, note: "Load Shedding", tone: "warn", sev: 90 - m.power });
-    if (m.aqi > 100) out.push({ id: `${z.id}-aqi`, title: "Air Quality", place: z.name, note: "Above Limit", tone: "warn", sev: (m.aqi - 100) / 2 });
+export function trafficLabel(value) {
+  if (!Number.isFinite(Number(value))) return "Unavailable";
+  const v = Number(value);
+
+  if (v >= 80) return "Free flowing";
+  if (v >= 60) return "Moderate";
+  if (v >= 40) return "Slow";
+  return "Heavy congestion";
+}
+
+// Retained so unrelated existing imports do not break.
+export function waterLabel(value) {
+  if (!Number.isFinite(Number(value))) return "Unavailable";
+  return Number(value) >= 85 ? "Stable" : "Watch";
+}
+
+export function powerLabel(value) {
+  if (!Number.isFinite(Number(value))) return "Unavailable";
+  return Number(value) >= 90 ? "Live" : "Hold";
+}
+
+export function toneFor(metrics) {
+  if (!metrics) return "ok";
+
+  const aqiWarning = Number.isFinite(Number(metrics.aqi)) && Number(metrics.aqi) > 100;
+  const trafficWarning =
+    Number.isFinite(Number(metrics.traffic)) && Number(metrics.traffic) < 40;
+  const heatWarning =
+    Number.isFinite(Number(metrics.heat)) && Number(metrics.heat) >= 40;
+
+  return aqiWarning || trafficWarning || heatWarning ? "warn" : "ok";
+}
+
+export function deriveAlerts(zoneMetrics = {}) {
+  const alerts = [];
+
+  ZONES.forEach((zone) => {
+    const metrics = zoneMetrics[zone.id];
+    if (!metrics) return;
+
+    if (Number.isFinite(Number(metrics.aqi)) && Number(metrics.aqi) > 200) {
+      alerts.push({
+        id: `aqi-${zone.id}`,
+        zone: zone.name,
+        type: "Air quality",
+        severity: "high",
+        message: `AQI is ${Math.round(Number(metrics.aqi))}`,
+      });
+    }
+
+    if (
+      Number.isFinite(Number(metrics.traffic)) &&
+      Number(metrics.traffic) < 40
+    ) {
+      alerts.push({
+        id: `traffic-${zone.id}`,
+        zone: zone.name,
+        type: "Traffic",
+        severity: "medium",
+        message: "Traffic flow is heavily reduced",
+      });
+    }
+
+    if (Number.isFinite(Number(metrics.heat)) && Number(metrics.heat) >= 40) {
+      alerts.push({
+        id: `heat-${zone.id}`,
+        zone: zone.name,
+        type: "Heat",
+        severity: "high",
+        message: `Temperature is ${Number(metrics.heat).toFixed(1)} °C`,
+      });
+    }
   });
-  return out.sort((a, b) => b.sev - a.sev);
+
+  return alerts;
 }

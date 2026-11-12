@@ -21,7 +21,7 @@ import { getDesk, acceptRequest, setDispatch, markUplinked } from "../store/staf
 import { SERVER_ON } from "../config/server";
 import { api } from "../lib/api";
 import { expertiseLabel } from "../config/expertise";
-
+import { rejectServerStaffRequest } from "./staffRequestService";
 
 
 // true once the backend is connected (VITE_API_URL set). The desk hides its demo controls then.
@@ -61,6 +61,14 @@ export async function notifyStaffAccepted(payload) {
     zone: payload.zone,
   });
   return data || { ok: true };
+}
+
+export async function rejectAndRemove(requestId) {
+  // Update MongoDB first.
+  await rejectServerStaffRequest(requestId);
+
+  // Remove from the local queue only after server success.
+  rejectRequest(requestId);
 }
 
 /**
@@ -115,9 +123,40 @@ async function dispatchKey(person, again = false) {
 }
 
 /** Accept a clearance request and transmit the activation key. */
-export function acceptAndDispatch(requestId, rank) {
+export async function acceptAndDispatch(requestId, rank) {
+  const request = getDesk().requests.find(
+    (item) => item.id === requestId
+  );
+
+  if (!request) {
+    throw new Error("Clearance request was not found.");
+  }
+
+  // Step 1: Approve in MongoDB and send the setup email.
+  await notifyStaffAccepted({
+    requestId,
+    name: request.name,
+    email: request.email,
+    experience: request.experience,
+    expertise: request.expertise,
+    zone: request.zone,
+    note: request.note || "",
+    rank,
+  });
+
+  // Step 2: Update the local roster only after backend success.
   const person = acceptRequest(requestId, rank);
-  if (person) dispatchKey(person);
+
+  if (!person) {
+    throw new Error(
+      "The application was approved, but the local roster could not be updated."
+    );
+  }
+
+  // Step 3: The approval endpoint already sent the setup email.
+  // Do not call notifyStaffAccepted() a second time.
+  setDispatch(person.id, "sent");
+
   return person;
 }
 

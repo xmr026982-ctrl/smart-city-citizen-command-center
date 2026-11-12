@@ -2,7 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Leaf, Car, Droplets, Zap, RotateCw, Box, LocateFixed, Radar, ArrowUpRight, Sun, Moon, SunMoon } from "lucide-react";
+import {
+  Leaf,
+  Car,
+  CloudRain,
+  ThermometerSun,
+  RotateCw,
+  Box,
+  LocateFixed,
+  Radar,
+  ArrowUpRight,
+  Sun,
+  Moon,
+  SunMoon,
+} from "lucide-react";
 import CityScene from "./CityScene";
 import { ZONE_POS, project } from "./geo";
 import { skyFor, SKY_MODES, SKY_LABEL } from "./sky";
@@ -281,11 +294,51 @@ function CityPlate() {
       </div>
 
       <div className="kpi-row">
-        <KpiCard icon={Leaf} label="Air Quality" value={zm.aqi} history={zm.history.aqi} unit=" AQI" status={aqiLabel(zm.aqi, cfg.aqiStd)} color="#16a34a" lowerIsBetter />
-        <KpiCard icon={Car} label="Traffic Flow" value={zm.traffic} history={zm.history.traffic} unit="%" status={trafficLabel(zm.traffic)} color="#2563eb" />
-        <KpiCard icon={Droplets} label="Water Supply" value={zm.water} history={zm.history.water} unit="%" status={waterLabel(zm.water)} color="#0ea5e9" />
-        <KpiCard icon={Zap} label="Power Supply" value={zm.power} history={zm.history.power} unit="%" status={powerLabel(zm.power)} color="#a855f7" />
-      </div>
+  <KpiCard
+    icon={Leaf}
+    label="Air Quality"
+    value={zm.aqi ?? "—"}
+    history={zm.history.aqi}
+    unit=" AQI"
+    status={aqiLabel(zm.aqi, cfg.aqiStd)}
+    color="#16a34a"
+    lowerIsBetter
+  />
+
+  <KpiCard
+    icon={Car}
+    label="Traffic Flow"
+    value={zm.traffic ?? "—"}
+    history={zm.history.traffic}
+    unit="%"
+    status={trafficLabel(zm.traffic)}
+    color="#2563eb"
+  />
+
+  <KpiCard
+    icon={CloudRain}
+    label="Rainfall"
+    value={zm.rain ?? "—"}
+    history={zm.history.rain}
+    unit=" mm"
+    status="Preceding hour"
+    color="#0ea5e9"
+  />
+
+  <KpiCard
+    icon={ThermometerSun}
+    label="Heat"
+    value={zm.heat ?? "—"}
+    history={zm.history.heat}
+    unit=" °C"
+    status={
+      Number.isFinite(Number(zm.feels))
+        ? `Feels like ${Number(zm.feels).toFixed(1)} °C`
+        : "Feels-like unavailable"
+    }
+    color="#a855f7"
+  />
+</div>
 
       <div className="panel-row">
         <LiveAlerts alerts={alerts} />

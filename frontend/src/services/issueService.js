@@ -31,7 +31,28 @@ export const RECALL_NOTE_MIN = 8; // why the field takes its request back
 export const RETURN_NOTE_MIN = 12; // what command says is still missing
 export const SEAL_NOTE_MIN = 8; // command's closing note (one quick fill is enough)
 
-const isMine = (issue, user) => Boolean(issue && user && issue.assignedTo === user.name);
+const isMine = (issue, user) => {
+  if (!issue || !user || user.role !== "staff") return false;
+
+  const userIds = [
+    user.serverId,
+    user._id,
+    user.id,
+  ]
+    .filter(Boolean)
+    .map(String);
+
+  // Prefer the stable MongoDB account ID.
+  if (issue.assignedToId) {
+    return userIds.includes(String(issue.assignedToId));
+  }
+
+  // Fallback for older/local issues.
+  const assignedName = String(issue.assignedTo || "").trim().toLowerCase();
+  const currentName = String(user.displayName || user.name || "").trim().toLowerCase();
+
+  return Boolean(assignedName && currentName && assignedName === currentName);
+};
 const find = (id) => getIssues().find((i) => i.id === id) || null;
 const clean = (text) => String(text || "").trim().replace(/\s+/g, " ");
 

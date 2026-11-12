@@ -1,4 +1,8 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { api } from "../lib/api";
+import { SERVER_ON } from "../config/server";
+import { getUser } from "./authStore";
+import { onEvent, EVENTS, STREAM_RESUMED } from "../services/events";
 import { getAllIssues, logEvent, addIssue, nextIssueId } from "./issueStore";
 import { isMash, MASH_MESSAGE } from "../utils/textGuard";
 import { windowFor } from "./slaPolicyStore";
@@ -204,9 +208,9 @@ if (typeof window !== "undefined") {
 }
 const subscribe = (f) => { subs.add(f); return () => subs.delete(f); };
 export const getCommunity = () => state;
-export function useCommunity() {
-  return useSyncExternalStore(subscribe, getCommunity, getCommunity);
-}
+// export function useCommunity() {
+//   return useSyncExternalStore(subscribe, getCommunity, getCommunity);
+// }
 
 function trail(actor, role, n) {
   state = { ...state, trail: [{ id: uid("ct"), at: now(), actor, role, n }, ...state.trail] };
@@ -545,4 +549,406 @@ export function answerStill(user, issueId, verdict, note) {
   logEvent({ actor: user.name, role: "staff", action: verdict === "fixed" ? `Checked ${issueId} after "still happening": fixed · ${text}` : `Asked to revisit ${issueId} · ${text}`, issueId, kind: "community" });
   save();
   return { ok: true };
+}
+
+
+/* ==================================================================
+   SERVER COMMUNITY SYNC
+   Announcements and polls are stored in MongoDB for server accounts.
+   Proposals, notices, checks and issue signals remain on the existing
+   local workflow.
+================================================================== */
+
+let communityRefreshInFlight = null;
+
+export function isServerCommunityUser(user = getUser()) {
+  return Boolean(SERVER_ON && user?.source === "server");
+}
+
+function notifyCommunitySubscribers() {
+  subs.forEach((fn) => fn());
+}
+
+/**
+ * Fetch the server's authoritative announcements and polls.
+ * Does not replace proposals, notices, checks or the community trail.
+ */
+export async function refreshServerCommunity(user = getUser()) {
+  if (!isServerCommunityUser(user)) return false;
+
+  if (communityRefreshInFlight) return communityRefreshInFlight;
+
+  communityRefreshInFlight = (async () => {
+    try {
+      const { data } = await api.get("/community");
+
+      state = {
+        ...state,
+        announcements: Array.isArray(data.announcements)
+          ? data.announcements
+          : [],
+        polls: Array.isArray(data.polls)
+          ? data.polls
+          : [],
+        anchor: Date.now()
+      };
+
+      // Cache the latest server data without changing the other domains.
+      try {
+        localStorage.setItem(KEY, JSON.stringify(state));
+      } catch {
+        // The current tab still has the server data in memory.
+      }
+
+      notifyCommunitySubscribers();
+      return true;
+    } catch (error) {
+      console.error("[Community] Server refresh failed:", error);
+      return false;
+    } finally {
+      communityRefreshInFlight = null;
+    }
+  })();
+
+  return communityRefreshInFlight;
+}
+
+/**
+ * useCommunity also refreshes the server-backed collections when a
+ * server account opens a Community screen.
+ */
+export function useCommunity() {
+  const community = useSyncExternalStore(
+    subscribe,
+    getCommunity,
+    getCommunity
+  );
+
+  useEffect(() => {
+    const user = getUser();
+
+    if (!SERVER_ON || !user || user.source !== "server") return;
+
+    refreshServerCommunity(user).catch((err) => {
+      console.error("[community] Initial server refresh failed:", err);
+    });
+
+    const unsubscribeCommunity = onEvent(
+      EVENTS.COMMUNITY_CHANGED,
+      () => {
+        refreshServerCommunity(user).catch((err) => {
+          console.error("[community] Realtime refresh failed:", err);
+        });
+      }
+    );
+
+    const unsubscribeResume = onEvent(STREAM_RESUMED, () => {
+      refreshServerCommunity(user).catch((err) => {
+        console.error("[community] Reconnect refresh failed:", err);
+      });
+    });
+
+    return () => {
+      unsubscribeCommunity();
+      unsubscribeResume();
+    };
+  }, []);
+
+  return community;
+}
+
+/**
+ * Admin: publish an announcement to MongoDB.
+ * Returns the same { ok, id } / { ok:false, reason } style as the
+ * existing local function.
+ */
+export async function publishServerAnnouncement(
+  user,
+  { title, body, zones, citizens = true, staff = true, hours = 72 }
+) {
+  if (!isServerCommunityUser(user)) {
+    return { ok: false, reason: "A connected server account is required." };
+  }
+
+  const t = String(title || "").trim();
+  const b = String(body || "").trim();
+
+  if (user?.role !== "admin") {
+    return { ok: false, reason: "Only command publishes announcements." };
+  }
+  if (t.length < 8) {
+    return { ok: false, reason: "Write a title (8 characters or more)." };
+  }
+  if (isMash(t, { title: true }) || isMash(b)) {
+    return { ok: false, reason: MASH_MESSAGE };
+  }
+  if (!Array.isArray(zones) || !zones.length) {
+    return { ok: false, reason: "Pick at least one zone." };
+  }
+  if (!citizens && !staff) {
+    return { ok: false, reason: "Pick who it reaches." };
+  }
+
+  try {
+    const { data } = await api.post("/community/announcements", {
+      title: t,
+      body: b,
+      zones,
+      citizens,
+      staff,
+      hours
+    });
+
+    const item = data.item;
+    if (!item?.id) {
+      return { ok: false, reason: "The server did not return the published announcement." };
+    }
+
+    state = {
+      ...state,
+      announcements: [
+        item,
+        ...state.announcements.filter((a) => a.id !== item.id)
+      ]
+    };
+
+    trail(user.name, "admin", {
+      type: "announced",
+      ref: item.id,
+      zones,
+      citizens,
+      staff
+    });
+
+    audit(user.name, `Published ${item.id} · ${zones.includes("all") ? "every zone" : zones.join(", ")} · ${t}`);
+    save();
+
+    return { ok: true, id: item.id };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.message || "Could not publish announcement."
+    };
+  }
+}
+
+/**
+ * Admin: create a MongoDB poll.
+ */
+export async function openServerPoll(
+  user,
+  { question, ward, options, hours = 48, from = null }
+) {
+  if (!isServerCommunityUser(user)) {
+    return { ok: false, reason: "A connected server account is required." };
+  }
+
+  const q = String(question || "").trim();
+  const opts = (options || []).map((o) => String(o || "").trim()).filter(Boolean);
+
+  if (user?.role !== "admin") {
+    return { ok: false, reason: "Only command opens polls." };
+  }
+  if (q.length < 8) {
+    return { ok: false, reason: "Write the question (8 characters or more)." };
+  }
+  if (isMash(q, { title: true }) || opts.some((o) => isMash(o, { title: true }))) {
+    return { ok: false, reason: MASH_MESSAGE };
+  }
+  if (opts.length < 2 || opts.length > 4) {
+    return { ok: false, reason: "Give 2 to 4 options." };
+  }
+  if (new Set(opts.map((o) => o.toLowerCase())).size !== opts.length) {
+    return { ok: false, reason: "Each option must be different." };
+  }
+
+  try {
+    const { data } = await api.post("/community/polls", {
+      question: q,
+      ward: ward || "all",
+      options: opts,
+      hours,
+      from
+    });
+
+    const item = data.item;
+    if (!item?.id) {
+      return { ok: false, reason: "The server did not return the new poll." };
+    }
+
+    state = {
+      ...state,
+      polls: [item, ...state.polls.filter((p) => p.id !== item.id)]
+    };
+
+    trail(user.name, "admin", {
+      type: "poll-opened",
+      ref: item.id,
+      ward: item.ward
+    });
+
+    audit(user.name, `Opened poll ${item.id} · ${item.ward} · ${q}`);
+    save();
+
+    return { ok: true, id: item.id };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.message || "Could not create poll."
+    };
+  }
+}
+
+/**
+ * Citizen: save or change a vote in MongoDB.
+ */
+export async function voteServerPoll(id, user, optionId) {
+  if (!isServerCommunityUser(user) || user?.role !== "citizen") {
+    return { ok: false, reason: "Only connected citizens can vote." };
+  }
+
+  const poll = state.polls.find((p) => p.id === id);
+  if (!poll || !pollOpen(poll)) {
+    return { ok: false, reason: "This poll is no longer open." };
+  }
+  if (!poll.options.some((o) => o.id === optionId)) {
+    return { ok: false, reason: "Select a valid option." };
+  }
+
+  try {
+    const { data } = await api.post(
+      `/community/polls/${encodeURIComponent(id)}/vote`,
+      { optionId }
+    );
+
+    if (data.item) {
+      state = {
+        ...state,
+        polls: state.polls.map((p) => p.id === id ? data.item : p)
+      };
+      save();
+    } else {
+      await refreshServerCommunity(user);
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.message || "Could not save your vote."
+    };
+  }
+}
+
+/**
+ * Admin: close a poll and publish its outcome.
+ */
+export async function closeServerPoll(id, user, optionId, note) {
+  if (!isServerCommunityUser(user) || user?.role !== "admin") {
+    return { ok: false, reason: "Only a connected administrator can close polls." };
+  }
+
+  const why = String(note || "").trim();
+  const poll = state.polls.find((p) => p.id === id);
+
+  if (!poll || poll.status === "closed") {
+    return { ok: false, reason: "This poll is already closed." };
+  }
+  if (!poll.options.some((o) => o.id === optionId)) {
+    return { ok: false, reason: "Pick the outcome." };
+  }
+  if (why.length < 6) {
+    return { ok: false, reason: "Say what happens next (6 characters or more)." };
+  }
+  if (isMash(why)) {
+    return { ok: false, reason: MASH_MESSAGE };
+  }
+
+  try {
+    const { data } = await api.post(
+      `/community/polls/${encodeURIComponent(id)}/close`,
+      { optionId, note: why }
+    );
+
+    const closedItem = data.item || {
+      ...poll,
+      status: "closed",
+      outcome: {
+        optionId,
+        note: why.slice(0, 200),
+        by: user.name,
+        at: now()
+      }
+    };
+
+    state = {
+      ...state,
+      polls: [
+        closedItem,
+        ...state.polls.filter((p) => p.id !== id)
+      ]
+    };
+
+    trail(user.name, "admin", {
+      type: "poll-closed",
+      ref: id,
+      ward: poll.ward
+    });
+
+    audit(user.name, `Closed poll ${id} · ${poll.options.find((o) => o.id === optionId).label} · ${why}`);
+    save();
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.message || "Could not close poll."
+    };
+  }
+}
+
+/**
+ * Admin: withdraw an announcement from the active MongoDB collection.
+ * Its archived copy remains available in Community history.
+ */
+export async function withdrawServerAnnouncement(id, user, reason) {
+  if (!isServerCommunityUser(user) || user?.role !== "admin") {
+    return { ok: false, reason: "Only a connected administrator can withdraw announcements." };
+  }
+
+  if (!MODERATION_REASONS.includes(reason)) {
+    return { ok: false, reason: "Select a valid moderation reason." };
+  }
+
+  try {
+    await api.delete(`/community/announcements/${encodeURIComponent(id)}`, {
+      body: { reason },
+    });
+
+    state = {
+      ...state,
+      announcements: state.announcements.map((a) =>
+        a.id === id
+          ? { ...a, hidden: { by: user.name, at: now(), reason } }
+          : a
+      )
+    };
+
+    trail(user.name, "admin", {
+      type: "moderated",
+      what: { type: "announcement", id },
+      reason,
+      label: id
+    });
+
+    audit(user.name, `Withdrew ${id} · ${reason}`);
+    save();
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error?.message || "Could not withdraw announcement."
+    };
+  }
 }

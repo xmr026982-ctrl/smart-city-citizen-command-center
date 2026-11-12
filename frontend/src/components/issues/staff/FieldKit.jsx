@@ -23,15 +23,48 @@ export const FIELD_FROM = {
 };
 
 /* the field user, their roster record (rank, expertise, zone, duty) and their issues */
+
 export function useFieldDesk() {
   const user = useAuth();
   const issues = useIssues();
   const audit = useAudit();
   const { roster } = useFieldRoster();
   const tick = useMinute();
-  const name = user?.name || "";
-  const me = useMemo(() => roster.find((p) => p.name === name) || null, [roster, name]);
-  const mine = useMemo(() => issues.filter((i) => i.assignedTo === name), [issues, name]);
+
+  const name = user?.displayName || user?.name || "";
+
+  // serverId is the backend MongoDB user ID.
+  const staffIds = useMemo(
+    () =>
+      [user?.serverId, user?._id, user?.id]
+        .filter(Boolean)
+        .map(String),
+    [user?.serverId, user?._id, user?.id]
+  );
+
+  const me = useMemo(
+    () => roster.find((p) => p.name === name) || null,
+    [roster, name]
+  );
+
+  const mine = useMemo(
+    () =>
+      issues.filter((issue) => {
+        // Prefer stable account IDs whenever the backend provides one.
+        if (issue.assignedToId) {
+          return staffIds.includes(String(issue.assignedToId));
+        }
+
+        // Compatibility fallback for older/local issues without an ID.
+        return Boolean(
+          name &&
+          String(issue.assignedTo || "").trim().toLowerCase() ===
+            name.trim().toLowerCase()
+        );
+      }),
+    [issues, staffIds, name]
+  );
+
   return { user, issues, audit, roster, me, mine, tick };
 }
 

@@ -8,7 +8,22 @@ function StaffIssueDetails() {
   const { id } = useParams();
   const user = useAuth();
   const issue = useIssues().find((item) => item.id === id);
-  if (issue && issue.assignedTo === user?.name) {
+  const userIds = [user?.serverId, user?._id, user?.id]
+  .filter(Boolean)
+  .map(String);
+
+const isAssigned =
+  issue &&
+  (
+    (issue.assignedToId && userIds.includes(String(issue.assignedToId))) ||
+    (
+      !issue.assignedToId &&
+      String(issue.assignedTo || "").trim().toLowerCase() ===
+        String(user?.displayName || user?.name || "").trim().toLowerCase()
+    )
+  );
+
+if (isAssigned) {
     return <Navigate to="/staff/assigned" replace state={{ target: issue.id }} />;
   }
   return <Navigate to="/staff/queue" replace state={issue ? { open: issue.id } : null} />;

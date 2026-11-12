@@ -1,214 +1,242 @@
-// ============================================================================
-//  LIVE FEED: the single place the dashboard gets its numbers from.
-//
-//  TODAY  : a built-in simulator (mode "simulated") random-walks the values.
-//  LATER  : Person 6 (real-time/admin) calls connectSocketFeed(socket) once,
-//           or calls the ingest*() functions from any source (REST polling, SSE...).
-//           No dashboard component needs to change.
-//
-//  PAYLOADS the ingest functions accept:
-//    ingestZoneMetrics(zoneId, { aqi, traffic, water, power, ts? })   // any subset
-//    ingestBatch([{ zoneId, aqi, traffic, water, power, ts? }, ...])
-//    ingestCity({ sensors, uptime, envIndex })                         // any subset
-//    ingestAlerts([{ id, title, place, note, tone: "warn"|"info"|"ok", sev }])
-//
-//  SOCKET EVENTS expected by connectSocketFeed:
-//    "zone:metrics"  -> one zone payload     "city:stats" -> city payload
-//    "alerts:list"   -> alerts array
-// ============================================================================
-import { ZONES, CITY, METRIC_KEYS, baseMetrics } from "../config/zones.js";
+import { ZONES, CITY, METRIC_KEYS } from "../config/zones.js";
+import { api } from "../lib/api";
+import { SERVER_ON } from "../config/server";
+import { getToken, subscribeRole } from "../store/authStore";
+import { onEvent, EVENTS, STREAM_RESUMED } from "./events";
 
 export const HISTORY_LEN = 28;
-let tickMs = 2500;
 
-const LIMITS = { aqi: [18, 190], traffic: [35, 98], water: [60, 100], power: [70, 100] };
-const STEP = { aqi: 3.2, traffic: 5, water: 2.4, power: 1.6 };
+function emptyHistory() {
+  return Object.fromEntries(METRIC_KEYS.map((key) => [key, []]));
+}
 
-const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
-const round1 = (v) => Math.round(v * 10) / 10;
-
-function rng(seedStr) {
-  let s = 0;
-  for (const ch of seedStr) s = (s * 31 + ch.charCodeAt(0)) >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
+function emptyZone() {
+  return {
+    aqi: null,
+    traffic: null,
+    rain: null,
+    heat: null,
+    feels: null,
+    at: null,
+    history: emptyHistory(),
   };
 }
 
-// A believable history that ends exactly on the current value.
-function seedHistory(base, key, id) {
-  const r = rng(`${id}:${key}`);
-  const raw = [];
-  let v = base;
-  for (let i = 0; i < HISTORY_LEN; i++) {
-    v = clamp(v + (r() - 0.5) * STEP[key] * 1.6, LIMITS[key]);
-    raw.push(v);
-  }
-  const shift = base - raw[raw.length - 1];
-  return raw.map((x) => round1(clamp(x + shift, LIMITS[key])));
-}
-
-const BASE = {};
-function buildInitial() {
+function initialState() {
   const zones = {};
-  ZONES.forEach((z) => {
-    const b = baseMetrics(z);
-    BASE[z.id] = b;
-    zones[z.id] = { ...b, history: {} };
-    METRIC_KEYS.forEach((k) => { zones[z.id].history[k] = seedHistory(b[k], k, z.id); });
+  ZONES.forEach((zone) => {
+    zones[zone.id] = emptyZone();
   });
-  const env = envFrom(zones);
+
   return {
-    mode: "simulated", // "simulated" | "live" | "offline"
-    updatedAt: Date.now(),
+    mode: "offline",
+    updatedAt: null,
     zones,
     city: {
-      sensors: CITY.sensors,
-      uptime: CITY.uptime,
-      envIndex: env,
-      envHistory: seedHistory(env, "power", "env"),
+      sensors: 0,
+      uptime: null,
+      envIndex: null,
+      envHistory: [],
     },
     alertsOverride: null,
   };
 }
 
-// City environmental index: higher is better, falls as average AQI rises.
-function envFrom(zones) {
-  const ids = Object.keys(zones);
-  const avg = ids.reduce((s, id) => s + zones[id].aqi, 0) / ids.length;
-  return Math.round(clamp(100 - avg * 0.45, [0, 100]));
-}
-
-let state = buildInitial();
+let state = initialState();
 const listeners = new Set();
-let timer = null;
+let started = false;
+let cleanup = [];
 
 function commit(patch) {
-  state = { ...state, ...patch }; // new reference every time, required by useSyncExternalStore
-  listeners.forEach((l) => l());
+  state = { ...state, ...patch };
+  listeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (error) {
+      console.error("[liveFeed] subscriber failed:", error);
+    }
+  });
 }
 
 export const getFeed = () => state;
 
-function mergeBatch(zones, batch) {
-  const next = { ...zones };
-  batch.forEach((p) => {
-    const cur = next[p.zoneId];
-    if (!cur) return;
-    const upd = { ...cur, history: { ...cur.history } };
-    METRIC_KEYS.forEach((k) => {
-      if (typeof p[k] === "number" && Number.isFinite(p[k])) {
-        const v = round1(p[k]);
-        upd[k] = v;
-        upd.history[k] = [...cur.history[k], v].slice(-HISTORY_LEN);
-      }
-    });
-    next[p.zoneId] = upd;
-  });
-  return next;
+function appendHistory(history, key, value) {
+  if (!Number.isFinite(Number(value))) return history;
+  return [...(history || []), Number(value)].slice(-HISTORY_LEN);
 }
 
-function mergeCity(city, c) {
-  const next = { ...city };
-  if (typeof c.sensors === "number") next.sensors = Math.round(c.sensors);
-  if (typeof c.uptime === "number") next.uptime = Math.round(c.uptime * 100) / 100;
-  if (typeof c.envIndex === "number") {
-    next.envIndex = Math.round(c.envIndex);
-    next.envHistory = [...city.envHistory, next.envIndex].slice(-HISTORY_LEN);
+function applyZoneReading(zoneId, payload = {}) {
+  if (!zoneId || !state.zones[zoneId]) return;
+
+  const previous = state.zones[zoneId];
+  const next = { ...previous, history: { ...previous.history } };
+
+  for (const key of METRIC_KEYS) {
+    if (payload[key] === null || payload[key] === undefined) continue;
+
+    const value = Number(payload[key]);
+    if (!Number.isFinite(value)) continue;
+
+    next[key] = value;
+    next.history[key] = appendHistory(previous.history[key], key, value);
   }
-  return next;
+
+  next.at = payload.at || new Date().toISOString();
+
+  commit({
+    zones: { ...state.zones, [zoneId]: next },
+    updatedAt: next.at,
+    mode: "live",
+  });
 }
 
-// ------------------------- public ingest API (Person 6) -------------------------
-export function ingestBatch(batch) {
-  const ts = batch.find((b) => b.ts)?.ts || Date.now();
-  commit({ zones: mergeBatch(state.zones, batch), updatedAt: ts });
+function applySnapshot(data = {}) {
+  const incoming = data.zones || {};
+  const zones = { ...state.zones };
+
+  for (const [zoneId, payload] of Object.entries(incoming)) {
+    if (!zones[zoneId] || !payload) continue;
+
+    const previous = zones[zoneId];
+    const next = { ...previous, history: { ...previous.history } };
+
+    for (const key of METRIC_KEYS) {
+      const raw = payload[key];
+      if (raw === null || raw === undefined) continue;
+
+      const value = Number(raw);
+      if (!Number.isFinite(value)) continue;
+
+      next[key] = value;
+      next.history[key] = appendHistory(previous.history[key], key, value);
+    }
+
+    next.at = payload.at || previous.at;
+    zones[zoneId] = next;
+  }
+
+  const city = data.city || {};
+
+  commit({
+    zones,
+    city: {
+      ...state.city,
+      sensors: Number.isFinite(Number(city.sensors))
+        ? Number(city.sensors)
+        : state.city.sensors,
+      uptime: city.uptime === null || city.uptime === undefined
+        ? state.city.uptime
+        : Number(city.uptime),
+    },
+    updatedAt: new Date().toISOString(),
+    mode: "live",
+  });
 }
+
+let requestInProgress = false;
+
+export async function refreshFeed() {
+  if (!SERVER_ON || !getToken()) {
+    commit({ mode: "offline" });
+    return;
+  }
+
+  if (requestInProgress) return;
+  requestInProgress = true;
+
+  try {
+    const { data } = await api.get("/metrics/live");
+    applySnapshot(data);
+  } catch (error) {
+    // Preserve the last successful readings when the API is temporarily down.
+    commit({ mode: "offline" });
+    console.error("[liveFeed] refresh failed:", error.message);
+  } finally {
+    requestInProgress = false;
+  }
+}
+
+function start() {
+  if (started) return;
+  started = true;
+
+  cleanup.push(
+    onEvent(EVENTS.CITY_METRICS, (event) => {
+      applyZoneReading(event.zoneId, event);
+    })
+  );
+
+  cleanup.push(
+    onEvent(STREAM_RESUMED, () => {
+      refreshFeed();
+    })
+  );
+
+  cleanup.push(
+    subscribeRole(() => {
+      if (getToken()) refreshFeed();
+      else commit({ mode: "offline" });
+    })
+  );
+
+  refreshFeed();
+}
+
+function stop() {
+  cleanup.forEach((unsubscribe) => {
+    try {
+      unsubscribe();
+    } catch {
+      // Ignore an already-removed listener.
+    }
+  });
+
+  cleanup = [];
+  started = false;
+}
+
+export function subscribeFeed(callback) {
+  listeners.add(callback);
+  start();
+
+  return () => {
+    listeners.delete(callback);
+    if (listeners.size === 0) stop();
+  };
+}
+
 export function ingestZoneMetrics(zoneId, payload) {
-  ingestBatch([{ ...payload, zoneId }]);
+  applyZoneReading(zoneId, payload);
 }
-export function ingestCity(payload) {
-  commit({ city: mergeCity(state.city, payload), updatedAt: Date.now() });
+
+export function ingestBatch(batch = []) {
+  batch.forEach((item) => {
+    applyZoneReading(item.zoneId, item);
+  });
 }
+
+export function ingestCity(payload = {}) {
+  commit({
+    city: { ...state.city, ...payload },
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 export function ingestAlerts(list) {
-  commit({ alertsOverride: Array.isArray(list) ? list : null, updatedAt: Date.now() });
+  commit({ alertsOverride: Array.isArray(list) ? list : [] });
 }
 
-export function connectSocketFeed(socket) {
-  stopSimulator();
-  commit({ mode: "live", alertsOverride: null });
-  const onZone = (p) => p && p.zoneId && ingestZoneMetrics(p.zoneId, p);
-  const onCity = (p) => p && ingestCity(p);
-  const onAlerts = (p) => ingestAlerts(p);
-  const onDown = () => commit({ mode: "offline" });
-  const onUp = () => commit({ mode: "live" });
-  socket.on("zone:metrics", onZone);
-  socket.on("city:stats", onCity);
-  socket.on("alerts:list", onAlerts);
-  socket.on("disconnect", onDown);
-  socket.on("connect", onUp);
-  return () => {
-    socket.off("zone:metrics", onZone);
-    socket.off("city:stats", onCity);
-    socket.off("alerts:list", onAlerts);
-    socket.off("disconnect", onDown);
-    socket.off("connect", onUp);
-    commit({ mode: "simulated", alertsOverride: null });
-    if (listeners.size) startSimulator();
-  };
+export function connectSocketFeed() {
+  // The shared realtime service owns the socket.
+  // This function remains as a compatibility no-op for older callers.
+  refreshFeed();
+  return () => {};
 }
 
-// ------------------------- simulator (placeholder data) -------------------------
+export function setFeedInterval() {
+  // Live readings are pushed by the backend; no client-side simulator.
+}
+
 export function tick() {
-  const batch = ZONES.map((z) => {
-    const cur = state.zones[z.id];
-    const base = BASE[z.id];
-    const out = { zoneId: z.id };
-    METRIC_KEYS.forEach((k) => {
-      const pull = (base[k] - cur[k]) * 0.1; // drift back toward the zone's normal level
-      const noise = (Math.random() - 0.5) * STEP[k];
-      out[k] = clamp(cur[k] + pull + noise, LIMITS[k]);
-    });
-    return out;
-  });
-  const zones = mergeBatch(state.zones, batch);
-  const city = mergeCity(state.city, {
-    sensors: clamp(state.city.sensors + Math.round((Math.random() - 0.5) * 6) + Math.sign(1247 - state.city.sensors), [1230, 1262]),
-    uptime: clamp(state.city.uptime + (Math.random() - 0.5) * 0.06, [99.5, 99.95]),
-    envIndex: envFrom(zones),
-  });
-  commit({ zones, city, updatedAt: Date.now() });
-}
-
-function startSimulator() {
-  if (timer || state.mode !== "simulated") return;
-  timer = setInterval(tick, tickMs);
-}
-function stopSimulator() {
-  if (timer) clearInterval(timer);
-  timer = null;
-}
-
-// Starts the simulator when the first component subscribes, stops with the last one.
-export function subscribeFeed(cb) {
-  listeners.add(cb);
-  if (listeners.size === 1) startSimulator();
-  return () => {
-    listeners.delete(cb);
-    if (listeners.size === 0) stopSimulator();
-  };
-}
-
-// Settings -> "Live data refresh" calls this. Takes milliseconds.
-export function setFeedInterval(ms) {
-  const next = Math.max(1000, Number(ms) || 2500);
-  if (next === tickMs) return;
-  tickMs = next;
-  if (timer) { stopSimulator(); startSimulator(); }
-}
-
-// The refresh button on System Uptime calls this.
-export function refreshFeed() {
-  if (state.mode === "simulated") tick();
+  // Intentionally disabled: City Health must never generate fake readings.
 }

@@ -135,7 +135,22 @@ function DeskDrawer({ issue, onClose, user, role }) {
   const mapTo = hasCoords ? `/map?lat=${issue.lat}&lng=${issue.lng}&issueId=${issue.id}` : "/map";
   const pinX = hasCoords ? 28 + (Math.abs(issue.lng * 100) % 44) : 56;
   const pinY = hasCoords ? 26 + (Math.abs(issue.lat * 100) % 40) : 48;
-  const isMine = role === "staff" && issue.assignedTo === user?.name;
+  const currentUserId = user?.id || user?._id;
+
+  const userIds = [user?.serverId, user?._id, user?.id]
+  .filter(Boolean)
+  .map(String);
+
+const isMine =
+  role === "staff" &&
+  (
+    (issue.assignedToId && userIds.includes(String(issue.assignedToId))) ||
+    (
+      !issue.assignedToId &&
+      String(issue.assignedTo || "").trim().toLowerCase() ===
+        String(user?.displayName || user?.name || "").trim().toLowerCase()
+    )
+  );
   const age = span(hoursSince(issue.createdAt));
   const access = notesAccess(issue, user);
   const closeNote = role === "admin" && issue.status === "pending_review" ? lastCloseNote(issue) : null;
@@ -259,13 +274,31 @@ function DeskDrawer({ issue, onClose, user, role }) {
 
           {/* ---------- next move ---------- */}
           <NextMove role={role} issue={issue} isMine={isMine} user={user} moved={moved} onMoved={setMoved} onRequestClose={() => setGate("close")} onWithdraw={() => setGate("recall")} />
-
+        
           {/* ---------- brief ---------- */}
           {issue.description ? (
             <section className="idr-panel idr-pad">
-              <p className="idr-label">{role === "admin" ? "Citizen report" : "Field brief"}</p>
+              <p className="idr-label">
+                {role === "admin" ? "Citizen report" : "Field brief"}
+              </p>
+
               <p className="idr-desc">{issue.description}</p>
-              {issue.reportedBy ? <p className="idr-by">Filed by {issue.reportedBy}{(issue.supporters || []).length ? ` · ${issue.supporters.length} more citizen${issue.supporters.length === 1 ? "" : "s"} reported the same` : ""}</p> : null}
+
+              {issue.reportedBy ? (
+                <div className="idr-by">
+                  Filed by{" "}
+                  <strong>
+                    {typeof issue.reportedBy === "object"
+                      ? issue.reportedBy?.name || "Unknown Citizen"
+                      : issue.reportedBy || "Unknown Citizen"}
+                  </strong>
+                  {(issue.supporters || []).length
+                    ? ` · ${issue.supporters.length} more citizen${
+                        issue.supporters.length === 1 ? "" : "s"
+                      } reported the same`
+                    : ""}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -300,8 +333,18 @@ function DeskDrawer({ issue, onClose, user, role }) {
             </div>
             <div className="idr-geo-info">
               <div>
-                <p className="idr-geo-name">{issue.location}</p>
-                <p className="idr-geo-sub">{issue.ward}</p>
+                <p className="idr-geo-name">
+  {issue.locationText ||
+    (typeof issue.location === "string"
+      ? issue.location
+      : "Location not available")}
+</p>
+                <p className="idr-geo-sub">
+  {issue.zone ||
+    issue.reportedBy?.zone ||
+    issue.reportedBy?.ward ||
+    "Zone not available"}
+</p>
               </div>
               <Link to={mapTo} className="idr-btn">
                 {role === "admin" ? "Open on command map" : "Open exact site"} <ArrowUpRight size={15} />

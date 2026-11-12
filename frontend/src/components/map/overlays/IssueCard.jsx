@@ -48,7 +48,21 @@ export default function IssueCard({ role, issueId, onClose, onRoute }) {
 
   if (!issue) return null;
   const r = ROLE[role] || "citizen";
-  const mine = r === "admin" || (r === "staff" ? issue.assignedTo === me?.name : issue.reporterId === me?.id);
+  const staffIds = [me?.serverId, me?._id, me?.id]
+  .filter(Boolean)
+  .map(String);
+
+const staffOwnsIssue =
+  (issue.assignedToId && staffIds.includes(String(issue.assignedToId))) ||
+  (
+    !issue.assignedToId &&
+    String(issue.assignedTo || "").trim().toLowerCase() ===
+      String(me?.displayName || me?.name || "").trim().toLowerCase()
+  );
+
+const mine =
+  r === "admin" ||
+  (r === "staff" ? Boolean(staffOwnsIssue) : issue.reporterId === me?.id);
   const isPublic = r === "citizen" && !mine;
   const sla = slaOf(issue);
   const status = r === "citizen" ? publicStatus(issue.status) : issue.status;

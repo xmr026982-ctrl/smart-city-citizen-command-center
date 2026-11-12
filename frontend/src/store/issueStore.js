@@ -165,14 +165,54 @@ function freshBoard() {
 
 /* Boards saved before per-person saves and "me too" support: one shared
    `saved` flag becomes the reporter's own save; supporters start empty. */
+
 function normalizeIssue(issue) {
   const out = { ...issue };
-  if (!Array.isArray(out.savedBy)) out.savedBy = out.saved && out.reporterId ? [out.reporterId] : [];
+
+  // MongoDB ID -> frontend ID
+  out.id = String(out.id || out._id || "");
+
+  // Populated MongoDB references -> frontend display values
+  if (out.reportedBy && typeof out.reportedBy === "object") {
+    out.reporterId = String(
+      out.reportedBy._id || out.reportedBy.id || ""
+    );
+    out.reportedBy = out.reportedBy.name || "Citizen";
+  }
+
+  if (out.assignedTo && typeof out.assignedTo === "object") {
+    out.assignedToId = String(
+      out.assignedTo._id || out.assignedTo.id || ""
+    );
+    out.assignedTo = out.assignedTo.name || null;
+  }
+
+  // Preserve the frontend's expected arrays and fields.
+  if (!Array.isArray(out.savedBy)) out.savedBy = [];
   if (!Array.isArray(out.supporters)) out.supporters = [];
   if (!Array.isArray(out.photos)) out.photos = [];
-  // photos kept as temporary blob: links died with the tab that made them
-  out.photos = out.photos.filter((ph) => typeof ph?.url === "string" && (ph.url.startsWith("data:") || /^https?:\/\//.test(ph.url)));
-  delete out.saved;
+  if (!Array.isArray(out.timeline)) out.timeline = [];
+  if (!Array.isArray(out.comments)) out.comments = [];
+  if (!Array.isArray(out.requests)) out.requests = [];
+
+  // Keep server photo URLs as well as existing local photo objects.
+  out.photos = out.photos
+    .map((photo) => {
+      if (typeof photo === "string") return { url: photo };
+      if (photo && typeof photo.url === "string") return photo;
+      return null;
+    })
+    .filter(Boolean);
+
+  // Convert GeoJSON coordinates [longitude, latitude].
+  if (out.location?.type === "Point") {
+    const [lng, lat] = out.location.coordinates || [];
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      out.lat = lat;
+      out.lng = lng;
+    }
+  }
+
   return out;
 }
 

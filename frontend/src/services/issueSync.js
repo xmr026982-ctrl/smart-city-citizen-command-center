@@ -83,30 +83,55 @@ function send(action, payload) {
 }
 
 let loading = null;
+
 export function loadBoard() {
   if (!onServer()) return Promise.resolve();
   if (loading) return loading;
+
   loading = (async () => {
     try {
       const { data } = await api.get("/issues");
-      let auditList;
+
+      let auditList = [];
+
       if (getUser()?.role === "admin") {
-        try { auditList = (await api.get("/audit")).data?.items || []; } catch { auditList = []; }
+        try {
+          auditList = (await api.get("/audit")).data?.items || [];
+        } catch {
+          auditList = [];
+        }
       }
-      replaceBoard(data?.items || [], auditList || []);
+
+      // Backend currently returns { issues, pagination }.
+      const serverIssues = data?.items || [];
+
+      replaceBoard(serverIssues, auditList);
     } catch (err) {
-      if (err?.status !== 401) serverNotice("Issues couldn't be loaded from the server. They'll load when it answers.");
+      if (err?.status !== 401) {
+        serverNotice(
+          "Issues couldn't be loaded from the server. They'll load when it answers."
+        );
+      }
     } finally {
       loading = null;
     }
   })();
+
   return loading;
 }
+
 
 /** File a new report (citizen). Resolves { ok, issue } or { ok: false, message }. */
 export async function fileIssue(fields, photos = []) {
   const form = new FormData();
-  Object.entries(fields).forEach(([k, v]) => form.append(k, String(v)));
+  Object.entries(fields).forEach(([k, v]) => {
+  const value =
+    v !== null && typeof v === "object"
+      ? JSON.stringify(v)
+      : String(v ?? "");
+
+  form.append(k, value);
+});
   for (const ph of photos) {
     try {
       const blob = await (await fetch(ph.url)).blob();

@@ -11,10 +11,12 @@ import {
 import { ROLE_META } from "../../config/settingsSchema";
 import {
   rejectRequest, removeStaff, setRank, setVerified,
-  RANKS, EXPERTISE, EXPERIENCE, expertiseLabel, uplinkPhase, isAwaiting, canVerify, UPLINK_STALL_DAYS,
+  RANKS, EXPERTISE, EXPERIENCE, expertiseLabel,
+  uplinkPhase, isAwaiting, canVerify, UPLINK_STALL_DAYS,
+  refreshStaffRequests, refreshStaffRoster
 } from "../../store/staffDeskStore";
 import { useFieldRoster, CAPACITY } from "../../store/fieldRoster";
-import { acceptAndDispatch, retransmitKey, handleStaffUplinked, UPLINK_BACKEND } from "../../services/staffUplinkService";
+import { acceptAndDispatch, retransmitKey, handleStaffUplinked, UPLINK_BACKEND, rejectAndRemove } from "../../services/staffUplinkService";
 import { useGlide } from "../../components/issues/admin/CommandKit";
 import "../../styles/staff-desk.css";
 import { nameFor, useNames } from "../../store/profileStore";
@@ -364,6 +366,16 @@ function StaffDesk() {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [target, lockedPerson]);
+
+  useEffect(() => {
+    refreshStaffRequests().catch((error) => {
+      console.error("Could not refresh staff requests:", error);
+    });
+
+    refreshStaffRoster().catch((error) => {
+      console.error("Could not refresh staff roster:", error);
+    });
+  }, []);
 
   return (
     <main className="page desk" style={{ "--acc": acc }}>
@@ -1299,9 +1311,25 @@ function RequestDoor({ request, roster, onClose }) {
   const footer = !deny ? (
     <>
       <p className="sd-foot-note"><KeyRound size={12} /><span>Accept transmits a one-time activation key to their mail. They join On field as <b>Awaiting uplink</b> until their first sign-in.</span></p>
-      <button type="button" className="sd-accept" onClick={() => { acceptAndDispatch(request.id, rank); onClose(); }}>
-        <CheckCircle2 size={16} /> Accept as {rank}
-      </button>
+      <button
+  type="button"
+  className="sd-accept"
+  onClick={async () => {
+    try {
+      await acceptAndDispatch(request.id, rank);
+      onClose();
+    } catch (error) {
+      console.error("Staff approval failed:", error);
+      window.alert(
+        error.response?.data?.message ||
+        error.message ||
+        "Could not approve this staff application."
+      );
+    }
+  }}
+>
+  <CheckCircle2 size={16} /> Accept as {rank}
+</button>
       <button type="button" className="sd-reject" onClick={() => setDeny(true)}>Reject</button>
     </>
   ) : null;
@@ -1353,7 +1381,25 @@ function RequestDoor({ request, roster, onClose }) {
             <strong>{request.name}</strong>
             <p>The request is closed. Access stays denied. This cannot be undone from here.</p>
             <div>
-              <button type="button" className="sd-kill" onClick={() => { rejectRequest(request.id); onClose(); }}>Reject request</button>
+              <button
+  type="button"
+  className="sd-kill"
+  onClick={async () => {
+    try {
+      await rejectAndRemove(request.id);
+      onClose();
+    } catch (error) {
+      console.error("Staff rejection failed:", error);
+      window.alert(
+        error.response?.data?.message ||
+        error.message ||
+        "Could not reject this application."
+      );
+    }
+  }}
+>
+  Reject request
+</button>
               <button type="button" className="sd-ghost" onClick={() => setDeny(false)}>Keep open</button>
             </div>
           </div>
