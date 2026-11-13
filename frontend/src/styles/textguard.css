@@ -1,0 +1,14 @@
+/* text guard: the line under a field that holds a keyboard mash */
+.tg-hint {
+  display: flex; align-items: center; gap: 7px; margin: 6px 0 0; padding: 6px 10px; border-radius: 10px;
+  font: 600 12px/1.35 var(--font-display, Inter, system-ui, sans-serif); color: #b91c1c;
+  background: linear-gradient(90deg, rgb(239 68 68 / .09), rgb(239 68 68 / .02)); box-shadow: inset 2px 0 0 #ef4444;
+  animation: tgIn .22s cubic-bezier(.22, 1, .36, 1) both;
+}
+.tg-hint i {
+  flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center;
+  font: 800 10px/1 "JetBrains Mono", ui-monospace, monospace; font-style: normal; color: #fff; background: #ef4444;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / .18);
+}
+@keyframes tgIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tg-hint { animation: none; } }

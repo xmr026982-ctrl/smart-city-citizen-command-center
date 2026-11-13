@@ -1,0 +1,287 @@
+/* ==================================================================
+   Map K2a: pins, the issue card, panel layout. Layered over Person 3's
+   MapView.css and city-map.css. Role accent comes from --cm / --cm2.
+   Layout (never overlapping):
+     top centre    search
+     top right     map types button → its panel, or the issue card (one at a time)
+     right         status filter under the map types button
+     left          tool dock → nearby / filters panels (top) and the route card (bottom)
+     bottom centre City Operations (admin) / Confirm (pinning)
+     bottom right  zoom
+   ================================================================== */
+
+/* ---------- pins ---------- */
+.ip-wrap { background: none !important; border: 0 !important; }
+.ip { --c: #64748b; position: relative; display: grid; place-items: center; width: 100%; height: 100%; transition: opacity .2s ease, transform .2s ease; }
+.ip i { width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px var(--c) inset, 0 0 0 2.5px #fff, 0 3px 8px rgba(15, 23, 42, .35); position: relative; }
+.ip i::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--c); }
+.ip.s-submitted { --c: #64748b; }
+.ip.s-acknowledged { --c: #7c3aed; }
+.ip.s-in_progress { --c: #f59e0b; }
+.ip.s-pending_review { --c: #06b6d4; }
+.ip.s-resolved { --c: #10b981; }
+.ip.br { --c: #ef4444; }
+.ip.br i { animation: ipPulse 2.2s ease-out infinite; }
+.ip.dim { opacity: .55; }
+.ip.dim:hover { opacity: 1; }
+.ip:hover i { transform: scale(1.12); }
+/* the citizen's own reports: a ring that fills as the report moves */
+.ip.own i { background: conic-gradient(var(--c) calc(var(--p) * 1%), #e2e8f0 0); box-shadow: 0 0 0 2.5px #fff, 0 3px 8px rgba(15, 23, 42, .35); }
+.ip.own i::after { inset: 4px; background: #fff; box-shadow: inset 0 0 0 4px var(--c); }
+/* everyone else's open issues, for a citizen: quiet dots */
+.ip.quiet i { width: 10px; height: 10px; box-shadow: 0 0 0 2px #fff, 0 2px 5px rgba(15, 23, 42, .3); background: var(--c); opacity: .8; }
+.ip.quiet i::after { display: none; }
+/* selected: bigger, with a lock-on reticle */
+.ip.sel i { width: 26px; height: 26px; }
+.ip.sel b {
+  position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  border: 1.5px dashed var(--cm, #7c3aed); animation: ipSpin 6s linear infinite, ipLock .5s cubic-bezier(.2, .8, .2, 1) 1 both;
+}
+.ip-bubble {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;
+  font: 700 12.5px "JetBrains Mono", ui-monospace, monospace; color: var(--cm2, #5b21b6); background: #fff;
+  box-shadow: 0 0 0 2.5px var(--cm, #7c3aed), 0 0 0 7px rgb(var(--cm-rgb, 124 58 237) / .16), 0 6px 14px rgba(15, 23, 42, .25); cursor: pointer;
+}
+.ip-bubble.hot { color: #b91c1c; box-shadow: 0 0 0 2.5px #ef4444, 0 0 0 7px rgba(239, 68, 68, .16), 0 6px 14px rgba(15, 23, 42, .25); }
+.city-map .leaflet-tooltip.ip-tip {
+  padding: 5px 9px; border: 0; border-radius: 9px; font: 600 12px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; background: #fff;
+  box-shadow: 0 0 0 1px rgb(var(--cm-rgb) / .3), 0 8px 18px rgba(15, 23, 42, .18); white-space: nowrap;
+}
+.city-map .leaflet-tooltip.ip-tip b { font: 700 10.5px "JetBrains Mono", ui-monospace, monospace; color: var(--cm2); margin-right: 4px; }
+.city-map .leaflet-tooltip.ip-tip::before { display: none; }
+@keyframes ipPulse { 0% { box-shadow: 0 0 0 3px var(--c) inset, 0 0 0 2.5px #fff, 0 0 0 2.5px rgba(239, 68, 68, .5); } 100% { box-shadow: 0 0 0 3px var(--c) inset, 0 0 0 2.5px #fff, 0 0 0 16px rgba(239, 68, 68, 0); } }
+@keyframes ipSpin { to { transform: rotate(360deg); } }
+@keyframes ipLock { from { opacity: 0; transform: scale(1.8); } to { opacity: 1; transform: scale(1); } }
+
+/* ---------- the issue card: top right, under the map types button ---------- */
+.city-map .mic {
+  position: absolute; top: 76px; right: 16px; z-index: 1260; width: 340px; max-height: calc(100% - 92px); overflow-y: auto;
+  display: grid; gap: 12px; padding: 16px; border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .99), rgba(250, 251, 255, .98));
+  box-shadow: 0 0 0 1px rgb(var(--cm-rgb) / .3), 0 24px 54px rgba(15, 23, 42, .2); animation: micIn .28s cubic-bezier(.2, .8, .2, 1) both;
+}
+.mic-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mic-kick { margin: 0 0 4px !important; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--cm2); }
+.mic-kick b { color: #0f172a; }
+.mic-head h3 { margin: 0; font: 650 16px "IBM Plex Sans", system-ui, sans-serif; letter-spacing: -.01em; color: #0f172a; line-height: 1.3; }
+.mic-x { flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; border: 0; cursor: pointer; display: grid; place-items: center; color: #64748b; background: #f1f5f9; }
+.mic-x:hover { color: #0f172a; background: #e2e8f0; }
+.mic-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mic-chips > span { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font: 600 11.5px "IBM Plex Sans", system-ui, sans-serif; background: #f1f5f9; color: #334155; }
+.mic-st i { width: 7px; height: 7px; border-radius: 50%; background: #64748b; }
+.mic-st.s-acknowledged i { background: #7c3aed; } .mic-st.s-in_progress i, .mic-st.s-pending_review i { background: #f59e0b; } .mic-st.s-resolved i { background: #10b981; }
+.mic-pr.p-critical { color: #b91c1c; background: #fef2f2; } .mic-pr.p-high { color: #c2410c; background: #fff7ed; } .mic-pr.p-medium { color: #4338ca; background: #eef2ff; }
+.mic-sla { display: flex; align-items: center; gap: 7px; padding: 8px 11px; border-radius: 11px; font: 650 12.5px "IBM Plex Sans", system-ui, sans-serif; color: #047857; background: #ecfdf5; }
+.mic-sla span { margin-left: auto; font-weight: 500; font-size: 11.5px; color: #64748b; }
+.mic-sla.warn { color: #92400e; background: #fffbeb; } .mic-sla.over { color: #b91c1c; background: #fef2f2; }
+.mic-facts { display: grid; gap: 0; margin: 0; border-radius: 13px; box-shadow: 0 0 0 1px rgba(148, 163, 184, .22); overflow: hidden; }
+.mic-facts > div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; background: #fff; }
+.mic-facts > div + div { border-top: 1px dashed rgba(148, 163, 184, .3); }
+.mic-facts dt { display: flex; align-items: center; gap: 6px; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }
+.mic-facts dd { margin: 0; font: 600 12.5px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; text-align: right; }
+.mic-facts dd.warn { color: #b45309; }
+.mic-place { margin: 0 !important; font-size: 12.5px; color: #475569; }
+/* coordinates: the row is the copy button (hover shows it) */
+.mic-coords {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 36px; padding: 0 6px 0 12px; border-radius: 11px; border: 0; cursor: pointer;
+  background: rgb(var(--cm-rgb) / .05); box-shadow: inset 0 0 0 1px rgb(var(--cm-rgb) / .14); transition: background-color .16s ease;
+}
+.mic-coords .m { font: 600 12px "JetBrains Mono", ui-monospace, monospace; color: #0f172a; font-variant-numeric: tabular-nums; }
+.mic-coords em { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 8px; font: 650 11px "IBM Plex Sans", system-ui, sans-serif; font-style: normal; color: var(--cm2); background: #fff; opacity: 0; transform: translateX(4px); transition: opacity .16s ease, transform .16s ease; }
+.mic-coords:hover, .mic-coords:focus-visible { background: rgb(var(--cm-rgb) / .09); }
+.mic-coords:hover em, .mic-coords:focus-visible em, .mic-coords.done em { opacity: 1; transform: none; }
+.mic-coords.done em { color: #047857; }
+.mic-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mic-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 12px; border-radius: 12px; cursor: pointer; font: 650 13px "IBM Plex Sans", system-ui, sans-serif; white-space: nowrap; }
+.mic-btn.ghost { border: 1px solid rgb(var(--cm-rgb) / .35); color: var(--cm2); background: #fff; }
+.mic-btn.ghost:hover { background: rgb(var(--cm-rgb) / .06); }
+.mic-btn.go { border: 0; color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2)); box-shadow: 0 10px 22px rgb(var(--cm-rgb) / .3); }
+.mic-lock { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #64748b; }
+@keyframes micIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- panels: one place each, never on top of each other ---------- */
+.city-map .layer-control-wrapper { top: 16px !important; right: 16px !important; }
+.city-map .layer-popup-card { top: 60px !important; right: 0 !important; }
+/* Map Types: never taller than the map; the rest scrolls inside the card */
+.city-map .layer-popup-card { max-height: calc(100dvh - 215px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* search: centred, clear of the tool dock and the map-type button (nothing else sits up here now) */
+.city-map .map-search-box { max-width: min(460px, calc(100% - 200px)) !important; }
+/* nearby / filters / tracking: top left beside the dock, never past the route card */
+.city-map .map-floating-panel:not(.route-panel) { top: 16px !important; bottom: auto !important; max-height: calc(100% - 32px) !important; }
+.city-map:has(.route-panel) .map-floating-panel:not(.route-panel) { max-height: calc(100% - 210px) !important; }
+/* the route card: bottom left, beside the dock */
+.city-map .map-floating-panel.route-panel { top: auto !important; bottom: 16px !important; left: 78px !important; width: 300px !important; max-height: 170px !important; }
+.city-map .route-panel .floating-panel-header button { margin-left: auto; width: 28px; height: 28px; border-radius: 9px; border: 0; cursor: pointer; color: #64748b; background: #f1f5f9; }
+
+/* City Operations: each count opens its files */
+.city-map .admin-status-item.ops-link { border: 0; background: none; cursor: pointer; text-align: left; font: inherit; transition: background-color .16s ease; }
+.city-map .admin-status-item.ops-link:hover { background: rgb(var(--cm-rgb) / .07); }
+.city-map .ops-open {
+  position: absolute; left: 50%; top: -30px; transform: translate(-50%, 4px); opacity: 0; pointer-events: none; white-space: nowrap;
+  padding: 4px 9px; border-radius: 8px; font: 700 9px "JetBrains Mono", ui-monospace, monospace; font-style: normal; letter-spacing: .14em; text-transform: uppercase;
+  color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2)); transition: opacity .16s ease, transform .16s ease;
+}
+.city-map .admin-status-item.ops-link:hover .ops-open { opacity: 1; transform: translate(-50%, 0); }
+
+/* while the card is open, the zoom stack steps left of it */
+.city-map:has(.mic) .leaflet-bottom.leaflet-right { right: 364px; transition: right .25s ease; }
+.city-map .layer-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+/* map types: smooth switch, sharp tiles */
+.city-map .leaflet-tile { image-rendering: auto; }
+.city-map .leaflet-tile-container { transition: opacity .3s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ip.br i, .ip.sel b, .city-map .mic { animation: none; }
+}
+
+/* ---------- K2b: bottom-left cards (nearby, today's route, zone) ---------- */
+.city-map .mx-card {
+  position: absolute; left: 78px; bottom: 16px; z-index: 1240; width: 360px; display: grid; gap: 10px; padding: 14px; border-radius: 18px;
+  background: rgba(255, 255, 255, .98); box-shadow: 0 0 0 1px rgb(var(--cm-rgb) / .3), 0 22px 48px rgba(15, 23, 42, .2); animation: micIn .28s ease both;
+}
+.city-map:has(.route-panel) .mx-card, .city-map:has(.route-panel) .mx-chip { bottom: 200px; }
+.city-map:has(.pick-confirm-button) .mx-card { bottom: 16px; }
+.city-map .mx-card.warn { box-shadow: 0 0 0 1px #fcd34d, 0 22px 48px rgba(15, 23, 42, .2); }
+.mx-card header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.mx-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2)); }
+.mx-card.warn .mx-ic { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.mx-kick { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 0 2px !important; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--cm2); }
+.mx-card.warn .mx-kick { color: #b45309; }
+.mx-card h4 { margin: 0; font: 650 14px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mx-x { width: 28px; height: 28px; border-radius: 9px; border: 0; cursor: pointer; display: grid; place-items: center; color: #64748b; background: #f1f5f9; }
+.mx-line { margin: 0 !important; font-size: 12px; color: #475569; }
+.mx-line.over { color: #b91c1c; } .mx-line.warn { color: #b45309; }
+.mx-note, .mx-foot { margin: 0 !important; font-size: 11.5px; color: #64748b; }
+.mx-acts { display: flex; gap: 8px; }
+.mx-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 11px; cursor: pointer; font: 650 12px "IBM Plex Sans", system-ui, sans-serif; white-space: nowrap; }
+.mx-btn.ghost { border: 1px solid rgb(var(--cm-rgb) / .35); color: var(--cm2); background: #fff; }
+.mx-btn.go { border: 0; color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2)); }
+.mx-card.warn .mx-btn.go { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.mx-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mx-stats > div { display: grid; padding: 8px 10px; border-radius: 11px; background: rgb(var(--cm-rgb) / .05); }
+.mx-stats b { font: 700 18px "Space Grotesk", system-ui, sans-serif; color: #0f172a; }
+.mx-stats span { font: 700 8.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #64748b; }
+.mx-stats .hot b { color: #b91c1c; }
+.city-map .mx-chip { position: absolute; left: 78px; bottom: 16px; z-index: 1240; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer; font: 650 12.5px "IBM Plex Sans", system-ui, sans-serif; color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2)); box-shadow: 0 10px 22px rgb(var(--cm-rgb) / .35); }
+.mx-stop { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font: 700 11px "JetBrains Mono", ui-monospace, monospace; color: var(--cm2, #0f766e); background: #fff; box-shadow: 0 0 0 2px var(--cm, #0d9488), 0 4px 10px rgba(15, 23, 42, .25); }
+.mx-stop.next { color: #fff; background: var(--cm, #0d9488); }
+.city-map .mx-path { animation: cmDash 1.4s linear infinite; }
+.city-map .mx-zone { cursor: pointer; transition: fill-opacity .2s ease; }
+.city-map .mx-zone:hover { fill-opacity: .2; }
+.city-map .leaflet-tooltip.mx-zone-tip { padding: 4px 9px; border: 0; border-radius: 8px; font: 650 11.5px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; background: #fff; box-shadow: 0 0 0 1px rgb(var(--cm-rgb) / .3), 0 8px 18px rgba(15, 23, 42, .18); }
+.city-map .leaflet-tooltip.mx-zone-tip::before { display: none; }
+
+/* N2: a pin with an unread update for you pulses in your role colour */
+.ip u { position: absolute; inset: 50% auto auto 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px var(--cm, #7c3aed); animation: ipFresh 1.8s ease-out infinite; }
+.ip.sel u { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+@keyframes ipFresh { from { transform: scale(1); opacity: .9; } to { transform: scale(2.3); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ip u { animation: none; opacity: .8; } }
+
+/* N2: the issue card names the latest update you haven't seen */
+.mic-news { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 12px; background: linear-gradient(90deg, rgb(var(--cm-rgb, 124 58 237) / .1), rgb(var(--cm-rgb, 124 58 237) / .03)); border: 1px solid rgb(var(--cm-rgb, 124 58 237) / .22); font-size: 12px; color: #0f172a; }
+.mic-news i { width: 7px; height: 7px; border-radius: 50%; background: var(--cm, #7c3aed); box-shadow: 0 0 8px var(--cm, #7c3aed); }
+.mic-news b { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mic-news time { font: 600 10px "JetBrains Mono", ui-monospace, monospace; color: #64748b; }
+
+/* C3: community layer: proposal diamonds (size follows resident backing) and announcement badges */
+.mx-prop { position: relative; display: grid; place-items: center; width: 100%; height: 100%; cursor: pointer; }
+.mx-prop i { width: 64%; height: 64%; transform: rotate(45deg); border-radius: 4px; background: #fff; box-shadow: 0 0 0 2.5px var(--cm, #7c3aed) inset, 0 0 0 2px #fff, 0 3px 8px rgba(15, 23, 42, .35); position: relative; transition: transform .2s ease; }
+.mx-prop i::after { content: ""; position: absolute; inset: 30%; border-radius: 2px; background: var(--cm, #7c3aed); opacity: calc(.35 + var(--k, 0) * .65); }
+.mx-prop.met i { box-shadow: 0 0 0 2.5px #10b981 inset, 0 0 0 2px #fff, 0 0 12px rgba(16, 185, 129, .6); }
+.mx-prop.met i::after { background: #10b981; }
+.mx-prop:hover i { transform: rotate(45deg) scale(1.15); }
+.mx-ann { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; background: linear-gradient(135deg, #f59e0b, #c2410c); box-shadow: 0 0 0 2px #fff, 0 6px 14px -4px rgba(194, 65, 12, .6); }
+.mx-ann::before { content: ""; position: absolute; width: 14px; height: 10px; background: #fff; clip-path: polygon(0 30%, 40% 30%, 100% 0, 100% 100%, 40% 70%, 0 70%); }
+.mx-ann b { position: absolute; right: -6px; top: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; display: grid; place-items: center; font: 700 9.5px "JetBrains Mono", ui-monospace, monospace; color: #c2410c; background: #fff; box-shadow: 0 0 0 1.5px #f59e0b; }
+.mx-ann { position: relative; }
+
+/* =================================================================
+   B4: Map polish
+   ================================================================= */
+
+/* pop-ups: one title line with an icon, quiet details under it */
+.city-map .leaflet-popup-content { display: grid; gap: 4px; margin: 12px 14px; font: 500 12.5px "IBM Plex Sans", system-ui, sans-serif; color: #334155; }
+.city-map .pop-title { display: inline-flex; align-items: center; gap: 6px; font: 650 13.5px "IBM Plex Sans", system-ui, sans-serif; color: #0f172a; }
+.city-map .pop-title svg, .city-map .pop-line svg { color: var(--cm); flex: none; }
+.city-map .pop-sub { color: #475569; }
+.city-map .pop-coord { font: 600 10.5px "JetBrains Mono", ui-monospace, monospace; color: #64748b; }
+.city-map .pop-line { display: flex; align-items: center; gap: 6px; color: #475569; }
+.city-map .pop-line a { color: var(--cm2); font-weight: 600; text-decoration: none; }
+.city-map .leaflet-popup-content .route-btn, .city-map .leaflet-popup-content .copy-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; margin-top: 6px; padding: 0 12px; border-radius: 10px; border: 0; cursor: pointer;
+  font: 650 12px "IBM Plex Sans", system-ui, sans-serif; color: #fff; background: linear-gradient(135deg, var(--cm), var(--cm2));
+}
+.city-map .leaflet-popup-content .copy-btn { color: var(--cm2); background: rgb(var(--cm-rgb) / .08); box-shadow: inset 0 0 0 1px rgb(var(--cm-rgb) / .25); }
+.city-map .category-tag { justify-self: start; padding: 1px 8px; border-radius: 999px; font: 700 9px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--cm2); background: rgb(var(--cm-rgb) / .08); }
+.city-map .popup-divider { display: none; }
+.glyph { display: inline-grid; place-items: center; line-height: 0; }
+.city-map .custom-category-icon .leaflet-category-icon-inner { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 10px; color: #fff; background: linear-gradient(135deg, var(--cm, #0284c7), var(--cm2, #0369a1)); box-shadow: 0 0 0 2px #fff, 0 6px 14px -4px rgba(15, 23, 42, .5); }
+.spin { animation: mapSpin 1s linear infinite; }
+@keyframes mapSpin { to { transform: rotate(360deg); } }
+.city-map .floating-panel-header strong { display: inline-flex; align-items: center; gap: 7px; }
+.city-map .floating-panel-header strong svg { color: var(--cm); }
+.city-map .floating-panel-header .calc { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #64748b; }
+.city-map .floating-panel-header button { display: grid; place-items: center; }
+.city-map .filter-option span, .city-map .nearby-filters button, .city-map .route-destination, .city-map .route-details span, .city-map .tracking-action, .city-map .clear-route-btn, .city-map .nearby-status { display: inline-flex; align-items: center; gap: 6px; }
+.city-map .nearby-filters .glyph { color: var(--cm); }
+.city-map .nearby-filters button.active .glyph { color: inherit; }
+.city-map .nearby-hint { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: #64748b; }
+.city-map .pick-mode-bar { display: inline-flex !important; align-items: center; gap: 6px; }
+.city-map .pick-mode-bar svg { color: var(--cm); flex: none; }
+
+/* map types: real buttons now */
+.city-map .layer-card { appearance: none; border: 0; padding: 0; background: none; font: inherit; color: inherit; text-align: center; cursor: pointer; display: grid; gap: 6px; }
+.city-map .layer-card .card-image-wrapper { display: block; position: relative; }
+.city-map .layer-card .active-badge { display: grid; place-items: center; }
+.city-map .layer-card:focus-visible { outline: 2px solid var(--cm); outline-offset: 3px; border-radius: 12px; }
+
+/* one chip row per desk: the filter for the pins */
+.city-map .map-stage-chips { display: flex; gap: 4px; }
+.city-map .map-stage-chips button { appearance: none; border: 0; cursor: pointer; font: inherit; }
+
+/* admin: City operations, one row: title · six stage chips · open in All Issues */
+.city-map .admin-city-status-bar { display: flex !important; align-items: center; gap: 6px !important; max-width: calc(100% - 32px); }
+.city-map .map-stage-chips.admin button { position: relative; display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center; padding: 6px 12px; border-radius: 12px; background: transparent; text-align: left; transition: background .15s ease; }
+.city-map .map-stage-chips.admin i { grid-row: span 2; width: 9px; height: 9px; border-radius: 50%; background: var(--dot, #94a3b8); box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot, #94a3b8) 18%, transparent); }
+.city-map .map-stage-chips.admin strong { font: 700 17px/1.1 "Space Grotesk", system-ui, sans-serif; letter-spacing: -.02em; color: #0f172a; }
+.city-map .map-stage-chips.admin small { font: 700 8.5px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: #64748b; white-space: nowrap; }
+.city-map .map-stage-chips.admin button:hover { background: rgb(var(--cm-rgb) / .07); }
+.city-map .map-stage-chips.admin button.on { background: rgb(var(--cm-rgb) / .1); box-shadow: inset 0 0 0 1.5px var(--cm); }
+.city-map .map-stage-chips.admin .st-all { --dot: var(--cm); }
+.city-map .map-stage-chips.admin .st-new { --dot: #64748b; }
+.city-map .map-stage-chips.admin .st-assigned { --dot: #6366f1; }
+.city-map .map-stage-chips.admin .st-working { --dot: #f59e0b; }
+.city-map .map-stage-chips.admin .st-confirm { --dot: #06b6d4; }
+.city-map .map-stage-chips.admin .st-resolved { --dot: #10b981; }
+.city-map .ops-open-all { flex: none; height: 34px; padding: 0 12px; margin-left: 4px; border-radius: 10px; border: 1px solid rgb(var(--cm-rgb) / .3); background: #fff; cursor: pointer; font: 650 12px "IBM Plex Sans", system-ui, sans-serif; color: var(--cm2); white-space: nowrap; }
+.city-map .ops-open-all:hover { background: rgb(var(--cm-rgb) / .06); }
+.city-map .admin-status-title small { text-transform: none; letter-spacing: 0; font: 500 11px "IBM Plex Sans", system-ui, sans-serif; color: #64748b; }
+@media (max-width: 1280px) { .city-map .admin-status-title { display: none; } }
+
+/* ---------- phones: everything inside the map, nothing under anything ---------- */
+@media (max-width: 760px) {
+  /* search: full width under the frame, beside the map-type button */
+  .city-map .map-search-box { top: 12px !important; left: 12px !important; right: 66px !important; transform: none !important; width: auto !important; max-width: none !important; }
+  .city-map .map-search-box > form { height: 46px; }
+  .city-map .layer-control-wrapper { top: 12px !important; right: 12px !important; }
+  /* tool dock: under the search, never on top of a card */
+  .city-map .map-left-toolbar { top: 70px !important; transform: none !important; left: 12px !important; }
+  .city-map .map-left-toolbar .tool-label { display: none; }
+  /* panels and cards: the width of the map, at the bottom, like a sheet */
+  .city-map .map-floating-panel, .city-map .map-floating-panel.route-panel { left: 12px !important; right: 12px !important; width: auto !important; max-width: none !important; top: auto !important; bottom: 12px !important; max-height: 60% !important; }
+  .city-map .mx-card { left: 12px; right: 12px; bottom: 12px; width: auto; }
+  .city-map .mx-chip { left: 12px; bottom: 12px; }
+  .city-map:has(.admin-city-status-bar) .mx-card, .city-map:has(.admin-city-status-bar) .mx-chip { bottom: 92px; }
+  .mx-acts { flex-wrap: wrap; }
+  .mx-btn { flex: 1 1 130px; }
+  /* admin: the chip row scrolls sideways inside the bar; the button stays */
+  .city-map .admin-city-status-bar { left: 12px !important; right: 12px !important; bottom: 12px !important; transform: none !important; max-width: none; padding: 6px !important; }
+  .city-map .map-stage-chips.admin { flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .city-map .map-stage-chips.admin::-webkit-scrollbar { display: none; }
+  .city-map .map-stage-chips.admin button { scroll-snap-align: start; flex: none; padding: 6px 10px; }
+  .city-map .ops-open-all { padding: 0 10px; font-size: 11.5px; }
+  /* credits: top right, under the rows, where no card ever opens */
+  .cm-credit { top: 70px; bottom: auto; left: auto; right: 12px; flex-direction: row-reverse; }
+  .cm-credit span { white-space: normal; max-width: 240px; }
+}

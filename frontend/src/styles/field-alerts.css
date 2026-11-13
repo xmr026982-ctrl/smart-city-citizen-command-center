@@ -1,0 +1,69 @@
+/* live alerts: top right, under the top bar, in the role colour */
+.fa-stack { --fa: #0d9488; --fa2: #0f766e; --fa-l: #5eead4; --fa-rgb: 13 148 136; --fa-soft: #f0fdfa; --fa-edge: #99f6e4; position: fixed; right: 22px; bottom: 22px; z-index: 3500; display: grid; gap: 10px; width: 360px; }
+/* bottom right: never over a page's own buttons (top right holds each page's actions).
+   On the map, above the zoom and locate stack. */
+body:has(.city-map) .fa-stack { bottom: 150px; }
+.fa-card {
+  position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: start;
+  padding: 13px 12px 15px 13px; border-radius: 16px; background: rgba(255, 255, 255, .98);
+  box-shadow: 0 0 0 1px rgb(var(--fa-rgb) / .28), 0 22px 46px -18px rgb(var(--fa-rgb) / .45); animation: faIn .35s cubic-bezier(.2, .8, .2, 1) both;
+}
+.fa-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--fa), var(--fa2)); box-shadow: 0 6px 14px -6px var(--fa); }
+.fa-card.warn .fa-ic { background: linear-gradient(135deg, #f59e0b, #b45309); box-shadow: 0 6px 14px -6px #d97706; }
+.fa-card.info .fa-ic { color: var(--fa2); background: var(--fa-soft); box-shadow: inset 0 0 0 1px var(--fa-edge); }
+.fa-card.alert .fa-ic { background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 6px 14px -6px #ef4444; }
+.fa-card.ok .fa-ic { background: linear-gradient(135deg, #10b981, #047857); }
+.fa-main { min-width: 0; }
+.fa-main b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; align-items: center; gap: 7px; font: 650 13.5px var(--font-display, "IBM Plex Sans", sans-serif); color: #0f172a; }
+.fa-main b em { font: 700 10.5px "JetBrains Mono", ui-monospace, monospace; font-style: normal; color: var(--fa2); background: var(--fa-soft); padding: 1px 6px; border-radius: 6px; }
+.fa-main p { margin: 3px 0 0 !important; font-size: 12.5px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fa-main small { display: block; margin-top: 3px; font-size: 11.5px; color: #64748b; }
+.fa-acts { display: grid; gap: 6px; justify-items: end; }
+.fa-go { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 9px; border: 0; cursor: pointer; white-space: nowrap; font: 650 11.5px var(--font-display, sans-serif); color: #fff; background: linear-gradient(135deg, var(--fa), var(--fa2)); }
+.fa-x { width: 24px; height: 24px; border-radius: 8px; border: 0; cursor: pointer; display: grid; place-items: center; color: #64748b; background: #f1f5f9; }
+.fa-life { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: linear-gradient(90deg, var(--fa-l), var(--fa)); transform-origin: left; animation: faLife var(--life) linear forwards; }
+.fa-stack.tone-admin { --fa: #7c3aed; --fa2: #5b21b6; --fa-l: #c4b5fd; --fa-rgb: 124 58 237; --fa-soft: #f5f3ff; --fa-edge: #ddd6fe; }
+.fa-stack.tone-citizen { --fa: #0284c7; --fa2: #0369a1; --fa-l: #7dd3fc; --fa-rgb: 2 132 199; --fa-soft: #f0f9ff; --fa-edge: #bae6fd; }
+@keyframes faIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes faLife { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .fa-card, .fa-life { animation: none; } }
+
+/* sidebar badge (staff: unread new assignments) */
+.nav-badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; font: 700 10.5px "JetBrains Mono", ui-monospace, monospace; color: #fff; background: linear-gradient(135deg, #14b8a6, #0f766e); box-shadow: 0 0 0 3px rgb(20 184 166 / .16); animation: faIn .3s ease both; }
+
+/* compact: one slim strip in the corner, so it never sits over a page's content for long */
+.fa-stack { right: 16px; bottom: 16px; width: 324px; gap: 8px; }
+.fa-card { align-items: center; gap: 10px; padding: 9px 9px 10px 10px; border-radius: 14px; }
+.fa-ic { width: 28px; height: 28px; border-radius: 9px; }
+.fa-main b { font-size: 13px; }
+.fa-main p { margin: 1px 0 0 !important; font-size: 11.5px; color: #475569; }
+.fa-acts { display: flex; align-items: center; gap: 4px; }
+.fa-go { height: 26px; padding: 0 9px; font-size: 11px; }
+.fa-x { width: 22px; height: 22px; background: transparent; }
+.fa-x:hover { background: #f1f5f9; color: #0f172a; }
+
+/* glass cards: frosted, a lit edge in the role colour, a scan on arrival.
+   The stack glides beside an open drawer (FieldAlerts useDock) and back to the corner. */
+.fa-stack { width: 340px; transition: right .38s cubic-bezier(.2, .8, .2, 1), top .38s cubic-bezier(.2, .8, .2, 1); }
+.fa-stack.docked-top { top: 84px; bottom: auto; left: 12px; right: 12px !important; width: auto; max-width: 420px; margin-inline: auto; }
+.fa-card {
+  grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 10px 11px 13px; border-radius: 14px;
+  background: rgba(255, 255, 255, .8); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 0 0 1px rgb(var(--fa-rgb) / .2), inset 0 1px 0 rgba(255, 255, 255, .9), 0 18px 40px -20px rgb(var(--fa-rgb) / .55);
+}
+.fa-card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: linear-gradient(var(--fa-l), var(--fa)); box-shadow: 0 0 10px var(--fa-l); }
+.fa-card.alert::before { background: linear-gradient(#fca5a5, #ef4444); box-shadow: 0 0 10px #f87171; }
+.fa-card.warn::before { background: linear-gradient(#fcd34d, #d97706); box-shadow: 0 0 10px #fbbf24; }
+.fa-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgb(var(--fa-rgb) / .12) 50%, transparent 70%); transform: translateX(-100%); animation: faScan .9s .1s ease-out both; }
+.fa-main b { font-size: 13px; letter-spacing: -.005em; }
+.fa-main p { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fa-id { flex: none; font: 700 10px "JetBrains Mono", ui-monospace, monospace; font-style: normal; letter-spacing: .02em; color: var(--fa2); background: var(--fa-soft); box-shadow: inset 0 0 0 1px var(--fa-edge); padding: 1px 5px; border-radius: 5px; }
+.fa-go { width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 10px; color: var(--fa2); background: var(--fa-soft); box-shadow: inset 0 0 0 1px var(--fa-edge); transition: background .2s, color .2s, transform .2s; }
+.fa-go:hover { color: #fff; background: linear-gradient(135deg, var(--fa), var(--fa2)); transform: translateY(-1px); }
+.fa-go:focus-visible, .fa-x:focus-visible { outline: 2px solid var(--fa); outline-offset: 2px; }
+.fa-card.alert .fa-go { color: #b91c1c; background: #fef2f2; box-shadow: inset 0 0 0 1px #fecaca; }
+.fa-card.alert .fa-go:hover { color: #fff; background: linear-gradient(135deg, #ef4444, #b91c1c); }
+@keyframes faScan { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .fa-stack { transition: none; } .fa-card::after { animation: none; display: none; } }
+.fa-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-stack.docked .fa-card, .fa-stack.docked-top .fa-card { background: rgba(255, 255, 255, .93); }

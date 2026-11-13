@@ -1,0 +1,108 @@
+/* ------------------------------------------------------------------
+   Fit every screen. The system is drawn for 1366 × 768: nothing in this
+   file applies between 1301 px and 1699 px wide, so that screen (and
+   1440 / 1536) looks exactly as designed. No zoom anywhere: wide screens
+   get a centred working column, narrow ones get tighter type and a
+   menu drawer. Loaded last (App.jsx), every rule is scoped to the shell.
+------------------------------------------------------------------- */
+
+/* ================= wide: 1700 px and up =================
+   Lists, tiles and forms stop stretching; they sit in a centred column
+   like any well-made site. City Health and the map stay full bleed. */
+@media (min-width: 1700px) {
+  .app-shell .shell-view > .page:not(.dash):not(.city-map-page) > :where(header, section, nav, div, article, aside, form, footer, p, h1) {
+    width: 100%;
+    max-width: 1500px;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+  /* the issue pages carry their own column (.ix): centre that once */
+  .app-shell .shell-view > .page.issue-page > .ix { max-width: 1500px; }
+  .app-shell .tb2 { max-width: none; }
+}
+
+@media (min-width: 2200px) {
+  .app-shell { grid-template-columns: 288px minmax(0, 1fr); }
+  .app-shell .shell-view > .page:not(.dash):not(.city-map-page) > :where(header, section, nav, div, article, aside, form, footer, p, h1),
+  .app-shell .shell-view > .page.issue-page > .ix { max-width: 1680px; }
+}
+
+/* ================= laptops: 1300 px and below =================
+   Tile labels keep their full words: a touch less tracking. */
+@media (max-width: 1300px) {
+  .app-shell .ac-kpi header > span:last-child { letter-spacing: .07em; font-size: 9.5px; }
+  .app-shell .ac-kpi { padding-left: 13px; padding-right: 13px; }
+  .app-shell .dk-tile header span { letter-spacing: .08em; }
+}
+
+/* ================= small laptops and tablets landscape: 1180 px and below ================= */
+@media (max-width: 1180px) {
+  /* City Health: the readings wrap to two rows, so the overlays stop floating and
+     stack in order over the 3D city: readings, coverage card, then the panels at
+     the foot. Nothing can sit on top of anything, whatever the card heights. */
+  .app-shell .stage { display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+  .app-shell .stage > .kpi-row,
+  .app-shell .stage > .cov-card,
+  .app-shell .stage > .panel-row { position: relative; top: auto; left: auto; right: auto; bottom: auto; }
+  .app-shell .stage > .cov-card { align-self: flex-start; width: 262px; max-width: calc(100% - 70px); }
+  .app-shell .stage > .kpi-row { order: 1; }
+  .app-shell .stage > .map-tools { order: 2; position: relative; top: auto; right: auto; transform: none; align-self: flex-end; display: flex; gap: 8px; z-index: 6; }
+  .app-shell .stage > .cov-card { order: 3; }
+  .app-shell .stage > .panel-row { order: 4; margin-top: auto; }
+  /* Staff Desk: the 01 / 04 counter steps aside so the label never collides */
+  .app-shell .dk-tile-idx { display: none; }
+  /* the lane bar scrolls sideways: fade the far edge so more lanes read as "more" */
+  .app-shell .ix-dock-rail { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+  .app-shell .ix-dock-rail a.on { scroll-margin-inline: 24px; }
+}
+
+/* ================= tablets: 960 px and below =================
+   The sidebar becomes a drawer, opened from the menu button in the top bar. */
+.tb2-menu { display: none; }
+.side-veil { display: none; }
+@media (max-width: 960px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .app-shell .sidebar {
+    display: flex !important;
+    position: fixed; z-index: 4000; top: 0; left: 0; bottom: 0; width: 272px; max-width: 86vw;
+    transform: translateX(-104%); transition: transform .32s cubic-bezier(.22, 1, .36, 1);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, .06), 24px 0 60px -20px rgba(15, 23, 42, .35);
+    background: rgba(255, 255, 255, .97);
+  }
+  body.nav-open .app-shell .sidebar { transform: none; }
+  .app-shell .side-veil {
+    display: block; position: fixed; inset: 0; z-index: 3990; border: 0; padding: 0; margin: 0;
+    background: rgba(15, 23, 42, .32); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease; cursor: default;
+  }
+  body.nav-open .app-shell .side-veil { opacity: 1; pointer-events: auto; }
+  .app-shell .tb2-menu {
+    display: inline-grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; margin-right: 6px;
+    border-radius: 12px; border: 1px solid rgb(var(--t-rgb, 2 132 199) / .22); background: #fff; color: rgb(var(--t-rgb, 2 132 199));
+    cursor: pointer; box-shadow: 0 6px 16px -10px rgb(var(--t-rgb, 2 132 199) / .6);
+  }
+  .app-shell .tb2-menu:focus-visible { outline: 2px solid rgb(var(--t-rgb, 2 132 199)); outline-offset: 2px; }
+  .app-shell .tb2-t1 { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); }
+
+}
+
+/* ================= phones: 760 px and below =================
+   Menu, the page, and you. The sync and clock step out (City Health
+   carries both), the page module takes the free width and cuts its own
+   text, and the profile shows as its avatar, still the menu button. */
+@media (max-width: 760px) {
+  .app-shell .tb2-t1 { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  .app-shell .tb2-core { display: none; }
+  .app-shell .tb2-l { min-width: 0; justify-self: stretch; }
+  .app-shell .tb2-l .tb2-mod { width: auto; max-width: 100%; min-width: 0; }
+}
+/* tablets and phones: the profile is its avatar (the menu opens with the full name) */
+@media (max-width: 960px) {
+  .app-shell .tb2-me { width: auto; padding: 4px; }
+  .app-shell .tb2-me .tb2-txt, .app-shell .tb2-me .tb2-chev { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .sidebar, .app-shell .side-veil { transition: none; }
+}

@@ -1,0 +1,50 @@
+
+const mongoose = require("mongoose");
+
+const passwordResetTokenSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    tokenHash: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    // one-time links share this model: "reset" (password) or "email" (email change)
+    kind: {
+      type: String,
+      enum: ["reset", "email"],
+      default: "reset",
+    },
+    revoked: {
+      type: Boolean,
+      default: false,
+    },
+    newEmail: {
+      type: String,
+      default: "",
+      lowercase: true,
+      trim: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+      expires: 0,
+    },
+  },
+  { timestamps: true }
+);
+
+passwordResetTokenSchema.index({
+  userId: 1,
+  createdAt: -1
+});
+
+module.exports = mongoose.model(
+  "PasswordResetToken",
+  passwordResetTokenSchema
+);

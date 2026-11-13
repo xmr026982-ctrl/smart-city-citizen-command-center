@@ -1,0 +1,139 @@
+/* ------------------------------------------------------------------
+   Issue Command layout: zone lens strip, dispatch beside the decision
+   queue and SLA watch, field force beside the command trace.
+   Built for 1366px full screen first; nothing stretches into empty air.
+------------------------------------------------------------------- */
+
+/* zone lens */
+.icx-zones {
+  position: relative; display: grid; gap: 10px; padding: 14px 16px 16px; border-radius: 20px;
+  background: rgba(255, 255, 255, .86); border: 1px solid var(--v-edge); box-shadow: 0 14px 34px -22px rgb(76 29 149 / .35);
+}
+.icx-zones > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+.icx-zones > header .ac-kicker { margin: 0; }
+.icx-zone-hint { font: 600 10.5px var(--ac-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ac-faint); }
+.icx-zone-release {
+  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px 0 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--v-edge); background: var(--v-soft); color: var(--ac-muted);
+  font: 600 11px var(--ac-mono); letter-spacing: .08em; text-transform: uppercase; animation: icxIn .22s ease-out both;
+}
+.icx-zone-release i { width: 7px; height: 7px; border-radius: 50%; background: var(--v); box-shadow: 0 0 0 4px rgb(124 58 237 / .16); }
+.icx-zone-release b { color: var(--ac-ink); letter-spacing: .06em; }
+.icx-zone-release .sep { width: 1px; height: 12px; background: var(--v-edge); }
+.icx-zone-release kbd { padding: 2px 6px; border-radius: 6px; background: #fff; border: 1px solid var(--v-edge); font: inherit; font-size: 10px; color: var(--v); }
+.icx-zone-release:hover { color: var(--ac-ink); }
+
+.icx-zone-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.icx-zone {
+  position: relative; display: grid; gap: 6px; padding: 11px 12px 10px; border-radius: 14px; text-align: left; cursor: pointer; min-width: 0;
+  border: 1px solid color-mix(in srgb, #ef4444 calc(var(--heat) * 28%), #ece8f8);
+  background: linear-gradient(180deg, color-mix(in srgb, #fff1f2 calc(var(--heat) * 100%), #fff), #fff);
+  transition: transform .18s ease, box-shadow .18s ease, opacity .2s ease, border-color .18s ease;
+}
+.icx-zone:hover { transform: translateY(-2px); box-shadow: 0 12px 24px -14px rgb(124 58 237 / .45); }
+.icx-zone:focus-visible { outline: 2px solid var(--v); outline-offset: 2px; }
+.icx-zone-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.icx-zone-top b { font-size: 12.5px; font-weight: 650; color: var(--ac-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icx-zone-top strong { font: 650 20px var(--font-display); letter-spacing: -.03em; line-height: 1; color: var(--ac-ink); }
+.icx-zone small { display: flex; align-items: center; gap: 5px; font: 600 10px var(--ac-mono); color: var(--ac-muted); white-space: nowrap; overflow: hidden; }
+.icx-zone small .hot { color: #b91c1c; }
+.icx-zone small .calm { color: #047857; }
+.icx-zone small .dot { color: var(--ac-faint); }
+.icx-zone .heat { display: block; height: 3px; border-radius: 999px; background: #eef0f6; overflow: hidden; }
+.icx-zone .heat i {
+  display: block; height: 100%; border-radius: inherit;
+  background: linear-gradient(90deg, var(--tk-a78bfa, #a78bfa), #f59e0b, #ef4444); background-size: 300% 100%; background-position: calc(var(--heat) * 100%) 0;
+}
+.icx-zone.hot::after {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 1px rgb(239 68 68 / .35); animation: icxPulse 2.6s ease-in-out infinite;
+}
+.icx-zone.on {
+  border-color: var(--v); background: linear-gradient(180deg, var(--v-soft), #fff);
+  box-shadow: 0 14px 28px -16px rgb(124 58 237 / .6), inset 0 0 0 1px var(--v);
+}
+.icx-zone.on::before {
+  content: ""; position: absolute; left: 10px; right: 10px; top: 0; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--v), transparent); animation: icxScan 1.1s ease-out 1 both;
+}
+.icx-zone.dim { opacity: .55; }
+.icx-zone.dim:hover { opacity: 1; }
+
+/* dispatch | decision + watch */
+.icx-main { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.icx-side { display: grid; grid-template-rows: auto 1fr; gap: 16px; min-width: 0; }
+.icx-main .ac-panel, .icx-lower .ac-panel { display: flex; flex-direction: column; min-width: 0; }
+.icx-main .ac-panel-body, .icx-lower .ac-panel-body { flex: 1; }
+
+.icx-queue { gap: 7px; }
+.icx-qrow { padding-top: 9px !important; padding-bottom: 9px !important; }
+.icx-qrow strong { font-size: 13px !important; }
+.icx-more {
+  display: flex; align-items: center; justify-content: center; gap: 6px; height: 34px; margin-top: 2px; border-radius: 11px; cursor: pointer;
+  border: 1px dashed var(--v-edge); background: transparent; color: var(--v); text-decoration: none;
+  font: 650 11px var(--ac-mono); letter-spacing: .1em; text-transform: uppercase; transition: background .16s ease;
+}
+.icx-more:hover { background: var(--v-soft); }
+
+.icx-decide.idle .ac-panel-body { padding-top: 4px; padding-bottom: 14px; }
+.icx-idle-line { display: flex; align-items: center; gap: 8px; margin: 0 !important; font-size: 12.5px; color: var(--ac-muted); }
+.icx-idle-line svg { color: #059669; }
+.icx-count {
+  min-width: 26px; height: 26px; padding: 0 8px; border-radius: 999px; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--v), #6d28d9); color: #fff; font: 700 12px var(--ac-mono);
+  box-shadow: 0 6px 14px -6px var(--v); animation: icxPulse 2.6s ease-in-out infinite;
+}
+
+/* live service-window clocks */
+.icx-clock {
+  display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 9px; white-space: nowrap;
+  font: 650 11px var(--ac-mono); font-variant-numeric: tabular-nums; border: 1px solid;
+}
+.icx-clock em { font-style: normal; font-weight: 600; opacity: .75; }
+.icx-clock.warn { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+.icx-clock.over { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.icx-wrow.over { border-color: #fecdd3 !important; }
+.icx-wrow.warn .icx-clock svg { animation: icxTurn 2s linear infinite; }
+
+/* field force | command trace */
+.icx-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 16px; align-items: stretch; }
+.icx-force .ac-panel-body { display: grid; align-content: start; }
+.ac-readout > a {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 6px; margin: 0 -4px; border-radius: 8px;
+  border-bottom: 1px dashed var(--tk-e7e3f7, #e7e3f7); text-decoration: none; color: inherit; transition: background .16s ease;
+}
+.ac-readout > a:last-child { border-bottom: 0; }
+.ac-readout > a:hover { background: var(--v-soft); }
+.ac-readout > a.amber b { color: #b45309; }
+
+.icx-trow {
+  width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; border-radius: 10px; font: inherit; color: inherit;
+  transition: background .16s ease;
+}
+.icx-trow:hover { background: var(--v-soft); }
+.icx-trow:hover p { color: var(--v); }
+.icx-trow .when { display: inline-flex; align-items: center; gap: 4px; }
+.icx-trow .when .go { opacity: 0; transform: translateX(-3px); transition: opacity .16s ease, transform .16s ease; color: var(--v); }
+.icx-trow:hover .when .go { opacity: 1; transform: none; }
+.icx-trow.fresh { animation: icxSlide .45s cubic-bezier(.2, .8, .2, 1) both; }
+.icx-trow.fresh .ac-trace-ic { box-shadow: 0 0 0 4px rgb(124 58 237 / .14); }
+
+@keyframes icxIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@keyframes icxSlide { from { opacity: 0; transform: translateY(-10px); background: var(--v-soft); } to { opacity: 1; transform: none; } }
+@keyframes icxPulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@keyframes icxScan { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+@keyframes icxTurn { to { transform: rotate(360deg); } }
+
+@media (max-width: 1200px) {
+  .icx-zone-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px) {
+  .icx-main, .icx-lower { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .icx-zone-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .icx-zone-hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icx-zone.hot::after, .icx-count, .icx-wrow.warn .icx-clock svg, .icx-trow.fresh, .icx-zone.on::before { animation: none; }
+}

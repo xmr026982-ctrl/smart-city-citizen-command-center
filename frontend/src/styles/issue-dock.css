@@ -1,0 +1,144 @@
+/* ==================================================================
+   Issue Management · command dock (the lane bar under the TopBar)
+   Compact glass bar, never stretched. Left edge lines up with the page
+   content; equal air above and below so it sits clear of the page glow.
+   One accent per desk: admin violet, staff teal, citizen cyan.
+   It sits outside .ix, so it carries its own variables.
+   ================================================================== */
+
+@keyframes ixDockPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.75); } }
+@keyframes ixDockRing { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(2.8); opacity: 0; } }
+@keyframes ixDockSweep { from { transform: translateX(-100%); opacity: 1; } to { transform: translateX(520%); opacity: 0; } }
+@keyframes ixDockIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+.ix-dock {
+  --d1: #0ea5e9;
+  --d2: #0284c7;
+  --d-soft: rgba(14, 165, 233, .08);
+  --d-edge: rgba(14, 165, 233, .28);
+  --d-glow: rgba(14, 165, 233, .28);
+  --d-ease: cubic-bezier(.22, 1, .36, 1);
+
+  /* pins 10px from the top while the page scrolls (the page has 22px of top padding) */
+  position: sticky; top: -12px; z-index: 30;
+  flex-shrink: 0; align-self: flex-start;
+  display: flex; align-items: center; gap: 10px;
+  width: fit-content; max-width: calc(100% - 12px);
+  margin: 6px 6px 20px; padding: 6px;
+  border-radius: 16px; overflow: hidden;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+
+  /* glass body + gradient hairline */
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(255, 255, 255, .82)) padding-box,
+    linear-gradient(100deg, var(--d-edge), rgba(148, 163, 184, .22) 38%, rgba(148, 163, 184, .16) 70%, var(--d-edge)) border-box;
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .9),
+    0 1px 2px rgba(15, 23, 42, .04),
+    0 12px 28px color-mix(in srgb, var(--d1) 9%, transparent);
+  animation: ixDockIn .45s var(--d-ease) both;
+  transition: box-shadow .3s ease, background .3s ease;
+}
+.ix-dock.tone-admin {
+  --d1: #7c3aed; --d2: #5b21b6;
+  --d-soft: rgba(124, 58, 237, .07); --d-edge: rgba(124, 58, 237, .34); --d-glow: rgba(124, 58, 237, .32);
+}
+.ix-dock.tone-staff {
+  --d1: #14b8a6; --d2: #0f766e;
+  --d-soft: rgba(20, 184, 166, .08); --d-edge: rgba(20, 184, 166, .32); --d-glow: rgba(20, 184, 166, .3);
+}
+
+/* pinned while the page scrolls: a touch more glass and lift */
+.ix-dock.docked {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(255, 255, 255, .93)) padding-box,
+    linear-gradient(100deg, var(--d-edge), rgba(148, 163, 184, .22) 38%, rgba(148, 163, 184, .16) 70%, var(--d-edge)) border-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .9),
+    0 2px 6px rgba(15, 23, 42, .06),
+    0 18px 40px color-mix(in srgb, var(--d1) 16%, transparent);
+}
+
+/* ---------- tag: live dot + desk name ---------- */
+.ix-dock-tag {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px 0 13px; flex-shrink: 0;
+  border-radius: 11px; background: var(--d-soft);
+  font: 700 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--d2);
+}
+.ix-dock-tag i { position: relative; width: 7px; height: 7px; border-radius: 50%; background: var(--d1); box-shadow: 0 0 8px var(--d-glow); animation: ixDockPulse 1.8s ease-in-out infinite; }
+.ix-dock-tag i::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px solid var(--d1); animation: ixDockRing 1.8s ease-out infinite; }
+
+.ix-dock-sep { width: 1px; height: 20px; flex-shrink: 0; background: linear-gradient(180deg, transparent, rgba(148, 163, 184, .45), transparent); }
+
+/* ---------- lanes + glider ---------- */
+.ix-dock-rail {
+  position: relative; display: flex; align-items: center; gap: 4px; min-width: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.ix-dock-rail::-webkit-scrollbar { display: none; }
+
+.ix-dock-rail a {
+  position: relative; z-index: 1; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 15px;
+  border-radius: 10px; white-space: nowrap; text-decoration: none;
+  font-size: 13px; font-weight: 500; color: #5b6573;
+  transition: color .25s ease, background .2s ease;
+}
+.ix-dock-rail a:hover { color: var(--d2); background: var(--d-soft); }
+/* reserve the bold width, so a lane is as wide active as idle */
+.ix-dock-rail a span { display: inline-flex; flex-direction: column; }
+.ix-dock-rail a span::after { content: attr(data-label); height: 0; overflow: hidden; visibility: hidden; font-weight: 650; pointer-events: none; user-select: none; }
+.ix-dock-rail a.on { color: #fff; font-weight: 650; background: transparent; }
+/* every lane keeps its icon, so lane widths never change when the page does */
+.ix-dock-rail a svg { display: block; flex-shrink: 0; opacity: .55; transition: opacity .25s ease, transform .35s var(--d-ease); }
+.ix-dock-rail a:hover svg { opacity: .9; }
+.ix-dock-rail a.on svg { opacity: 1; transform: scale(1.08); }
+.ix-dock-rail a:focus-visible { outline: 2px solid var(--d1); outline-offset: 1px; }
+
+/* the glider's own box never widens the rail (it's drawn wider and scaled) */
+.ix-dock-track { position: absolute; left: 0; top: 0; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
+.ix-dock-glider {
+  position: absolute; left: 0; top: 0; z-index: 0; height: 38px; border-radius: 11px; pointer-events: none;
+  transform-origin: 0 50%; will-change: transform;
+  background: linear-gradient(135deg, var(--d1), var(--d2));
+  box-shadow: 0 8px 18px var(--d-glow), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.ix-dock-glider::after {
+  /* thin light line along the top of the active lane */
+  content: ""; position: absolute; left: 10px; right: 10px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent);
+}
+.ix-dock-glider.live { transition: transform .42s var(--d-ease); }
+
+/* the command desk has seven lanes: same height, tighter sides, so it fits at 1366 */
+.ix-dock.dense .ix-dock-rail { gap: 2px; }
+.ix-dock.dense .ix-dock-rail a { gap: 6px; padding: 0 10px; font-size: 12.5px; }
+.ix-dock.dense .ix-dock-rail a svg { width: 13px; height: 13px; }
+.ix-dock.dense { gap: 6px; }
+.ix-dock.dense .ix-dock-tag { padding: 0 12px 0 11px; }
+
+/* ---------- one light sweep across the bar when the page changes ---------- */
+.ix-dock-sweep {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 22%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--d1) 14%, transparent), transparent);
+  animation: ixDockSweep 1s var(--d-ease) both;
+}
+
+/* ---------- narrow screens: lanes only, scrolling sideways ---------- */
+@media (max-width: 760px) {
+  .ix-dock { padding: 4px; gap: 6px; margin: 4px 6px 14px; }
+  .ix-dock-tag, .ix-dock-sep { display: none; }
+  .ix-dock-rail a { padding: 0 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ix-dock, .ix-dock-sweep { animation: none; }
+  .ix-dock-sweep { display: none; }
+  .ix-dock-tag i, .ix-dock-tag i::after { animation: none; }
+  .ix-dock-glider.live, .ix-dock-rail a { transition: none; }
+  .ix-dock-rail a svg { transition: none; }
+}
+html[data-motion="reduced"] .ix-dock-sweep { display: none; }

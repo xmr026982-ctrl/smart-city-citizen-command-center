@@ -1,0 +1,16 @@
+/* Issue Management responsive rules (scoped to .ix so the original desk pages are untouched) */
+@media (max-width: 960px) {
+  .ix .hero-grid,
+  .ix .report-layout,
+  .ix .step-grid,
+  .ix .stats-grid,
+  .ix .form-grid,
+  .ix .intel-grid,
+  .ix .category-grid {
+    grid-template-columns: 1fr;
+  }
+  .ix .span-2 { grid-column: auto; }
+  .ix .page-wrap,
+  .ix .page-stack,
+  .ix .hero-card { padding-left: 16px; padding-right: 16px; }
+}
