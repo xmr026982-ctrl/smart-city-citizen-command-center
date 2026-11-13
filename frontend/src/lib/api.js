@@ -8,9 +8,11 @@ import { API_URL, SERVER_ON } from "../config/server";
      const { data } = await api.get("/issues");
      await api.patch(`/issues/${id}/status`, { status: "in_progress" });
 
-   • The token saved by the sign-in pages is sent as
-     "Authorization: Bearer <token>" on every request.
-   • A 401 (token missing, expired or revoked) signs the person out:
+   • The session travels as an httpOnly cookie (credentials: "include"):
+     page scripts never see it. Every request also carries X-Client-Tab,
+     which the server requires for changes made with the cookie (it
+     blocks cross-site request forgery).
+   • A 401 (session missing, expired or revoked) signs the person out:
      whoever registered with onSignedOut() is told (authStore does this).
    • Errors are thrown as ApiError with the server's own message, so a
      screen can show it as is.
@@ -44,7 +46,7 @@ export function setTokenSource(fn) {
   tokenSource = typeof fn === "function" ? fn : () => null;
 }
 
-/** called once when the server rejects the token (401) */
+/** called once when the server rejects the token (401), with the server's message */
 export function onSignedOut(fn) {
   signedOut = typeof fn === "function" ? fn : () => {};
 }
@@ -53,7 +55,8 @@ async function request(method, path, body, opts = {}) {
   if (!SERVER_ON) throw new ApiError("The server is not connected.", 0);
 
   const headers = { Accept: "application/json", "X-Client-Tab": TAB_ID };
-  const token = tokenSource();
+  // a token only for the one-time upgrade of an older version's session (authStore adoptLegacy)
+  const token = opts.bearer || tokenSource();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
@@ -68,6 +71,7 @@ async function request(method, path, body, opts = {}) {
     res = await fetch(`${API_URL}${path.startsWith("/") ? path : `/${path}`}`, {
       method,
       headers,
+      credentials: "include",
       body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       signal: ctrl.signal,
     });
@@ -86,9 +90,12 @@ async function request(method, path, body, opts = {}) {
     data = text;
   }
 
-  if (res.status === 401 && token) {
+  // a 401 on a signed-in request ends the session; sign-in attempts and the upgrade report their own errors
+  const signInCall = /^\/?auth\/(login|register|google|session)\b/.test(path);
+  if (res.status === 401 && !signInCall) {
     try {
-      signedOut();
+      // the server's reason ("Signed out after 30 min away…") goes to the sign-in page
+      signedOut((data && typeof data === "object" && data.message) || "");
     } catch {
       /* never break the caller */
     }

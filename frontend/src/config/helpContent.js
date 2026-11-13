@@ -45,11 +45,11 @@ export const TOPICS = [
     to: { citizen: "/citizen", admin: "/admin" },
     copy: {
       citizen: {
-        lead: "Live readings for one zone: air, traffic, water and power.",
+        lead: "Live readings for one zone: air quality, traffic, rainfall and heat.",
         steps: [
           "The zone in the top bar decides which zone you see. Pick another there.",
-          "Readings refresh on their own. The SYNCED light in the top bar shows the desk is live.",
-          "The small line under a reading is its recent history, not a forecast.",
+          "Readings arrive on their own from real sources: CPCB stations for air quality, TomTom for traffic, Open-Meteo for rain and heat. LIVE in the top bar means the desk is connected; a card says No reading when its source hasn't answered.",
+          "The small line under a reading is its last 24 hours, not a forecast.",
           "The model follows the real sky over Kolkata: the day city after sunrise, the lit night city after dusk. The sun button beside the model switches between Live sky, Day and Night.",
           "Something broken in the street? That's a report, not a reading: use Report Issue.",
         ],
@@ -58,7 +58,7 @@ export const TOPICS = [
         lead: "The command view of one zone's readings.",
         steps: [
           "The zone in the top bar decides which zone you see. Pick another there.",
-          "Readings refresh on their own. The SYNCED light in the top bar shows the desk is live.",
+          "Readings arrive on their own from real sources: CPCB stations for air quality, TomTom for traffic, Open-Meteo for rain and heat. LIVE in the top bar means the desk is connected; a card says No reading when its source hasn't answered.",
           "A spike is a signal, not a file. The files themselves are in Issue Command.",
           "The model follows the real sky over Kolkata: the day city after sunrise, the lit night city after dusk. The sun button beside the model switches between Live sky, Day and Night.",
         ],
@@ -125,7 +125,7 @@ export const TOPICS = [
         lead: "Live readings for the zone you're working in.",
         steps: [
           "The zone in the top bar decides which zone you see. Pick another there.",
-          "Readings refresh on their own. The SYNCED light in the top bar shows the desk is live.",
+          "Readings arrive on their own from real sources: CPCB stations for air quality, TomTom for traffic, Open-Meteo for rain and heat. LIVE in the top bar means the desk is connected; a card says No reading when its source hasn't answered.",
           "The pill in the top bar is your most urgent file (red when it is past its window). Click it to go straight to it.",
           "The model follows the real sky over Kolkata: the day city after sunrise, the lit night city after dusk. The sun button beside the model switches between Live sky, Day and Night.",
         ],
@@ -316,7 +316,7 @@ export const TOPICS = [
         lead: "Your profile, home zone and sign-in, and how this device behaves.",
         steps: [
           "Profile: display name, photo and home zone. These are saved to your account.",
-          "Alerts and Display & 3D are kept on this device only. Each row says which.",
+          "Alerts and the away limit follow your account to every device. Display & 3D stays on this device. Each row says which.",
           "Check this device suggests a 3D quality that runs smoothly here.",
           "City sky keeps the model on Live sky, or always on Day or Night.",
           "Export downloads your settings. Reset this device puts them back to the defaults.",
@@ -327,7 +327,7 @@ export const TOPICS = [
         steps: [
           "Duty status (on duty, on break, off duty) shows to command and to dispatch.",
           "Rank, expertise and zone are set by command on the Staff Desk. Settings shows them, read only.",
-          "Alerts and Display & 3D are kept on this device only. City sky keeps the model on Live sky, or always on Day or Night.",
+          "Alerts follow your account to every device. Display & 3D stays on this device. City sky keeps the model on Live sky, or always on Day or Night.",
           "Sign out when away: your desk closes after the time you pick.",
         ],
       },

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Play, ShieldCheck, CheckCircle2, Crosshair, CornerUpLeft, LocateFixed, Check, AlertTriangle } from "lucide-react";
 import { Command, LiveChip } from "../admin/CommandKit";
 import { readFileParam } from "../../../utils/fileLink";
+import { isServerBoard, loadBoard } from "../../../services/issueSync";
 import { useAuth } from "../../../store/authStore";
 import { useIssues, useAudit } from "../../../store/issueStore";
 import { useFieldRoster, CAPACITY } from "../../../store/fieldRoster";
@@ -184,6 +185,7 @@ export function LoadReactor({ load, label = "Capacity used" }) {
    once the issue moved. Same rules as the Reassign lock on Assign Issues. */
 export function useTargetLock({ location, navigate, issues, focus, onMiss }) {
   const [target, setTarget] = useState(null); // { id, from, at, base, done? }
+  const [pending, setPending] = useState(null); // { id, from, at } once the board has answered
 
   useEffect(() => {
     // ?file=ISS-… (utils/fileLink.js) locks on the same way as a { target } hand-off
@@ -191,12 +193,30 @@ export function useTargetLock({ location, navigate, issues, focus, onMiss }) {
     const st = file ? { target: file.id, from: file.from } : location.state;
     if (!st?.target) return;
     navigate(location.pathname, { replace: true, state: null });
+    const from = st.from && st.from !== location.pathname ? st.from : null;
     const issue = issues.find((i) => i.id === st.target);
-    if (!issue) { onMiss?.(st.target); return; } // closed or not on the list: open the file without a lock
-    focus(issue);
-    setTarget({ id: issue.id, from: st.from && st.from !== location.pathname ? st.from : null, at: Date.now(), base: issue.status });
+    if (issue) {
+      focus(issue);
+      setTarget({ id: issue.id, from, at: Date.now(), base: issue.status });
+      return;
+    }
+    if (!isServerBoard()) { onMiss?.(st.target); return; } // closed or not on the list: open the file without a lock
+    // a fresh page load (reload, a link from mail or another page): the list may still be on its way.
+    // Hold the target until the board has answered, then lock or fall back (below).
+    const id = st.target;
+    loadBoard().finally(() => setPending({ id, from, at: Date.now() }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key]);
+
+  // the board answered: lock on if the list holds it now, else open the file without a lock
+  if (pending) {
+    const issue = issues.find((i) => i.id === pending.id);
+    setPending(null);
+    if (issue) {
+      focus(issue);
+      setTarget({ id: issue.id, from: pending.from, at: pending.at, base: issue.status });
+    } else onMiss?.(pending.id);
+  }
 
   // the issue moved since the lock: say what happened, then let go
   const current = target ? issues.find((i) => i.id === target.id) : null;

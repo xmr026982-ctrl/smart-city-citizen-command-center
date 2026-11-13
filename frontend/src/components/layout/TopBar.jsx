@@ -322,21 +322,41 @@ function StatusCore({ role }) {
   const feed = useLiveFeed();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
-  const sec = Math.max(0, Math.round((now - feed.updatedAt) / 1000));
-  const age = sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m`;
+  // how long since a moment, compact (12s, 4m, 2h, 1d)
+  const since = (t) => {
+    const sec = Math.max(0, Math.round((now - t) / 1000));
+    return sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}m` : sec < 86400 ? `${Math.floor(sec / 3600)}h` : `${Math.floor(sec / 86400)}d`;
+  };
   const d = new Date(now);
   const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
   const date = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
-  // with the server: the live connection's state wins (services/realtime.js); without it: the data feed's
+  /* The capsule is the live link's state (services/realtime.js), not the data's age:
+       LIVE           connected; every change arrives as it happens (no number: each card dates its own reading)
+       RECONNECTING   the link dropped under 20 s ago and is retrying
+       OFFLINE · 3m   still down: how long this screen has gone without updates
+     The server pushes every change, so an age only means something while the link is down. */
   const rt = useRealtimeStatus();
-  const down = rt === "offline" || (rt === "local" && feed.mode === "offline");
-  const label = rt === "offline" ? "Offline" : rt === "connecting" ? "Connecting" : rt === "live" ? "Live" : feed.mode === "offline" ? "Offline" : feed.mode === "live" ? "Live" : "Synced";
-  const tip = rt === "offline" ? "The live connection dropped. Reconnecting; screens show the last data received." : rt === "live" ? "Connected live to the city server" : down ? "Connection lost. Showing the last data received." : "Time since the last data update";
+  const [link, setLink] = useState({ state: rt, at: now, ever: rt === "live" });
+  if (link.state !== rt) setLink({ state: rt, at: now, ever: link.ever || rt === "live" });
+  const live = rt === "live";
+  const retrying = !live && link.ever && now - link.at < 20000;
+  const label = live ? "Live" : retrying ? "Reconnecting" : rt === "connecting" ? "Connecting" : "Offline";
+  const age = !live && !retrying && link.ever ? since(link.at) : "";
+  const down = !live && !retrying && rt !== "connecting";
+  const tip = live
+    ? "Connected live to the city server: every change arrives as it happens."
+    : retrying
+      ? "The live link dropped. Reconnecting now; the screen keeps the last data it received."
+      : rt === "connecting"
+        ? "Opening the live link to the city server."
+        : link.ever
+          ? `Offline for ${since(link.at)}: this screen hasn't received updates since then. It reconnects by itself.`
+          : "Can't reach the city server. It keeps trying; the screen updates once it answers.";
   return (
-    <div className={`tb2-core${down ? " down" : ""}`}>
+    <div className={`tb2-core${down ? " down" : ""}${retrying || rt === "connecting" ? " retry" : ""}`}>
       <span className="tb2-sync" title={tip}>
         <i key={feed.updatedAt} className="beat" />
-        <em>{label}</em><span className="m">{age}</span>
+        <em>{label}</em>{age ? <span className="m">{age}</span> : null}
       </span>
       <i className="tb2-sep" aria-hidden />
       <span className="tb2-clock" title="India Standard Time"><b className="m">{time}</b><em>IST</em><span>{date}</span></span>

@@ -41,3 +41,29 @@ body:has(.city-map) .fa-stack { bottom: 150px; }
 .fa-go { height: 26px; padding: 0 9px; font-size: 11px; }
 .fa-x { width: 22px; height: 22px; background: transparent; }
 .fa-x:hover { background: #f1f5f9; color: #0f172a; }
+
+/* glass cards: frosted, a lit edge in the role colour, a scan on arrival.
+   The stack glides beside an open drawer (FieldAlerts useDock) and back to the corner. */
+.fa-stack { width: 340px; transition: right .38s cubic-bezier(.2, .8, .2, 1), top .38s cubic-bezier(.2, .8, .2, 1); }
+.fa-stack.docked-top { top: 84px; bottom: auto; left: 12px; right: 12px !important; width: auto; max-width: 420px; margin-inline: auto; }
+.fa-card {
+  grid-template-columns: auto minmax(0, 1fr) auto; padding: 10px 10px 11px 13px; border-radius: 14px;
+  background: rgba(255, 255, 255, .8); -webkit-backdrop-filter: blur(16px) saturate(1.5); backdrop-filter: blur(16px) saturate(1.5);
+  box-shadow: 0 0 0 1px rgb(var(--fa-rgb) / .2), inset 0 1px 0 rgba(255, 255, 255, .9), 0 18px 40px -20px rgb(var(--fa-rgb) / .55);
+}
+.fa-card::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 2px; background: linear-gradient(var(--fa-l), var(--fa)); box-shadow: 0 0 10px var(--fa-l); }
+.fa-card.alert::before { background: linear-gradient(#fca5a5, #ef4444); box-shadow: 0 0 10px #f87171; }
+.fa-card.warn::before { background: linear-gradient(#fcd34d, #d97706); box-shadow: 0 0 10px #fbbf24; }
+.fa-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 30%, rgb(var(--fa-rgb) / .12) 50%, transparent 70%); transform: translateX(-100%); animation: faScan .9s .1s ease-out both; }
+.fa-main b { font-size: 13px; letter-spacing: -.005em; }
+.fa-main p { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fa-id { flex: none; font: 700 10px "JetBrains Mono", ui-monospace, monospace; font-style: normal; letter-spacing: .02em; color: var(--fa2); background: var(--fa-soft); box-shadow: inset 0 0 0 1px var(--fa-edge); padding: 1px 5px; border-radius: 5px; }
+.fa-go { width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 10px; color: var(--fa2); background: var(--fa-soft); box-shadow: inset 0 0 0 1px var(--fa-edge); transition: background .2s, color .2s, transform .2s; }
+.fa-go:hover { color: #fff; background: linear-gradient(135deg, var(--fa), var(--fa2)); transform: translateY(-1px); }
+.fa-go:focus-visible, .fa-x:focus-visible { outline: 2px solid var(--fa); outline-offset: 2px; }
+.fa-card.alert .fa-go { color: #b91c1c; background: #fef2f2; box-shadow: inset 0 0 0 1px #fecaca; }
+.fa-card.alert .fa-go:hover { color: #fff; background: linear-gradient(135deg, #ef4444, #b91c1c); }
+@keyframes faScan { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .fa-stack { transition: none; } .fa-card::after { animation: none; display: none; } }
+.fa-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-stack.docked .fa-card, .fa-stack.docked-top .fa-card { background: rgba(255, 255, 255, .93); }

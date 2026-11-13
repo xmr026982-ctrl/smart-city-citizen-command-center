@@ -694,13 +694,13 @@ function labelWidth(name) {
   c.font = NAME_FONT;
   const wn = c.measureText(name.toUpperCase()).width + name.length * 2.2;
   c.font = VALUE_FONT;
-  const wv = c.measureText("AQI 000 · LIVE").width;
+  const wv = Math.max(c.measureText("AQI 000 · LIVE").width, c.measureText("NO LIVE READING").width);
   return Math.ceil(Math.max(wn, wv) + PAD * 2 + 14 + 40);
 }
 
 function ZoneLabel({ zone, active, accent, onSelect, y, dark }) {
   const [x, z] = ZONE_POS[zone.id];
-  const aqi = useSyncExternalStore(subscribeFeed, () => Math.round(getFeed().zones[zone.id]?.aqi ?? 0));
+  const aqi = useSyncExternalStore(subscribeFeed, () => { const v = getFeed().zones[zone.id]?.aqi; return v === null || v === undefined || !Number.isFinite(Number(v)) ? -1 : Math.round(Number(v)); });
   const tone = useSyncExternalStore(subscribeFeed, () => toneFor(getFeed().zones[zone.id]));
   const tex = useMemo(() => {
     const canvas = document.createElement("canvas");
@@ -713,7 +713,7 @@ function ZoneLabel({ zone, active, accent, onSelect, y, dark }) {
   }, [zone.name]);
   useEffect(() => () => tex.dispose(), [tex]);
   useEffect(() => {
-    const paint = () => { drawLabel(tex.image, { name: zone.name.toUpperCase(), value: `AQI ${aqi} · LIVE`, on: active, accent, dark, tone }); tex.needsUpdate = true; };
+    const paint = () => { drawLabel(tex.image, { name: zone.name.toUpperCase(), value: aqi < 0 ? "NO LIVE READING" : `AQI ${aqi} · LIVE`, on: active, accent, dark, tone }); tex.needsUpdate = true; };
     paint();
     let live = true;
     document.fonts?.ready?.then(() => { if (live) paint(); });

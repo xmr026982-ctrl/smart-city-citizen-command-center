@@ -4,7 +4,6 @@ import { api } from "../lib/api";
 import { SERVER_ON } from "../config/server";
 import { registerProfile } from "./profileStore";
 import { defaultsFor, zoneIdOf } from "../config/settingsSchema";
-import { setFeedInterval } from "../services/liveFeed";
 
 /* ------------------------------------------------------------------
    Settings, per person (role + account), kept in this browser.
@@ -80,8 +79,17 @@ function own(role, s) {
     out.pendingEmailAt = 0;
   }
   if (role === "staff" && !out.defaultZone) out.defaultZone = zoneIdOf(me.ward) || "central";
-  // the account's preferences win over whatever this browser kept
-  const prefs = me.source === "server" ? getAccount()?.prefs : null;
+  // the account's fields and preferences win over whatever this browser kept
+  const account = me.source === "server" ? getAccount() : null;
+  if (account) {
+    out.displayName = account.displayName || account.name || out.displayName;
+    if ("avatar" in account) out.avatar = account.avatar || "";
+    if (role === "admin") {
+      out.designation = account.designation || "";
+      out.office = account.office || "";
+    }
+  }
+  const prefs = account?.prefs || null;
   if (prefs && typeof prefs === "object") ACCOUNT_PREFS.forEach((k) => { if (prefs[k] !== undefined && prefs[k] !== null) out[k] = prefs[k]; });
   registerProfile(me.id, { name: me.name, displayName: out.displayName, role });
   const duty = dutyBridge?.read(me);
@@ -169,7 +177,6 @@ export function applySettingsEffects() {
   const root = document.documentElement;
   root.dataset.motion = s.reduceMotion ? "reduced" : "full";
   root.dataset.contrast = s.highContrast ? "high" : "normal";
-  setFeedInterval((Number(s.feedInterval) || 2.5) * 1000);
 }
 
 /** This person's settings as a file (no passwords, no tokens, no photo data). */

@@ -35,7 +35,7 @@ function OperatorCard({ role, me, s, onJump, onPhoto, onRemovePhoto }) {
   const zone = role === "citizen" ? zoneNameOf(s.homeWard) || me.ward : role === "staff" ? me.ward : "";
   const pills = [
     { t: meta.clearance.toUpperCase(), on: true },
-    server ? { t: "SERVER VERIFIED", on: true } : { t: "DEVELOPER DESK", on: false },
+    server ? { t: "SERVER VERIFIED", on: true } : { t: "NOT VERIFIED", on: false },
     server ? { t: me.provider === "google" ? "GOOGLE SIGN-IN" : "PASSWORD SIGN-IN", on: true } : null,
     zone ? { t: `ZONE · ${zone.toUpperCase()}`, on: true } : null,
     role !== "citizen" && DUTY[s.dutyStatus] ? { t: DUTY[s.dutyStatus].toUpperCase(), on: s.dutyStatus === "on" } : null,
@@ -97,7 +97,7 @@ function OperatorCard({ role, me, s, onJump, onPhoto, onRemovePhoto }) {
           </div>
         </div>
         <div className="info">
-          <strong><ShieldCheck size={14} /> {server ? "Session secured" : "Sample desk"}</strong>
+          <strong><ShieldCheck size={14} /> {server ? "Session secured" : "Session not confirmed"}</strong>
           {server ? (
             <ul className="st-hud">
               {clk?.iat ? <li><span>Signed in</span><b>{clock(clk.iat)} IST</b></li> : null}
@@ -105,7 +105,7 @@ function OperatorCard({ role, me, s, onJump, onPhoto, onRemovePhoto }) {
               <li><span>Away sign-out</span><b>{idle ? (idle >= 60 ? `${idle / 60} h` : `${idle} min`) : "Off"}</b></li>
             </ul>
           ) : (
-            <p>Sample data on this browser. Nothing reaches the server.</p>
+            <p>The server hasn't confirmed this sign-in yet. Sign in again if this stays.</p>
           )}
           <button type="button" className="st-hud-go" onClick={() => onJump("signin")}>Sign-in & security</button>
         </div>

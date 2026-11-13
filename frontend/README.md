@@ -20,41 +20,41 @@ Copy `.env.example` to `.env` and fill it in (never commit `.env`):
 
 | Variable | What it does |
 |---|---|
-| `VITE_API_URL` | Backend address, e.g. `http://localhost:5000/api`. Empty: the app runs on its own sample data |
+| `VITE_API_URL` | Backend address, e.g. `http://localhost:5000/api`. Required: every sign-in and every screen's data comes from the server |
 | `VITE_FIREBASE_*` | Google sign-in for citizens (empty hides the button) |
 | `VITE_MAPTILER_KEY`, `VITE_TOMTOM_API_KEY` | Map tiles and traffic |
 
 ## Backend
 
-The backend (Person 6) is built to fit this frontend. Everything it must do is in one
-document: `docs/backend/BACKEND-HANDOVER.md`.
+The backend is in `../backend` (Node, Express, MongoDB, Socket.io). How the whole system works,
+every endpoint, live event, privacy rule and setup step, is in one document:
+`docs/backend/BACKEND-HANDOVER.md`.
 
 The connection points in this code: `src/config/server.js` (reads `VITE_API_URL`),
 `src/lib/api.js` (the one HTTP client), `src/lib/socket.js` and `src/services/realtime.js`
 (Socket.io), `src/services/events.js` (event names), `src/store/authStore.js` (the session).
 
-Without `VITE_API_URL` the app runs on sample data in the browser. `VITE_DEV_DESK=true` in
-`.env.local` opens a sample desk per role, under `npm run dev` only.
+There is no sample data and no offline desk: sign in with a real account (create the first
+ones with `npm run seed` in the backend).
 
 ## How the parts connect
 
 One issue board (`src/store/issueStore.js`), one command trail, one event channel
-(`src/services/events.js`), one rule for opening a file (`src/utils/fileLink.js`).
-Notifications (`src/store/notifyStore.js`) and Community (`src/store/communityStore.js`) read the
-same board and trail, so a change shows up everywhere at once: the file, the map, the 3D city,
-the top bar, the notifications and the community board.
+(`src/services/events.js`), one rule for opening a file (`src/utils/fileLink.js`), all fed by the server and kept live over
+Socket.io. Notifications (`src/store/notifyStore.js`) and Community (`src/store/communityStore.js`)
+read the same board and trail, so a change shows up everywhere at once: the file, the map, the
+3D city, the top bar, the notifications and the community board.
 
 
-## Team and credits
+## Team · Group D
 
-| Person | Part |
+| Member | Part |
 |---|---|
-| Person 1 · Sayan Majumder | Authentication, users, profile |
-| Person 2 | Dashboard and city data (taken over by Person 4) |
-| Person 3 | Map: Leaflet map, routing, search, zone pinning (`src/components/map/`) |
-| Person 4 | Issue Management, City Health 3D, top bar and shell, Notifications and Community rebuild |
-| Person 5 | Community and Notifications: the original module and its API design (`/community-posts`, `/voting-slots`, `/notifications`). The rebuilt Community keeps those endpoint names as its contract |
-| Person 6 · Priti Sarkar | Admin, backend and real-time (Socket.io), integration |
+| **Koushik Bhowmik** | Frontend and command interface, backend rebuild and system integration |
+| **Priti Sarkar** | Backend foundations |
+| **Sayan Majumder** | Sign-in, users and profiles |
+| **Subhomoy Ghosh** | Community and Notifications: the original module and its API design |
+| **Swarup Sutradhar** | City map |
+| **Taras Hembram** | Project support |
 
-Person 5's original module (`src/modules/community`, `src/modules/community-admin`) was replaced by
-the rebuilt Community and Notifications; it remains in the git history.
+Full details in the [project README](../README.md).

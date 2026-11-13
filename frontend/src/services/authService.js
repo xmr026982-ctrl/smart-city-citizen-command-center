@@ -41,7 +41,7 @@ export async function signIn({ email, password, role, zone }) {
   const body = { email: clean(email), password, role: role === "citizen" ? "user" : role };
   if (zone) body.zone = zone;
   const { data } = await api.post("/auth/login", body);
-  return data; // { token, user } or { requiresZone, email }
+  return data; // { user, session } (the session is set as an httpOnly cookie) or { requiresZone, email }
 }
 
 export async function register({ name, email, password, zone }) {

@@ -67,6 +67,14 @@ function ServiceWindows() {
   const [logEvent_, setLogEvent] = useState(null); // change-log entry file
   const [cell, setCell] = useState(null); // { p, c } window-map cell lens
   const [draft, setDraft] = useState(policy);
+  // the live table changed (another command desk saved, or a reconnect re-read it):
+  // an untouched draft follows it; a draft being edited is kept, and its save bar
+  // then shows the difference against the new table
+  const [base, setBase] = useState(policy);
+  if (policy !== base) {
+    setBase(policy);
+    if (policyDiff(base, draft).length === 0) setDraft(policy);
+  }
   const [saved, setSaved] = useState("");
 
   const open = useMemo(() => issues.filter((i) => i.status !== "resolved"), [issues]);

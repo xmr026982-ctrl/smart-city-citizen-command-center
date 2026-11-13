@@ -50,11 +50,54 @@ export function useStaffBadge() {
   return useFieldUnread(audit, everything, me?.role === "staff" ? me?.name : null).assigned.length;
 }
 
+/* Where the stack sits. Bottom right by default; while a drawer is open on the right it docks
+   just outside the drawer's left edge, so it never lands on the drawer's buttons. When the
+   drawer fills the screen (phones) the stack drops from the top instead. Centred dialogs
+   leave it where it is. */
+function findDrawer() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const roots = document.querySelectorAll('[aria-modal="true"]');
+  for (const root of roots) {
+    for (const el of [root, ...root.children]) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 240 || r.height < vh * 0.6) continue;
+      if (Math.abs(r.right - vw) > 4) continue; // docked on the right edge
+      if (r.width >= vw - 4 && el === root && root.children.length) continue; // a full-screen veil: look at its panel
+      return r;
+    }
+  }
+  return null;
+}
+function useDock(active) {
+  const [dock, setDock] = useState(null); // null | { right } | { top: true }
+  useEffect(() => {
+    if (!active) return undefined;
+    let raf = 0, settle = 0;
+    const measure = () => {
+      const r = findDrawer();
+      const vw = window.innerWidth;
+      const next = !r ? null : r.left < 360 + 32 ? { top: true } : { right: Math.round(vw - r.left + 16) };
+      setDock((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
+    };
+    const schedule = () => {
+      cancelAnimationFrame(raf); raf = requestAnimationFrame(measure);
+      clearTimeout(settle); settle = setTimeout(measure, 420); // after the drawer's slide-in
+    };
+    const mo = new MutationObserver(schedule);
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal", "class"] });
+    window.addEventListener("resize", schedule);
+    schedule();
+    return () => { mo.disconnect(); window.removeEventListener("resize", schedule); cancelAnimationFrame(raf); clearTimeout(settle); };
+  }, [active]);
+  return active ? dock : null;
+}
+
 function FieldAlerts() {
   const { me, role, items } = useInbox();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [list, setList] = useState([]);
+  const dock = useDock(list.length > 0);
   const seen = useRef(null);
   const greeted = useRef(""); // the away summary shows once per sign-in (StrictMode runs effects twice)
   const here = useRef(pathname);
@@ -115,7 +158,11 @@ function FieldAlerts() {
 
   if (!list.length) return null;
   return createPortal(
-    <div className={`fa-stack tone-${role}`} role="status" aria-live="polite">
+    <div
+      className={`fa-stack tone-${role}${dock?.right ? " docked" : ""}${dock?.top ? " docked-top" : ""}`}
+      style={dock?.right ? { right: `${dock.right}px` } : undefined}
+      role="status" aria-live="polite"
+    >
       {list.map((n) => {
         const Icon = ICON[n.kind] || Bell;
         const t = n.go || noticeLink(n, role, pathname);
@@ -124,12 +171,12 @@ function FieldAlerts() {
             <span className="fa-ic"><Icon size={15} /></span>
             <div className="fa-main">
               <b>{n.title}</b>
-              <p>{n.line}</p>
+              <p>{n.ref?.id && !String(n.line || "").includes(n.ref.id) ? <em className="fa-id">{n.ref.id}</em> : null}<span className="fa-line">{n.line}</span></p>
             </div>
             <div className="fa-acts">
               {t && !t.locked ? (
-                <button type="button" className="fa-go" onClick={() => open(n)}>
-                  {n.go ? t.label : "Open"} <ArrowUpRight size={12} />
+                <button type="button" className="fa-go" onClick={() => open(n)} aria-label={n.go ? t.label : "Open"} title={n.go ? t.label : "Open"}>
+                  <ArrowUpRight size={14} />
                 </button>
               ) : null}
               <button type="button" className="fa-x" aria-label="Dismiss" onClick={() => close(n.toastKey)}><X size={13} /></button>

@@ -2,7 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Leaf, Car, Droplets, Zap, RotateCw, Box, LocateFixed, Radar, ArrowUpRight, Sun, Moon, SunMoon } from "lucide-react";
+import {
+  Leaf,
+  Car,
+  CloudRain,
+  ThermometerSun,
+  RotateCw,
+  Box,
+  LocateFixed,
+  Radar,
+  ArrowUpRight,
+  Sun,
+  Moon,
+  SunMoon,
+} from "lucide-react";
 import CityScene from "./CityScene";
 import { ZONE_POS, project } from "./geo";
 import { skyFor, SKY_MODES, SKY_LABEL } from "./sky";
@@ -16,7 +29,7 @@ import { useIssues } from "../../store/issueStore";
 import { useInbox } from "../../store/notifyStore";
 import { useCommunity, pollOpen } from "../../store/communityStore";
 import { refreshFeed } from "../../services/liveFeed";
-import { ZONES, deriveAlerts, aqiLabel, trafficLabel, waterLabel, powerLabel } from "../../config/zones";
+import { ZONES, deriveAlerts, aqiLabel, trafficLabel, rainLabel, num } from "../../config/zones";
 import { WARDS } from "../../constants/issueConstants";
 import { STATUS_LABEL, publicStatus } from "../../constants/issueStatuses";
 import { slaOf } from "../../utils/sla";
@@ -41,6 +54,15 @@ function mine(role, me) {
   if (role === "admin") return () => true;
   if (role === "staff") return (i) => i.assignedTo === me?.name;
   return (i) => i.reporterId === me?.id;
+}
+
+/* "Moderate", or while the official 24 h average builds: "Moderate · Calibrating 3/16 h" */
+const AQI_CALIBRATING_TIP = "Estimated from the latest station readings. Switches to the official CPCB 24-hour average after 16 hours.";
+function aqiStatusLine(zm, std) {
+  const label = aqiLabel(zm.aqi, std);
+  if (num(zm.aqi) === null || zm.aqiBasis !== "provisional") return label;
+  const h = num(zm.aqiHours);
+  return `${label} · Calibrating${h !== null ? ` ${Math.min(h, 16)}/16 h` : ""}`;
 }
 
 function CityPlate() {
@@ -143,6 +165,7 @@ function CityPlate() {
   const feed = useLiveFeed();
   const active = ZONES.find((z) => z.id === activeId) || ZONES[0];
   const zm = feed.zones[active.id];
+  const live = feed.mode === "live";
   const alerts = useMemo(() => feed.alertsOverride ?? deriveAlerts(feed.zones), [feed.alertsOverride, feed.zones]);
   const inCoverage = COVERED.has(active.name);
 
@@ -281,16 +304,16 @@ function CityPlate() {
       </div>
 
       <div className="kpi-row">
-        <KpiCard icon={Leaf} label="Air Quality" value={zm.aqi} history={zm.history.aqi} unit=" AQI" status={aqiLabel(zm.aqi, cfg.aqiStd)} color="#16a34a" lowerIsBetter />
-        <KpiCard icon={Car} label="Traffic Flow" value={zm.traffic} history={zm.history.traffic} unit="%" status={trafficLabel(zm.traffic)} color="#2563eb" />
-        <KpiCard icon={Droplets} label="Water Supply" value={zm.water} history={zm.history.water} unit="%" status={waterLabel(zm.water)} color="#0ea5e9" />
-        <KpiCard icon={Zap} label="Power Supply" value={zm.power} history={zm.history.power} unit="%" status={powerLabel(zm.power)} color="#a855f7" />
+        <KpiCard icon={Leaf} label="Air Quality" value={num(zm.aqi)} history={zm.history.aqi} unit=" AQI" status={aqiStatusLine(zm, cfg.aqiStd)} statusTip={zm.aqiBasis === "provisional" && num(zm.aqi) !== null ? AQI_CALIBRATING_TIP : ""} color="#16a34a" lowerIsBetter live={live} />
+        <KpiCard icon={Car} label="Traffic Flow" value={num(zm.traffic)} history={zm.history.traffic} unit="%" status={trafficLabel(zm.traffic)} color="#2563eb" live={live} />
+        <KpiCard icon={CloudRain} label="Rainfall" value={num(zm.rain)} history={zm.history.rain} unit=" mm" decimals={1} status={num(zm.rain) === null ? "No reading" : `${rainLabel(zm.rain)} · past hour`} color="#0ea5e9" lowerIsBetter live={live} />
+        <KpiCard icon={ThermometerSun} label="Heat" value={num(zm.heat)} history={zm.history.heat} unit=" °C" decimals={1} status={num(zm.feels) === null ? (num(zm.heat) === null ? "No reading" : "Air temperature") : `Feels like ${num(zm.feels).toFixed(1)} °C`} color="#a855f7" lowerIsBetter live={live} />
       </div>
 
       <div className="panel-row">
-        <LiveAlerts alerts={alerts} />
+        <LiveAlerts alerts={alerts} live={live} />
         <CityOverview sensors={feed.city.sensors} />
-        <EnvIndex value={feed.city.envIndex} history={feed.city.envHistory} />
+        <EnvIndex value={feed.city.envIndex} history={feed.city.envHistory} std={cfg.aqiStd} calibrating={Object.values(feed.zones).some((z) => z.aqiBasis === "provisional")} />
         <Uptime value={feed.city.uptime} onRefresh={refreshFeed} />
       </div>
     </section>

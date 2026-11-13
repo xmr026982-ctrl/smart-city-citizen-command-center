@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, UserRound } from "lucide-react";
+import ZoneLock from "../../components/public/ZoneLock";
 import { AuthFrame, Field, PasswordInput, PasswordRules, ZonePicker, Status, Submit, GoogleButton, Divider } from "../../components/public/PublicKit";
 import { register, googleSignIn, passwordCheck, ZONES, EMAIL_RE } from "../../services/authService";
 import { googleIdToken, GOOGLE_ON } from "../../lib/firebase";
@@ -71,13 +72,14 @@ export default function SignUp() {
     }
   };
 
-  const finishGoogle = async (e) => {
-    e.preventDefault();
-    if (!ZONES.includes(zone)) return setMsg({ type: "bad", text: "Pick your zone." });
+  const finishGoogle = async (picked) => {
+    if (!ZONES.includes(picked)) { setMsg({ type: "bad", text: "Lock a zone to continue." }); return; }
+    setZone(picked);
+    setMsg(null);
     setBusy("google");
     try {
-      const data = await googleSignIn({ idToken: google.idToken, zone });
-      if (!data?.token) throw new Error("The server didn't finish the sign-up. Please start again.");
+      const data = await googleSignIn({ idToken: google.idToken, zone: picked });
+      if (!data?.user) throw new Error("The server didn't finish the sign-up. Please start again.");
       done(data);
     } catch (err) {
       setMsg({ type: "bad", text: err?.message || "Google sign-up didn't finish." });
@@ -88,12 +90,10 @@ export default function SignUp() {
 
   if (google) {
     return (
-      <AuthFrame tone="citizen" title="Pick your zone" sub={`Joining with Google as ${google.email || "your account"}.`} back={{ to: "/register", label: "Back" }}>
-        <form onSubmit={finishGoogle} noValidate>
-          <ZonePicker value={zone} onChange={setZone} />
-          <Status msg={msg} />
-          <Submit busy={busy === "google"} tone="citizen" disabled={!zone}>Create my account</Submit>
-        </form>
+      <AuthFrame tone="citizen" title="Choose your home zone" sub="Your board, alerts and announcements follow this zone.">
+        <ZoneLock email={google.email} busy={busy === "google"} onEngage={finishGoogle} />
+        <Status msg={msg} />
+        <button type="button" className="pk-link" disabled={busy === "google"} onClick={() => { setGoogle(null); setMsg(null); }}>Use another account</button>
       </AuthFrame>
     );
   }

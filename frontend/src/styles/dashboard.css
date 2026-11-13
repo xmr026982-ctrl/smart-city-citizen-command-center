@@ -223,3 +223,11 @@
 .overview dl { grid-template-columns: repeat(3, minmax(0, max-content)); column-gap: clamp(10px, 1.1vw, 18px); }
 .overview dd { white-space: nowrap; font-size: clamp(15px, 1.3vw, 20px); }
 .overview dt { white-space: nowrap; }
+
+/* a reading that hasn't arrived (or a source that isn't answering) */
+.live-chip.off { color: #94a3b8; background: rgba(148,163,184,.12); }
+.live-chip.off i { background: #94a3b8; }
+.live-chip.off i::after { animation: none; opacity: 0; }
+.kpi-none .kpi-value { color: #94a3b8; }
+.spark-empty { opacity: .9; }
+.panel .big.none { color: #94a3b8; }

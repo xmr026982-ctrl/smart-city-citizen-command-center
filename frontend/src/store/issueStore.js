@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { STATUS_LABEL } from "../constants/issueStatuses";
 import { PRIORITY_LABEL } from "../constants/issuePriorities";
-import { WARDS } from "../constants/issueConstants";
 import { EVENTS, emitEvent } from "../services/events";
 import { windowFor } from "./slaPolicyStore";
 import { isMash } from "../utils/textGuard";
@@ -32,135 +31,11 @@ import { isMash } from "../utils/textGuard";
 ------------------------------------------------------------------- */
 
 const KEY = "issue-board-v2";
-const ADMIN = "Priti Sarkar";
-const HOUR = 36e5;
-const ago = (h) => new Date(Date.now() - h * HOUR).toISOString();
+const ADMIN = "City Command";
 
-function spot(ward, n) {
-  const w = WARDS.find((z) => z.name === ward) || WARDS[0];
-  const j = ((n * 37) % 11) / 1000 - 0.005;
-  return { lat: +(w.lat + j).toFixed(4), lng: +(w.lng - j).toFixed(4) };
-}
-
-/* Build one seeded issue with a believable timeline.
-   age: hours since it was filed. *After: hours after filing that step happened. */
-function seedIssue(s, n) {
-  const created = s.age;
-  const steps = [{ status: "submitted", at: ago(created), by: s.reportedBy }];
-  const reached = ["submitted", "acknowledged", "in_progress", "pending_review", "resolved"].indexOf(s.status);
-  if (s.assignedTo && reached >= 1) {
-    steps.push({ status: "acknowledged", at: ago(created - (s.assignAfter ?? 1)), by: ADMIN, note: `Assigned to ${s.assignedTo}` });
-  }
-  if (reached >= 2) steps.push({ status: "in_progress", at: ago(created - (s.startAfter ?? 3)), by: s.assignedTo });
-  if (reached >= 3) steps.push({ status: "pending_review", at: ago(created - (s.reviewAfter ?? (s.resolveAfter ? s.resolveAfter - 1 : 6))), by: s.assignedTo });
-  if (reached >= 4) steps.push({ status: "resolved", at: ago(created - s.resolveAfter), by: ADMIN });
-  const last = steps[steps.length - 1];
-  return {
-    id: s.id,
-    title: s.title,
-    description: s.description,
-    category: s.category,
-    location: s.location,
-    ward: s.ward,
-    ...spot(s.ward, n),
-    photos: [],
-    reportedBy: s.reportedBy,
-    reporterId: s.reporterId,
-    status: s.status,
-    priority: s.priority,
-    assignedTo: s.assignedTo && reached >= 1 ? s.assignedTo : null,
-    assignedAt: s.assignedTo && reached >= 1 ? steps[1].at : null,
-    comments: [],
-    timeline: steps,
-    createdAt: steps[0].at,
-    updatedAt: last.at,
-    savedBy: s.saved ? [s.reporterId] : [],
-    supporters: [],
-    danger: false,
-    slaHours: s.slaHours,
-  };
-}
-
-const A = { reportedBy: "Aanya Mehra", reporterId: "citizen-1" };
-const V = { reportedBy: "Vikram Joshi", reporterId: "citizen-2" };
-const R = { reportedBy: "Riya Banerjee", reporterId: "citizen-3" };
-const M = { reportedBy: "Mehul Shah", reporterId: "citizen-4" };
-
-const SEED_SPECS = [
-  { ...A, id: "ISS-2401", title: "Broken streetlight near Central Park", description: "The streetlight has been out for a week. The area is unsafe after sunset.", category: "lighting", location: "Near the park gate, beside the tram line", ward: "Ballygunge", priority: "high", slaHours: 48, age: 30, assignedTo: "Koushik Bhowmik", status: "in_progress", saved: true },
-  { ...A, id: "ISS-2398", title: "Water leakage on 3rd Avenue", description: "A broken municipal pipe is flooding the footpath.", category: "water", location: "Opposite the Writers' Building approach", ward: "B.B.D. Bagh", priority: "critical", slaHours: 24, age: 20, assignedTo: "Debasish Roy", status: "acknowledged" },
-  { ...A, id: "ISS-2385", title: "Garbage pile-up behind market", description: "Uncollected waste has been piling up for several days.", category: "waste", location: "Behind the book market lane", ward: "College Street", priority: "medium", slaHours: 72, age: 160, assignedTo: "Arnab Saha", status: "resolved", resolveAfter: 40 },
-  { ...V, id: "ISS-2410", title: "Pothole cluster near Esplanade crossing", description: "Five deep potholes are slowing peak-hour traffic.", category: "roads", location: "Esplanade crossing", ward: "Dharmatala", priority: "high", slaHours: 36, age: 10, status: "submitted" },
-  { ...R, id: "ISS-2411", title: "Transformer sparking on Bidhan Sarani", description: "Sparks and a burning smell from the pole-mounted transformer.", category: "electricity", location: "Bidhan Sarani, near the metro gate", ward: "Shyambazar", priority: "critical", slaHours: 12, age: 14, assignedTo: "Koushik Bhowmik", status: "in_progress", startAfter: 2 },
-  { ...M, id: "ISS-2412", title: "Streetlights out on College Row", description: "Six lights in a row are dark since the storm.", category: "lighting", location: "College Row, near the coffee house", ward: "College Street", priority: "medium", slaHours: 72, age: 50, assignedTo: "Sourav Kundu", status: "in_progress" },
-  { ...V, id: "ISS-2413", title: "Open manhole on Park Street", description: "Manhole cover missing in the middle of the footpath.", category: "safety", location: "Park Street, outside the bakery", ward: "Ballygunge", priority: "critical", slaHours: 12, age: 3, status: "submitted" },
-  { ...R, id: "ISS-2414", title: "Sewer overflow near the tram depot", description: "Sewage is spilling onto the road after every rain.", category: "water", location: "Dharmatala tram depot gate", ward: "Dharmatala", priority: "high", slaHours: 24, age: 26, assignedTo: "Debasish Roy", status: "in_progress" },
-  { ...M, id: "ISS-2415", title: "Road cave-in at the five-point crossing", description: "A section of road has sunk about a foot deep.", category: "roads", location: "Shyambazar five-point crossing", ward: "Shyambazar", priority: "critical", slaHours: 24, age: 18, assignedTo: "Arjun Dutta", status: "in_progress", startAfter: 2 },
-  { ...A, id: "ISS-2416", title: "Footpath tiles broken outside Writers'", description: "Loose tiles are tripping people near the bus stop.", category: "roads", location: "Writers' Building bus stop", ward: "B.B.D. Bagh", priority: "low", slaHours: 120, age: 40, assignedTo: "Subhomoy Ghosh", status: "acknowledged" },
-  { ...R, id: "ISS-2417", title: "Overflowing bins at Gariahat market", description: "Bins have not been cleared and waste is on the road.", category: "waste", location: "Gariahat market, south gate", ward: "Ballygunge", priority: "high", slaHours: 24, age: 9, assignedTo: "Arnab Saha", status: "in_progress", startAfter: 2 },
-  { ...M, id: "ISS-2418", title: "Low water pressure in block BD", description: "Taps run dry from the evening onwards.", category: "water", location: "Salt Lake block BD", ward: "B.P. Township", priority: "medium", slaHours: 72, age: 30, assignedTo: "Moumita Pal", status: "acknowledged" },
-  { ...V, id: "ISS-2419", title: "Illegal dumping beside the canal", description: "Construction debris dumped along the canal bank.", category: "waste", location: "Canal bank, sector 2", ward: "B.P. Township", priority: "medium", slaHours: 72, age: 6, status: "submitted" },
-  { ...R, id: "ISS-2420", title: "Power cut across the Esplanade block", description: "Shops on the block have had no power since morning.", category: "electricity", location: "Esplanade East block", ward: "Dharmatala", priority: "high", slaHours: 18, age: 15, assignedTo: "Tanmoy Ghoshal", status: "pending_review", reviewAfter: 13 },
-  { ...M, id: "ISS-2421", title: "Waterlogging at College Street crossing", description: "Knee-deep water after an hour of rain.", category: "water", location: "College Street crossing", ward: "College Street", priority: "high", slaHours: 24, age: 4, status: "submitted" },
-  { ...V, id: "ISS-2422", title: "Faded zebra crossing at Gariahat", description: "The crossing is barely visible at night.", category: "roads", location: "Gariahat crossing", ward: "Ballygunge", priority: "low", slaHours: 168, age: 60, assignedTo: "Nilanjan Bose", status: "acknowledged" },
-  { ...R, id: "ISS-2423", title: "Fallen tree blocking a lane", description: "A tree came down in the night and blocks the lane.", category: "safety", location: "Lane 4, sector 1", ward: "B.P. Township", priority: "high", slaHours: 12, age: 8, assignedTo: "Rupa Chatterjee", status: "in_progress", startAfter: 1 },
-  { ...A, id: "ISS-2424", title: "Flickering lamp posts on Strand Road", description: "Lamp posts flicker on and off all night.", category: "lighting", location: "Strand Road, ferry ghat", ward: "B.B.D. Bagh", priority: "low", slaHours: 96, age: 200, assignedTo: "Koushik Bhowmik", status: "resolved", resolveAfter: 80 },
-  { ...M, id: "ISS-2425", title: "Burst pipe at Hatibagan", description: "Water gushing from a burst main.", category: "water", location: "Hatibagan market", ward: "Shyambazar", priority: "critical", slaHours: 12, age: 90, assignedTo: "Debasish Roy", status: "resolved", resolveAfter: 10 },
-  { ...V, id: "ISS-2426", title: "Pothole on Rashbehari Avenue", description: "A wide pothole in the left lane.", category: "roads", location: "Rashbehari Avenue", ward: "Ballygunge", priority: "medium", slaHours: 48, age: 140, assignedTo: "Arjun Dutta", status: "resolved", resolveAfter: 70 },
-  { ...R, id: "ISS-2427", title: "Garbage truck missed the sector V route", description: "No pickup for three days on the route.", category: "waste", location: "Sector V, street 12", ward: "B.P. Township", priority: "medium", slaHours: 48, age: 70, assignedTo: "Arnab Saha", status: "resolved", resolveAfter: 40 },
-  { ...M, id: "ISS-2428", title: "Live wire hanging low", description: "A cable is hanging at head height over the footpath.", category: "electricity", location: "Surya Sen Street", ward: "College Street", priority: "critical", slaHours: 8, age: 34, assignedTo: "Sourav Kundu", status: "resolved", resolveAfter: 6 },
-  { ...V, id: "ISS-2429", title: "Broken divider on AJC Bose Road", description: "Concrete divider smashed by a truck.", category: "roads", location: "AJC Bose Road flyover foot", ward: "Dharmatala", priority: "medium", slaHours: 72, age: 20, assignedTo: "Arjun Dutta", status: "acknowledged" },
-  { ...R, id: "ISS-2430", title: "Clogged drain at Lalbazar", description: "The drain is blocked and smells.", category: "water", location: "Lalbazar Street", ward: "B.B.D. Bagh", priority: "high", slaHours: 24, age: 28, assignedTo: "Moumita Pal", status: "pending_review", reviewAfter: 22 },
-  { ...M, id: "ISS-2431", title: "Streetlight pole leaning", description: "A pole is leaning over the road after a truck hit it.", category: "lighting", location: "Bagbazar Street", ward: "Shyambazar", priority: "high", slaHours: 36, age: 12, status: "submitted" },
-  { ...V, id: "ISS-2432", title: "Garbage burning near a school", description: "Waste is being burned beside the school wall.", category: "safety", location: "Behind Hindu School", ward: "College Street", priority: "high", slaHours: 24, age: 22, assignedTo: "Rupa Chatterjee", status: "acknowledged" },
-  { ...R, id: "ISS-2433", title: "Pothole near Hatibagan tram line", description: "Deep pothole next to the tram tracks.", category: "roads", location: "Hatibagan tram line", ward: "Shyambazar", priority: "high", slaHours: 36, age: 16, assignedTo: "Arjun Dutta", status: "in_progress" },
-  { ...M, id: "ISS-2434", title: "Road dug up and left open", description: "Utility trench left open with no barricade.", category: "roads", location: "Dalhousie Square east", ward: "B.B.D. Bagh", priority: "medium", slaHours: 48, age: 11, assignedTo: "Arjun Dutta", status: "acknowledged" },
-  { ...V, id: "ISS-2435", title: "Waste heap at the Ballygunge station", description: "A heap of waste near the station entrance.", category: "waste", location: "Ballygunge station road", ward: "Ballygunge", priority: "medium", slaHours: 48, age: 7, assignedTo: "Arnab Saha", status: "acknowledged" },
-  { ...R, id: "ISS-2436", title: "Dead animal on the roadside", description: "Needs removal before it becomes a health risk.", category: "waste", location: "Amherst Street", ward: "College Street", priority: "high", slaHours: 12, age: 5, assignedTo: "Arnab Saha", status: "in_progress", startAfter: 1 },
-  { ...A, id: "ISS-2437", title: "Streetlight timer fault", description: "Lights stay on all day and go off at night.", category: "lighting", location: "Shyambazar metro exit", ward: "Shyambazar", priority: "medium", slaHours: 72, age: 9, assignedTo: "Koushik Bhowmik", status: "acknowledged" },
-];
-
-function auditFromIssues(list) {
-  const events = [];
-  list.forEach((issue) => {
-    issue.timeline.forEach((t, i) => {
-      let action;
-      let role = "admin";
-      let kind = "status";
-      const from = i ? issue.timeline[i - 1].status : null;
-      let n = { type: "status", from, to: t.status, owner: issue.assignedTo || null };
-      if (t.status === "submitted") { action = `Filed ${issue.id}`; role = "citizen"; kind = "filed"; n = { type: "filed", reporterId: issue.reporterId || null }; }
-      else if (t.status === "acknowledged") { action = `Assigned ${issue.id} to ${issue.assignedTo || "field"}`; kind = "dispatch"; n = { type: "assign", to: issue.assignedTo || null, from: null }; }
-      else if (t.status === "pending_review") { action = `Requested close on ${issue.id}`; role = "staff"; }
-      else if (t.status === "resolved") { action = `Confirmed close on ${issue.id}`; }
-      else { action = `Moved ${issue.id} to ${STATUS_LABEL[t.status]}`; role = "staff"; }
-      events.push({ id: `s-${issue.id}-${i}`, at: t.at, actor: t.by, role, action, issueId: issue.id, kind, n, ...(kind === "dispatch" && issue.assignedTo ? { to: issue.assignedTo } : {}) });
-    });
-  });
-  // a few clearance events so the trace matches the Staff Desk sample data
-  events.push(
-    { id: "s-desk-1", at: ago(100), actor: ADMIN, role: "admin", action: "Cleared Sreya Mondal as Field Operative · Electrician · Ballygunge", issueId: null, kind: "desk", ...SEED_DESK["s-desk-1"] },
-    { id: "s-desk-2", at: ago(30), actor: ADMIN, role: "admin", action: "Cleared Ritam Sen as Field Operative · Waste · College Street", issueId: null, kind: "desk", ...SEED_DESK["s-desk-2"] },
-    { id: "s-desk-3", at: ago(26), actor: ADMIN, role: "admin", action: "Cleared Priyanka Das as Field Operative · Civic General · B.B.D. Bagh", issueId: null, kind: "desk", ...SEED_DESK["s-desk-3"] },
-    { id: "s-desk-4", at: ago(3), actor: "Ritam Sen", role: "staff", action: "Ritam Sen uplinked (first sign-in)", issueId: null, kind: "desk", ...SEED_DESK["s-desk-4"] },
-  );
-  return events.sort((a, b) => new Date(b.at) - new Date(a.at));
-}
-
-// who each seeded Staff Desk event is about (also back-fills boards saved before subjects existed)
-const SREYA = { id: "stf-sreya", name: "Sreya Mondal", email: "sreya.mondal@example.com", rank: "Field Operative", expertise: "electrical", zone: "Ballygunge", experience: "2 Years" };
-const RITAM = { id: "stf-ritam", name: "Ritam Sen", email: "ritam.sen@example.com", rank: "Field Operative", expertise: "waste", zone: "College Street", experience: "Field Active" };
-const PRIYANKA = { id: "stf-priyanka", name: "Priyanka Das", email: "priyanka.das@example.com", rank: "Field Operative", expertise: "civic", zone: "B.B.D. Bagh", experience: "Field Active" };
-const SEED_DESK = {
-  "s-desk-1": { verb: "cleared", subject: SREYA },
-  "s-desk-2": { verb: "cleared", subject: RITAM },
-  "s-desk-3": { verb: "cleared", subject: PRIYANKA },
-  "s-desk-4": { verb: "uplink", subject: RITAM },
-};
-
+/* The board starts empty: every issue comes from the server (GET /issues). */
 function freshBoard() {
-  const list = SEED_SPECS.map(seedIssue);
-  return { issues: list, audit: auditFromIssues(list) };
+  return { issues: [], audit: [] };
 }
 
 /* Boards saved before per-person saves and "me too" support: one shared
@@ -174,50 +49,6 @@ function normalizeIssue(issue) {
   out.photos = out.photos.filter((ph) => typeof ph?.url === "string" && (ph.url.startsWith("data:") || /^https?:\/\//.test(ph.url)));
   delete out.saved;
   return out;
-}
-
-/* Static-data phase: the board lives in this browser, so a board saved days
-   ago would open with every window long breached. When the app opens after
-   a break (over 2 hours), the whole board is moved forward in time by the
-   gap, so the city reads as it did: same ages, same windows, same order.
-   Removed once the backend serves the board. */
-const REANCHOR_AFTER = 2 * HOUR;
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-
-function shiftDates(value, delta, key = "", max = Infinity) {
-  if (Array.isArray(value)) return value.map((v) => shiftDates(v, delta, "", max));
-  if (value && typeof value === "object") {
-    const out = {};
-    Object.keys(value).forEach((k) => { out[k] = shiftDates(value[k], delta, k, max); });
-    return out;
-  }
-  if (typeof value === "string" && (key === "at" || /At$/.test(key)) && ISO.test(value)) {
-    const t = new Date(value).getTime();
-    return Number.isFinite(t) ? new Date(Math.min(t + delta, max)).toISOString() : value;
-  }
-  return value;
-}
-
-/* How far the board has drifted: the seeded reports know how old they
-   should look (SEED_SPECS age), so the median gap between that and their
-   saved time is the drift. Your own recent clicks and new reports don't
-   hide it. Anything pushed past "now" by the shift is held at now. */
-function drift(board) {
-  const gaps = [];
-  SEED_SPECS.forEach((spec) => {
-    const i = board.issues.find((x) => x.id === spec.id);
-    if (i) gaps.push(Date.now() - spec.age * HOUR - new Date(i.createdAt).getTime());
-  });
-  if (!gaps.length) return 0;
-  gaps.sort((x, y) => x - y);
-  return gaps[Math.floor(gaps.length / 2)];
-}
-
-function reanchor(board) {
-  const gap = drift(board);
-  if (gap < REANCHOR_AFTER) return board;
-  const cap = (list) => shiftDates(list, gap, "", Date.now());
-  return { ...board, issues: cap(board.issues), audit: cap(board.audit) };
 }
 
 /* Boards saved before the trail carried structured notices (n): read the
@@ -265,11 +96,11 @@ function load() {
     if (!raw) return freshBoard();
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.issues) || !Array.isArray(parsed.audit)) return freshBoard();
-    const board = reanchor(parsed);
+    const board = parsed;
     return {
       ...board,
       issues: board.issues.map(normalizeIssue),
-      audit: board.audit.map((e) => withNotice(SEED_DESK[e.id] && !e.subject ? { ...e, ...SEED_DESK[e.id] } : e)),
+      audit: board.audit.map(withNotice),
     };
   } catch {
     return freshBoard();

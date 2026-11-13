@@ -1,22 +1,27 @@
 import { useSyncExternalStore } from "react";
-import { SERVER_ON, API_URL, TOKEN_KEY, USER_KEY, ROLES, DEV_DESK } from "../config/server";
-import { setTokenSource, onSignedOut, api } from "../lib/api";
+import { SERVER_ON, API_URL, TOKEN_KEY, USER_KEY, ROLES } from "../config/server";
+import { setTokenSource, onSignedOut, api, TAB_ID } from "../lib/api";
 import { onEvent, EVENTS, STREAM_RESUMED } from "../services/events";
 
 /* ------------------------------------------------------------------
    ONE SESSION SOURCE for the whole app.
 
    Signing in is always real. The sign-in pages send the email and the
-   password to the server; the server answers with a token and the
-   account. Nothing about any account (email, password, role) is
-   written in this code.
+   password to the server; the server answers with the account and sets
+   the session as an httpOnly cookie. Page scripts never see the token,
+   so a script injected into a page can't steal it for later use.
 
-   What the app keeps after a sign-in:
-     localStorage.token   the server's token (JWT)
-     localStorage.user    { id, name, email, role, zone } as the server sent it
+   What the app keeps after a sign-in (nothing secret):
+     localStorage["sk-session"]  { iat, exp, role }: when the session
+                                 started and ends (the countdown, tab sync)
+     localStorage.user           { id, name, email, role, zone } as the server sent it
+
+   A token left in localStorage by an older version is handed to the
+   server once (POST /auth/session), comes back as the cookie and is
+   deleted here, so the upgrade signs nobody out.
 
    The role is never taken on trust from the browser. On every start the
-   app asks the server who this token belongs to (GET /auth/me) and uses
+   app asks the server who this session belongs to (GET /auth/me) and uses
    the server's answer. Until it answers, the desk stays closed. Editing
    localStorage changes nothing: the server decides, and the server
    checks the role again on every request it serves.
@@ -25,21 +30,13 @@ import { onEvent, EVENTS, STREAM_RESUMED } from "../services/events";
      { id, serverId, name, displayName, email, role, ward, source }
 
    id is the account's server id (the same id every issue, request and
-   follow on the server refers to). On the developer desk it's the
-   sample desk's id.
+   follow on the server refers to). Every session is a server sign-in.
 ------------------------------------------------------------------- */
 
-const DEV_KEY = "wardline-session"; // developer desk only (config/server.js · DEV_DESK)
 const ROLE_ALIAS = { user: "citizen" };
 
-
-/* Developer desk: one sample person per role, sample data only. Works only
-   in "npm run dev" with VITE_DEV_DESK=true; no email, no password, no token. */
-export const DEV_DESKS = [
-  { id: "citizen-1", name: "Aanya Mehra", role: "citizen", ward: "Ballygunge" },
-  { id: "staff-koushik", name: "Koushik Bhowmik", role: "staff", ward: "Shyambazar" },
-  { id: "admin-1", name: "Priti Sarkar", role: "admin", ward: "Command" },
-];
+// a developer-desk session left by an older build is cleared (sign-in is server-only now)
+try { if (typeof localStorage !== "undefined") localStorage.removeItem("wardline-session"); } catch { /* storage blocked */ }
 
 /* JWT payload (unverified: only the server can verify it) */
 function tokenPayload(token) {
@@ -52,14 +49,30 @@ function tokenPayload(token) {
   }
 }
 
-function tokenExpired(token) {
-  const p = tokenPayload(token);
-  return Boolean(p && typeof p.exp === "number" && p.exp * 1000 <= Date.now());
+/* the non-secret session marker: { iat, exp, role } in ms */
+const SESSION_KEY = "sk-session";
+function readMarker() {
+  try {
+    const m = JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    return m && typeof m === "object" ? m : null;
+  } catch {
+    return null;
+  }
+}
+function writeMarker(session, role) {
+  if (!session || typeof session !== "object") return;
+  const m = { iat: Number(session.iat) || Date.now(), exp: Number(session.exp) || null, role: role || null };
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(m)); } catch { /* storage blocked */ }
+}
+/* a token kept by an older version (handed to the server once, then deleted) */
+function legacyToken() {
+  try { return localStorage.getItem(TOKEN_KEY) || null; } catch { return null; }
 }
 
 function clearServerKeys() {
   try {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(USER_KEY);
   } catch {
     /* ignore */
@@ -90,19 +103,25 @@ function shape(u, source = "server") {
 function readServerSession() {
   if (!SERVER_ON) return null;
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
     const raw = localStorage.getItem(USER_KEY);
-    if (!token || !raw) return null;
-    if (tokenExpired(token)) {
+    if (!raw) return null;
+    let marker = readMarker();
+    const old = legacyToken();
+    if (!marker && old) {
+      // an older version's token: its times and role become the marker until the server swaps it
+      const p = tokenPayload(old);
+      if (p) marker = { iat: typeof p.iat === "number" ? p.iat * 1000 : null, exp: typeof p.exp === "number" ? p.exp * 1000 : null, role: p.role || null };
+    }
+    if (!marker) return null;
+    if (typeof marker.exp === "number" && marker.exp <= Date.now()) {
       clearServerKeys();
       return null;
     }
     const next = shape(JSON.parse(raw));
     if (!next) return null;
-    // the token's own role must agree with the saved account; a hand-edited role fails here
-    const p = tokenPayload(token);
-    const tokenRole = p && (ROLE_ALIAS[p.role] || p.role);
-    if (tokenRole && tokenRole !== next.role) {
+    // the marker's role must agree with the saved account (the server checks again on every request)
+    const markerRole = marker.role && (ROLE_ALIAS[marker.role] || marker.role);
+    if (markerRole && markerRole !== next.role) {
       clearServerKeys();
       return null;
     }
@@ -112,19 +131,8 @@ function readServerSession() {
   }
 }
 
-function readDevSession() {
-  if (!DEV_DESK) return null;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DEV_KEY) || "null");
-    const desk = DEV_DESKS.find((d) => d.id === parsed?.id);
-    return desk ? { ...desk, serverId: null, displayName: "", email: "", provider: "local", source: "dev" } : null;
-  } catch {
-    return null;
-  }
-}
-
 function readSession() {
-  return readServerSession() || readDevSession();
+  return readServerSession();
 }
 
 let user = readSession();
@@ -166,49 +174,42 @@ const NOTE_KEY = "sk-signout-note";
 export function setSignOutNote(text) {
   try { sessionStorage.setItem(NOTE_KEY, String(text || "")); } catch { /* ignore */ }
 }
+// React's StrictMode (development) runs a page's first render twice: the note taken
+// by the first run is handed to the second instead of disappearing.
+let lastNote = { text: "", at: 0 };
 export function takeSignOutNote() {
   try {
     const t = sessionStorage.getItem(NOTE_KEY) || "";
     sessionStorage.removeItem(NOTE_KEY);
-    return t;
+    if (t) {
+      lastNote = { text: t, at: Date.now() };
+      return t;
+    }
+    return Date.now() - lastNote.at < 1500 ? lastNote.text : "";
   } catch {
     return "";
   }
 }
 
-/** When this server session started and when it ends (from the token), in ms. Null on a developer desk. */
+/** When this server session started and when it ends, in ms. Null before the server confirms it. */
 export function sessionClock() {
   if (user?.source !== "server") return null;
-  try {
-    const p = tokenPayload(localStorage.getItem(TOKEN_KEY));
-    if (!p) return null;
-    return {
-      iat: typeof p.iat === "number" ? p.iat * 1000 : null,
-      exp: typeof p.exp === "number" ? p.exp * 1000 : null,
-    };
-  } catch {
-    return null;
-  }
+  const m = readMarker();
+  if (!m) return null;
+  return { iat: typeof m.iat === "number" ? m.iat : null, exp: typeof m.exp === "number" ? m.exp : null };
 }
 
-/** The server issued a fresh token for this session (after a password change). */
-export function replaceToken(token) {
-  if (user?.source !== "server" || !token) return false;
-  const p = tokenPayload(token);
-  if (p?.role && (ROLE_ALIAS[p.role] || p.role) !== user.role) return false;
-  try { localStorage.setItem(TOKEN_KEY, token); } catch { return false; }
-  armExpiry();
-  emit();
-  return true;
+/** Kept for older callers: the session lives in the cookie, so there is no token to replace. */
+export function replaceToken() {
+  return false;
 }
 
 /** The server sent a newer copy of this account (zone, name or email changed): keep it. */
-export function updateSessionUser(serverUser, token) {
+export function updateSessionUser(serverUser) {
   if (user?.source !== "server" || !serverUser) return null;
   const next = shape(serverUser);
   if (!next || next.role !== user.role) return null;
   try {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(USER_KEY, JSON.stringify(serverUser));
   } catch {
     return null;
@@ -223,30 +224,48 @@ export function getAccount() {
   try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch { return null; }
 }
 
-/** The current server token, or null */
-export function getToken() {
+/** Which session is open ("<account>:<start>"), or null. Changes when the person or the session changes. */
+export function getSessionKey() {
   if (user?.source !== "server") return null;
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
+  const m = readMarker();
+  return `${user.serverId}:${m?.iat || "legacy"}`;
 }
 
-/** After a successful sign-in: keep the server's token and account, open the desk. */
-export function setServerSession({ token, user: serverUser } = {}) {
-  if (!token || !serverUser) return null;
+/** After a successful sign-in: the server set the cookie; keep the account and the session marker, open the desk. */
+export function setServerSession({ user: serverUser, session } = {}) {
+  if (!serverUser) return null;
   const next = shape(serverUser);
   if (!next) return null;
   try {
-    localStorage.removeItem(DEV_KEY);
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.setItem(USER_KEY, JSON.stringify(serverUser));
   } catch {
     return null;
   }
+  writeMarker(session || { iat: Date.now() }, next.role);
   setUser(next, true); // the server just issued it
   return next;
+}
+
+/* one-time: an older version's token becomes the httpOnly cookie, then is deleted */
+let adopting = null;
+function adoptLegacy() {
+  const old = legacyToken();
+  if (!old) return Promise.resolve();
+  if (adopting) return adopting;
+  adopting = api
+    .post("/auth/session", undefined, { bearer: old })
+    .then(({ data }) => {
+      try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+      if (data?.session) writeMarker(data.session, user?.role);
+    })
+    .catch((err) => {
+      if (err?.status === 401 || err?.status === 403 || err?.status === 400) {
+        try { localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+      }
+    })
+    .finally(() => { adopting = null; });
+  return adopting;
 }
 
 /* ------------------------------------------------------------------
@@ -263,13 +282,14 @@ let verifyError = "";
 export function verifySession() {
   if (!user || user.source !== "server") { verified = true; emit(); return Promise.resolve(user); }
   if (verifying) return verifying;
-  verifying = api
-    .get("/auth/me")
+  verifying = adoptLegacy()
+    .then(() => api.get("/auth/me"))
     .then(({ data }) => {
       const account = data?.user || data;
       const next = shape(account);
       if (!next) { logout(); return null; }
       try { localStorage.setItem(USER_KEY, JSON.stringify(account)); } catch { /* ignore */ }
+      if (data?.session) writeMarker(data.session, next.role);
       setUser(next, true);
       return next;
     })
@@ -289,36 +309,28 @@ export function retryVerify() {
   return verifySession();
 }
 
-/** Developer desk (npm run dev + VITE_DEV_DESK=true only) */
-export function openDevDesk(id) {
-  if (!DEV_DESK) return null;
-  const desk = DEV_DESKS.find((d) => d.id === id);
-  if (!desk) return null;
-  try { localStorage.setItem(DEV_KEY, JSON.stringify({ id })); } catch { /* ignore */ }
-  setUser(readDevSession(), true);
-  return user;
-}
-
 export function logout() {
   const wasServer = user?.source === "server";
-  const token = getToken();
+  const old = legacyToken();
   clearServerKeys();
-  try { localStorage.removeItem(DEV_KEY); } catch { /* ignore */ }
   setUser(null, true);
-  // tell the server the token is finished (it may keep a revocation list); never blocks sign-out
-  if (wasServer && token && SERVER_ON) {
+  // the server ends the session and drops the cookie; never blocks sign-out
+  if (wasServer && SERVER_ON) {
     fetch(`${API_URL}/auth/logout`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      headers: { "X-Client-Tab": TAB_ID, ...(old ? { Authorization: `Bearer ${old}` } : {}) },
       keepalive: true,
     }).catch(() => {});
   }
 }
 
-// the API client sends this session's token, and a rejected token signs out
-setTokenSource(getToken);
-onSignedOut(() => {
-  if (user?.source === "server") logout();
+// the session travels as the cookie; no token is handed to the API client any more
+setTokenSource(() => null);
+onSignedOut((message) => {
+  if (user?.source !== "server") return;
+  if (message) setSignOutNote(message);
+  logout();
 });
 
 // the account changed on another device (name, photo, zone, preferences), or the live link came back: read it again
@@ -328,7 +340,7 @@ onEvent(STREAM_RESUMED, () => { if (user?.source === "server") verifySession(); 
 // a sign-in or sign-out in another tab is picked up here
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => {
-    if (e.key !== null && ![TOKEN_KEY, USER_KEY, DEV_KEY].includes(e.key)) return;
+    if (e.key !== null && ![SESSION_KEY, USER_KEY, TOKEN_KEY].includes(e.key)) return;
     const next = readSession();
     if (JSON.stringify(next) !== JSON.stringify(user)) setUser(next, true);
   });

@@ -8,7 +8,7 @@ import { Field, Segmented, Toggle, TimeInput, toast } from "./Controls";
 import { useLiveFeed } from "../../hooks/useLiveFeed";
 import { useMinute } from "../../hooks/useMinute";
 import { setMany, setSetting } from "../../store/settingsStore";
-import { logout, replaceToken, sessionClock, setSignOutNote } from "../../store/authStore";
+import { logout, sessionClock, setSignOutNote } from "../../store/authStore";
 import { GROUPS, GROUP_HINT, LOCKED_GROUPS, mutedGroups, inQuietHours } from "../../store/notifyStore";
 import { rosterEntryOf } from "../../store/dutyStore";
 import { expertiseLabel } from "../../config/expertise";
@@ -102,7 +102,7 @@ function EmailBlock({ role, me, s }) {
 
   let body;
   if (!server) {
-    body = <p className="st-note">A developer desk has no account email. Sign in through the server to manage it.</p>;
+    body = <p className="st-note">Your sign-in isn't confirmed by the server yet. Sign in again to manage your email.</p>;
   } else if (role === "staff") {
     body = <p className="st-note"><Lock size={12} /> Your work email is set by command when it clears you. To change it, ask an admin on the Staff Desk.</p>;
   } else if (role === "admin") {
@@ -167,8 +167,7 @@ function PasswordBlock({ role, me }) {
     if (!ready || busy) return;
     setErr(""); setBusy(true);
     try {
-      const data = await changePassword({ current: cur, next });
-      if (data?.token) replaceToken(data.token);
+      await changePassword({ current: cur, next });
       setCur(""); setNext(""); setAgain("");
       toast("Password changed. Every other device has to sign in again.");
     } catch (e2) { setErr(e2.status === 401 || e2.status === 400 ? e2.message || "Your current password isn't right." : e2.message); } finally { setBusy(false); }
@@ -186,7 +185,7 @@ function PasswordBlock({ role, me }) {
   let body;
   let badge = null;
   if (!server) {
-    body = <p className="st-note">A developer desk has no password. Sign in through the server to change yours.</p>;
+    body = <p className="st-note">Your sign-in isn't confirmed by the server yet. Sign in again to change your password.</p>;
   } else if (google) {
     badge = { text: "GOOGLE", tone: "ok" };
     body = (
@@ -294,7 +293,7 @@ function SessionsBlock({ me, onConfirm }) {
             <span>
               {server
                 ? <>Signed in {clk?.iat ? `${clock(clk.iat)} IST` : "with the server"}{ends !== null ? <> · session ends {clock(clk.exp)} IST <em className="st-left">{left(ends)} left</em></> : null}</>
-                : "Developer desk · sample data, this browser only"}
+                : "Waiting for the server to confirm this sign-in"}
             </span>
           </div>
           <button type="button" className="st-btn" onClick={signOutHere}><LogOut size={14} /> Sign out</button>
@@ -485,10 +484,10 @@ export function DiagPanel() {
   return (
     <div className="st-diag">
       <div className="st-stats">
-        <div className={server ? "ok" : "warn"}><span><Server size={11} /> Server</span><b>{server ? "Connected" : SERVER_ON ? "Developer desk" : "Local only"}</b></div>
-        <div className={h.ok ? "ok" : "warn"}><span><Radio size={11} /> Live feed</span><b>{feed.mode}</b><small>updated {h.age}s ago</small></div>
-        <div><span><Activity size={11} /> Zones tracked</span><b>{Object.keys(feed.zones).length}</b></div>
-        <div><span><Clock size={11} /> Uptime</span><b>{feed.city.uptime.toFixed(1)}%</b><small>{feed.city.sensors.toLocaleString("en-IN")} sensors</small></div>
+        <div className={server ? "ok" : "warn"}><span><Server size={11} /> Server</span><b>{server ? "Connected" : SERVER_ON ? "Not confirmed" : "Not configured"}</b></div>
+        <div className={h.ok ? "ok" : "warn"}><span><Radio size={11} /> Live feed</span><b>{feed.mode === "live" ? "Live" : "Offline"}</b><small>{h.age === null ? "no reading yet" : h.age < 60 ? `updated ${h.age}s ago` : `updated ${Math.round(h.age / 60)} min ago`}</small></div>
+        <div><span><Activity size={11} /> Zones reporting</span><b>{Object.values(feed.zones).filter((z) => z.at).length} / {Object.keys(feed.zones).length}</b></div>
+        <div><span><Clock size={11} /> Feed uptime · 24 h</span><b>{Number.isFinite(feed.city.uptime) ? `${feed.city.uptime.toFixed(1)}%` : "—"}</b><small>{Number.isFinite(feed.city.sensors) ? `${feed.city.sensors.toLocaleString("en-IN")} live feeds` : "no feeds yet"}</small></div>
       </div>
     </div>
   );

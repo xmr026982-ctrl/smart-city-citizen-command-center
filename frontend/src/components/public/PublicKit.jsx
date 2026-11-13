@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { LogoIcon } from "../brand/Logo";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { Building2, Eye, EyeOff, Check, ArrowLeft, MapPin, Mail, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Check, ArrowLeft, MapPin, Mail, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { PRODUCT, SUPPORT_EMAIL, supportMail } from "../../config/server";
 import { rulesFor, passwordCheck, ZONES } from "../../services/authService";
 import "../../styles/public.css";
@@ -16,7 +17,7 @@ export const HERO_POSTER = "/media/hero-poster.jpg";
 export function BrandMark({ to = "/", sub = "Citizen Command Center", tone = "" }) {
   return (
     <Link to={to} className={`pk-brand ${tone}`} aria-label={`${PRODUCT} home`}>
-      <span className="pk-brand-mark"><Building2 size={18} strokeWidth={1.8} /><i /></span>
+      <span className="pk-brand-mark"><LogoIcon size={22} /></span>
       <span className="pk-brand-text">
         <b>{PRODUCT}</b>
         <small>{sub}</small>

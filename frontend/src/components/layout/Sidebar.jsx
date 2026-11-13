@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Building2 } from "lucide-react";
+import { LogoIcon } from "../brand/Logo";
 import { NAV } from "../../config/nav";
 import { getRole } from "../../store/authStore";
 import Sparkline from "../dashboard/Sparkline";
 import { useLiveFeed } from "../../hooks/useLiveFeed";
 import { useStaffBadge } from "./FieldAlerts";
 import { useInbox } from "../../store/notifyStore";
+import { useRealtimeStatus } from "../../services/realtime";
 
 const DESK = { citizen: "Citizen Services", staff: "Field Desk", admin: "Civic Command" };
 const LAYER = { citizen: "Citizen Layer", staff: "Field Layer", admin: "Command Layer" };
@@ -15,6 +16,8 @@ function Sidebar() {
   const role = getRole();
   const items = NAV[role] || [];
   const feed = useLiveFeed();
+  const link = useRealtimeStatus();
+  const down = feed.mode === "offline" || link === "offline";
   const { pathname } = useLocation();
   const badge = useStaffBadge(); // staff: new assignments not yet seen
   const { unread } = useInbox(); // everyone: unread notifications
@@ -39,8 +42,7 @@ function Sidebar() {
 
       <div className="brand">
         <div className="brand-mark">
-          <Building2 size={20} strokeWidth={1.8} />
-          <i />
+          <LogoIcon size={26} title="Smart Kolkata" />
         </div>
         <div>
           <strong>Smart Kolkata</strong>
@@ -64,11 +66,11 @@ function Sidebar() {
       <div className="sys-card">
         <div className="sys-head">
           <strong>System status</strong>
-          <i className={`live${feed.mode === "offline" ? " down" : ""}`} />
+          <i className={`live${down ? " down" : ""}`} />
         </div>
-        <span>{feed.mode === "offline" ? "Connection lost · showing last data" : "All systems operational"}</span>
-        <Sparkline data={feed.city.envHistory} color={feed.mode === "offline" ? "#d97706" : "#16a34a"} height={36} live />
-        <small className="sys-cap">City environment index</small>
+        <span>{down ? (feed.updatedAt ? "Connection lost · showing last data" : "Connecting to the city feed") : "All systems operational"}</span>
+        <Sparkline data={feed.city.envHistory} color={down ? "#d97706" : "#16a34a"} height={36} live={!down && feed.mode === "live"} />
+        <small className="sys-cap">City air index{Number.isFinite(feed.city.envIndex) ? ` · AQI ${feed.city.envIndex}` : ""}</small>
       </div>
 
     </aside>

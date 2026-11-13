@@ -28,7 +28,7 @@ const path = (id) => `/issues/${encodeURIComponent(id)}`;
 const ROUTES = {
   support: (p) => ["post", `${path(p.id)}/support`, {}],
   status: (p) => ["patch", `${path(p.id)}/status`, { status: p.status, ...(p.note ? { note: p.note } : {}) }],
-  assign: (p) => ["patch", `${path(p.id)}/assign`, { staff: p.staff, ...(p.note ? { note: p.note } : {}) }],
+  assign: (p) => ["patch", `${path(p.id)}/assign`, { staff: p.staff, ...(p.note ? { note: p.note } : {}), ...(p.undo ? { undo: true } : {}) }],
   priority: (p) => ["patch", `${path(p.id)}/priority`, { priority: p.priority }],
   follow: (p) => ["post", `${path(p.id)}/follow`, { on: p.on }],
   comment: (p) => ["post", `${path(p.id)}/comments`, { body: p.body, internal: p.internal }],
@@ -37,7 +37,7 @@ const ROUTES = {
   seen: (p) => ["patch", `${path(p.id)}/requests/${encodeURIComponent(p.reqId)}/seen`, {}],
   decide: (p) => ["patch", `${path(p.id)}/requests/${encodeURIComponent(p.reqId)}`, { verdict: p.verdict, ...(p.reason ? { reason: p.reason } : {}) }],
   dismiss: (p) => ["post", `${path(p.id)}/dismiss`, { reason: p.reason, note: p.note, ...(p.linkedTo ? { linkedTo: p.linkedTo } : {}) }],
-  restore: (p) => ["post", `${path(p.id)}/restore`, { note: p.note || "" }],
+  restore: (p) => ["post", `${path(p.id)}/restore`, { note: p.note || "", ...(p.undo ? { undo: true } : {}) }],
   merge: (p) => ["post", `${path(p.id)}/merge`, { into: p.into, note: p.note || "" }],
 };
 
@@ -56,12 +56,13 @@ async function reread(id) {
   }
 }
 
+const auditPath = () => (getUser()?.role === "admin" ? "/audit" : "/audit/mine");
 let auditTimer = null;
 function rereadAudit() {
-  if (getUser()?.role !== "admin") return;
+  if (!onServer()) return;
   clearTimeout(auditTimer);
   auditTimer = setTimeout(async () => {
-    try { const { data } = await api.get("/audit"); setAudit(data?.items || []); } catch { /* next event tries again */ }
+    try { const { data } = await api.get(auditPath()); setAudit(data?.items || []); } catch { /* next event tries again */ }
   }, 600);
 }
 
@@ -89,11 +90,10 @@ export function loadBoard() {
   loading = (async () => {
     try {
       const { data } = await api.get("/issues");
-      let auditList;
-      if (getUser()?.role === "admin") {
-        try { auditList = (await api.get("/audit")).data?.items || []; } catch { auditList = []; }
-      }
-      replaceBoard(data?.items || [], auditList || []);
+      // command reads the whole trail; crews and citizens the part about them (their inbox and field log)
+      let auditList = [];
+      try { auditList = (await api.get(auditPath())).data?.items || []; } catch { auditList = []; }
+      replaceBoard(data?.items || [], auditList);
     } catch (err) {
       if (err?.status !== 401) serverNotice("Issues couldn't be loaded from the server. They'll load when it answers.");
     } finally {
@@ -149,3 +149,20 @@ connectRemote({ active: onServer, send });
   });
 });
 onEvent(STREAM_RESUMED, () => { if (onServer()) loadBoard(); });
+
+/* command's trail also follows the Staff Desk, duty, service windows and account changes */
+[EVENTS.STAFF_CHANGED, EVENTS.STAFF_DUTY, EVENTS.POLICY_CHANGED, EVENTS.PROFILE_UPDATED].forEach((name) => {
+  onEvent(name, (e) => { if (e?.remote && onServer()) rereadAudit(); });
+});
+
+/* a rename (someone else's, or yours from another tab): command and crews read the
+   board again so the new name shows on every file; names come from the server, never
+   from a payload */
+let renameTimer = null;
+onEvent(EVENTS.PROFILE_UPDATED, (e) => {
+  const me = getUser();
+  if (!e?.remote || !onServer() || !me) return;
+  if (me.role === "citizen" && String(e.id) !== me.serverId) return; // a citizen's board names only themselves
+  clearTimeout(renameTimer);
+  renameTimer = setTimeout(() => loadBoard(), 800);
+});

@@ -24,7 +24,6 @@ export const zoneIdOf = (name) => ZONES.find((z) => z.name.toLowerCase() === Str
 export const zoneNameOf = (id) => ZONES.find((z) => z.id === id)?.name || "";
 
 const PERF = [{ v: "high", l: "High" }, { v: "balanced", l: "Balanced" }, { v: "lite", l: "Lite" }];
-const REFRESH = [{ v: 2.5, l: "2.5 s" }, { v: 5, l: "5 s" }, { v: 30, l: "30 s" }, { v: 60, l: "60 s" }];
 const DUTY = [{ v: "on", l: "On duty" }, { v: "break", l: "On break" }, { v: "off", l: "Off duty" }];
 
 /* sign out after this many idle minutes (0 = never). Command can't switch it off. */
@@ -64,7 +63,6 @@ const display = {
     { key: "autoOrbit", type: "toggle", scope: "device", label: "Auto-orbit camera", hint: "Slowly turns the 3D city while you're idle.", def: true },
     { key: "reduceMotion", type: "toggle", scope: "device", label: "Reduce motion", hint: "Switches off animations and transitions across the app.", def: false },
     { key: "highContrast", type: "toggle", scope: "device", label: "High contrast", hint: "Stronger text and borders for easier reading.", def: false },
-    { key: "feedInterval", type: "segmented", scope: "device", label: "Live data refresh", hint: "How often city readings update on your dashboard.", options: REFRESH, def: 2.5 },
     { key: "aqiStd", type: "segmented", scope: "device", label: "Air-quality scale", hint: "Which bands label air quality: India CPCB or US EPA.", options: [{ v: "cpcb", l: "India CPCB" }, { v: "epa", l: "US EPA" }], def: "cpcb" },
   ],
 };
@@ -115,7 +113,7 @@ const admin = [
   {
     id: "duty", code: "DTY", title: "Desk", icon: "radio", keywords: "duty status zone dashboard",
     rows: [
-      { key: "dutyStatus", type: "segmented", scope: "device", label: "Status", hint: "Shown on your profile dot in the top bar.", options: DUTY, def: "on" },
+      { key: "dutyStatus", type: "segmented", scope: "account", label: "Status", hint: "Shown on your profile dot in the top bar, on every device.", options: DUTY, def: "on" },
       { key: "defaultZone", type: "select", scope: "device", label: "Dashboard opens on", hint: "The zone City Health shows first.", options: WARDS, def: "central" },
     ],
   },

@@ -3,6 +3,11 @@ import { getAllIssues, logEvent, addIssue, nextIssueId } from "./issueStore";
 import { isMash, MASH_MESSAGE } from "../utils/textGuard";
 import { windowFor } from "./slaPolicyStore";
 import { WARDS } from "../constants/issueConstants";
+import { SERVER_ON } from "../config/server";
+import { api } from "../lib/api";
+import { getUser, subscribeRole } from "./authStore";
+import { onEvent, EVENTS, STREAM_RESUMED } from "../services/events";
+import { serverNotice } from "../services/notice";
 
 /* ------------------------------------------------------------------
    Community: proposals, polls, announcements, work notices and the
@@ -24,6 +29,14 @@ import { WARDS } from "../constants/issueConstants";
 
    Every change is written to the community trail with a structured
    notice (n), and the notifications inbox reads it (notifyStore).
+
+   WITH THE SERVER (signed in through it): the board is GET /community,
+   masked per role by the server (no other person's id or name reaches a
+   citizen). Every action runs the same checks here, shows at once, is sent
+   to its endpoint, and the server's copy replaces the screen's. The server
+   writes the trail, the audit rows and the work order a proposal becomes.
+   community:changed and a reconnect read the board again.
+   WITHOUT A SERVER: an empty board kept in this browser.
    API names follow Person 5's original contract: /community-posts
    (proposals), /voting-slots (polls), /notifications/broadcast
    (announcements). See docs/backend/BACKEND-HANDOVER.md · B3.
@@ -33,8 +46,6 @@ const KEY = "community-v1";
 const H = 36e5;
 const D = 24 * H;
 const now = () => new Date().toISOString();
-const ago = (h) => new Date(Date.now() - h * H).toISOString();
-const ahead = (h) => new Date(Date.now() + h * H).toISOString();
 const uid = (p) => `${p}-${Math.random().toString(36).slice(2, 8)}`;
 
 export const PROPOSAL_ANSWER_DAYS = 7; // the city answers every proposal within a week
@@ -51,154 +62,94 @@ export const PROPOSAL_STATUS = {
 };
 export const NOTICE_KINDS = ["Power off", "Road closed", "Water off", "Crew on site", "Noise"];
 
-/* ---------------- seed ---------------- */
-function backers(prefix, residents, supporters, hoursBack) {
-  const out = [];
-  for (let k = 0; k < residents + supporters; k++) {
-    out.push({ userId: `${prefix}-${k}`, name: "Resident", kind: k % 5 === 4 ? "use" : "affects", resident: k < residents, at: ago(Math.max(0.2, hoursBack * (1 - k / (residents + supporters)))) });
-  }
-  return out;
-}
-const concern = (prefix, reason, n) => Array.from({ length: n }, (_, k) => ({ userId: `${prefix}-c${reason.length}-${k}`, reason, at: ago(5 + k) }));
-
-function seedIssueFor(ward, categories) {
-  return getAllIssues().find((i) => i.ward === ward && categories.includes(i.category) && !i.removed) || null;
-}
-
+/* The board starts empty: everything comes from the server (GET /community). */
 function freshCommunity() {
-  const fern = seedIssueFor("Ballygunge", ["roads", "other"]);
-  const proposals = [
-    {
-      id: "PRP-0107", title: "Shaded seating and drinking water at Rabindra Sarobar", ward: "Ballygunge", category: "other",
-      summary: "Benches with shade and two drinking water points along the lake path, for walkers and senior citizens.",
-      by: { id: "res-bg-author", name: "A Ballygunge resident" }, at: ago(52), status: "review", target: 60,
-      signals: backers("res-bg107", 54, 12, 50), concerns: [...concern("bg107", "Wrong location", 3), ...concern("bg107", "Cost", 1)],
-      photos: [], responses: [{ id: "rsp-1", by: "Priti Sarkar", role: "admin", body: "Parks team is surveying both lake gates this week. A decision will be posted here by Thursday.", at: ago(3) }],
-      decision: null, hidden: [],
-    },
-    {
-      id: "PRP-0111", title: "LED lights on the Bidhan Sarani stretch", ward: "Shyambazar", category: "lighting",
-      summary: "Bright LED lights between the five-point crossing and Hatibagan. The stretch is dark after 8 pm.",
-      by: { id: "res-sb-author", name: "A Shyambazar resident" }, at: ago(80), status: "review", target: 60,
-      signals: backers("res-sb111", 68, 9, 78), concerns: [], photos: [], responses: [], decision: null, hidden: [],
-    },
-    {
-      id: "PRP-0104", title: "Drain grilles near the College Square gate", ward: "College Street", category: "water",
-      summary: "Covered grilles over the open drain at the College Square east gate. People trip on it in the rain.",
-      by: { id: "res-cs-author", name: "A College Street resident" }, at: ago(130), status: "review", target: 50,
-      signals: backers("res-cs104", 31, 6, 120), concerns: concern("cs104", "Already exists", 2), photos: [], responses: [], decision: null, hidden: [],
-    },
-    {
-      id: "PRP-0109", title: "Pedestrian signal at the Patuli lake crossing", ward: "B.P. Township", category: "safety",
-      summary: "A pedestrian signal where the lake road meets the connector. Children cross there for school.",
-      by: { id: "res-bp-author", name: "A B.P. Township resident" }, at: ago(40), status: "review", target: 50,
-      signals: backers("res-bp109", 40, 7, 38), concerns: concern("bp109", "Safety", 1), photos: [], responses: [], decision: null, hidden: [],
-    },
-    {
-      id: "PRP-0102", title: "Covered cycle stand at the Dharmatala bus terminus", ward: "Dharmatala", category: "roads",
-      summary: "A covered, lockable cycle stand next to the bus terminus for people who ride in to work.",
-      by: { id: "res-dh-author", name: "A Dharmatala resident" }, at: ago(260), status: "notnow", target: 50,
-      signals: backers("res-dh102", 12, 4, 250), concerns: concern("dh102", "Better alternative", 4), photos: [], responses: [],
-      decision: { status: "notnow", reason: "The terminus is being redesigned next year; a stand is in that plan.", by: "Priti Sarkar", at: ago(30) }, hidden: [],
-    },
-    {
-      id: "PRP-0098", title: "Shaded waiting area at the Dalhousie tram stop", ward: "B.B.D. Bagh", category: "other",
-      summary: "A roof and seating at the tram stop on the Dalhousie Square side.",
-      by: { id: "res-bb-author", name: "A B.B.D. Bagh resident" }, at: ago(300), status: "planned", target: 50,
-      signals: backers("res-bb098", 57, 15, 290), concerns: [], photos: [], responses: [],
-      decision: { status: "planned", reason: "Included in the December works list for the Dalhousie area.", by: "Priti Sarkar", at: ago(20) }, hidden: [],
-    },
-  ];
-  if (fern) {
-    proposals.push({
-      id: "PRP-0095", title: "Fix the broken footpath on Fern Road", ward: "Ballygunge", category: "roads",
-      summary: "Footpath tiles are broken for about 200 m. Walkers step into traffic to get past.",
-      by: { id: "res-bg-author2", name: "A Ballygunge resident" }, at: ago(200), status: "issue", target: 50,
-      signals: backers("res-bg095", 44, 5, 190), concerns: [], photos: [], responses: [],
-      decision: { status: "issue", reason: "Sent to the field as a work order.", by: "Priti Sarkar", at: ago(60), issueId: fern.id }, hidden: [],
-    });
-  }
-
-  const polls = [
-    {
-      id: "POL-0033", question: "Which park gets new benches first?", ward: "Ballygunge", from: null,
-      options: [{ id: "a", label: "Deshapriya Park", base: 96 }, { id: "b", label: "Lake Kalibari side", base: 58 }, { id: "c", label: "Triangular Park", base: 31 }],
-      votes: {}, opensAt: ago(26), closesAt: ahead(46), status: "open", outcome: null, by: "Priti Sarkar",
-    },
-    {
-      id: "POL-0031", question: "Which stretch gets new LED lights first?", ward: "College Street", from: null,
-      options: [{ id: "a", label: "College Square east", base: 124 }, { id: "b", label: "Surya Sen Street", base: 90 }],
-      votes: {}, opensAt: ago(70), closesAt: ahead(2), status: "open", outcome: null, by: "Priti Sarkar",
-    },
-    {
-      id: "POL-0029", question: "When should the Hatibagan market lane be cleaned?", ward: "Shyambazar", from: null,
-      options: [{ id: "a", label: "Early morning, 5–7 am", base: 141 }, { id: "b", label: "Late night, 11 pm–1 am", base: 77 }],
-      votes: {}, opensAt: ago(220), closesAt: ago(52), status: "closed", outcome: { optionId: "a", note: "Cleaning moves to 5–7 am from next Monday.", by: "Priti Sarkar", at: ago(50) }, by: "Priti Sarkar",
-    },
-  ];
-
-  const announcements = [
-    { id: "ANN-0014", title: "Water supply off 10:00–14:00 on Saturday for main repair", body: "Gariahat Road to Hindustan Park. Tankers at the Ballygunge Phari stop.", zones: ["Ballygunge"], audience: { citizens: true, staff: true }, by: "Priti Sarkar", at: ago(0.7), until: ahead(30), hidden: false },
-    { id: "ANN-0013", title: "Night crews on Bidhan Sarani from Monday, 22:00–05:00", body: "Traffic diverted via APC Road while the cables are replaced.", zones: ["Shyambazar"], audience: { citizens: true, staff: true }, by: "Priti Sarkar", at: ago(9), until: ahead(120), hidden: false },
-    { id: "ANN-0012", title: "Pre-monsoon drain cleaning drive", body: "Crews will clear the main drains in every zone over the next two weeks. Keep the drain covers clear of parked vehicles.", zones: ["all"], audience: { citizens: true, staff: true }, by: "Priti Sarkar", at: ago(30), until: ahead(300), hidden: false },
-  ];
-
-  const notices = [
-    { id: "WN-0007", issueId: "ISS-2411", ward: "Shyambazar", kind: "Power off", from: ahead(2), to: ahead(4), note: "Bidhan Sarani between the five-point crossing and Hatibagan. Keep clear of the pole.", by: "Koushik Bhowmik", at: ago(0.4), hidden: false },
-  ];
-
-  const trail = [
-    { id: "ct-s1", at: ago(0.7), actor: "Priti Sarkar", role: "admin", n: { type: "announced", ref: "ANN-0014", zones: ["Ballygunge"], citizens: true, staff: true } },
-    { id: "ct-s2", at: ago(0.4), actor: "Koushik Bhowmik", role: "staff", n: { type: "notice", ref: "WN-0007", ward: "Shyambazar", issueId: "ISS-2411" } },
-    { id: "ct-s3", at: ago(3), actor: "Priti Sarkar", role: "admin", n: { type: "responded", ref: "PRP-0107" } },
-    { id: "ct-s4", at: ago(20), actor: "Priti Sarkar", role: "admin", n: { type: "decided", ref: "PRP-0098", status: "planned" } },
-    { id: "ct-s5", at: ago(26), actor: "Priti Sarkar", role: "admin", n: { type: "poll-opened", ref: "POL-0033", ward: "Ballygunge" } },
-    { id: "ct-s6", at: ago(30), actor: "Priti Sarkar", role: "admin", n: { type: "decided", ref: "PRP-0102", status: "notnow" } },
-  ];
-
-  return { proposals, polls, announcements, notices, issueSignals: [], checks: [], trail, anchor: Date.now() };
+  return { proposals: [], polls: [], announcements: [], notices: [], issueSignals: [], checks: [], trail: [], anchor: Date.now() };
 }
 
 /* ---------------- load / save / sync ---------------- */
-const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-function shift(value, delta, key = "") {
-  if (Array.isArray(value)) return value.map((v) => shift(v, delta));
-  if (value && typeof value === "object") {
-    const out = {};
-    Object.keys(value).forEach((k) => { out[k] = shift(value[k], delta, k); });
-    return out;
-  }
-  if (typeof value === "string" && /(^at$|At$|^from$|^to$|^until$)/.test(key) && ISO.test(value)) return new Date(new Date(value).getTime() + delta).toISOString();
-  return value;
-}
-
-/* Static-data phase (same rule as the issue board): after a break of more
-   than 2 hours, the whole record moves forward by the gap, so polls and
-   notices read as they did. Removed once the backend serves it. */
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return freshCommunity();
     const v = JSON.parse(raw);
     if (!Array.isArray(v.proposals) || !Array.isArray(v.polls)) return freshCommunity();
-    const gap = Date.now() - (v.anchor || Date.now());
-    const base = gap > 2 * H ? { ...shift(v, gap), anchor: Date.now() } : v;
-    return { notices: [], issueSignals: [], trail: [], announcements: [], checks: [], ...base };
+    return { notices: [], issueSignals: [], trail: [], announcements: [], checks: [], ...v };
   } catch {
     return freshCommunity();
   }
 }
 
-let state = load();
+const onServer = () => SERVER_ON && getUser()?.source === "server";
+const EMPTY = { proposals: [], polls: [], announcements: [], notices: [], issueSignals: [], checks: [], trail: [] };
+
+let state = SERVER_ON ? EMPTY : load();
 const subs = new Set();
 function save() {
   state = { ...state, anchor: Date.now(), trail: state.trail.slice(0, 400) };
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full or blocked: kept for this tab */ }
+  if (!onServer()) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage full or blocked: kept for this tab */ }
+  }
   subs.forEach((f) => f());
 }
+
+/* ---------------- server ---------------- */
+let loading = null;
+let again = false;
+/** Read the board again from the server (one request at a time). */
+export function refreshCommunity() {
+  if (!onServer()) return Promise.resolve();
+  if (loading) {
+    again = true;
+    return loading;
+  }
+  loading = (async () => {
+    try {
+      const { data } = await api.get("/community");
+      state = { ...EMPTY, ...data, anchor: Date.now() };
+      subs.forEach((f) => f());
+    } catch (err) {
+      if (err?.status && err.status !== 401) serverNotice(err.message || "The community board couldn't be loaded.");
+    } finally {
+      loading = null;
+      if (again) {
+        again = false;
+        refreshCommunity();
+      }
+    }
+  })();
+  return loading;
+}
+
+/* one change to the server; the screen already shows it. Refused: the message, then the server's copy. */
+function send(method, url, body) {
+  api[method](url, body)
+    .catch((err) => { if (err?.status !== 401) serverNotice(err?.message || "The server didn't accept that change."); })
+    .finally(() => refreshCommunity());
+}
+
+let who = "";
+subscribeRole(() => {
+  const me = getUser();
+  const next = onServer() ? `${me.serverId}:${me.role}` : me ? "local" : "";
+  if (next === who) return;
+  who = next;
+  if (onServer()) {
+    state = EMPTY;
+    subs.forEach((f) => f());
+    refreshCommunity();
+  } else {
+    state = SERVER_ON ? EMPTY : load();
+    subs.forEach((f) => f());
+  }
+});
+let changedTimer = null;
+onEvent(EVENTS.COMMUNITY_CHANGED, () => { clearTimeout(changedTimer); changedTimer = setTimeout(refreshCommunity, 250); });
+onEvent(STREAM_RESUMED, () => refreshCommunity());
+
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => {
-    if (e.key !== KEY || !e.newValue) return;
+    if (e.key !== KEY || !e.newValue || onServer()) return;
     try { state = JSON.parse(e.newValue); subs.forEach((f) => f()); } catch { /* half-written: the next save brings it */ }
   });
 }
@@ -265,6 +216,7 @@ export function proposeImprovement(user, { title, summary, category, ward }) {
   state = { ...state, proposals: [p, ...state.proposals] };
   trail(user.name, "citizen", { type: "proposed", ref: id, ward });
   save();
+  if (onServer()) send("post", "/community/proposals", { title: t, summary: s, category: category || "other", ward });
   return { ok: true, id };
 }
 
@@ -282,6 +234,7 @@ export function signalProposal(id, user, kind) {
   const crossed = MILESTONES.find((m) => before < m && after >= m) || (before < p.target && after >= p.target ? p.target : null);
   if (crossed) trail(user.name, "citizen", { type: "backed", ref: id, ward: p.ward, residents: after, target: p.target, reached: after >= p.target });
   save();
+  if (onServer()) send("post", `/community/proposals/${encodeURIComponent(id)}/signal`, { kind });
   return true;
 }
 
@@ -292,6 +245,7 @@ export function raiseConcern(id, user, reason) {
   const rest = p.concerns.filter((c) => c.userId !== user.id);
   patchList("proposals", id, (x) => ({ ...x, concerns: reason ? [...rest, { userId: user.id, reason, at: now() }] : rest }));
   save();
+  if (onServer()) send("post", `/community/proposals/${encodeURIComponent(id)}/concern`, { reason: reason || null });
   return true;
 }
 
@@ -303,6 +257,7 @@ export function addProposalPhoto(id, user, photo) {
   if (rest.length >= 12) return false;
   patchList("proposals", id, (x) => ({ ...x, photos: [...rest, { id: photo.id, url: photo.url, userId: user.id, at: now(), hidden: false }] }));
   save();
+  if (onServer()) send("post", `/community/proposals/${encodeURIComponent(id)}/photo`, { url: photo.url });
   return true;
 }
 
@@ -314,6 +269,7 @@ export function respondToProposal(id, user, body) {
   patchList("proposals", id, (x) => ({ ...x, responses: [...x.responses, { id: uid("rsp"), by: user.name, role: user.role, body: text.slice(0, 400), at: now() }] }));
   trail(user.name, user.role, { type: "responded", ref: id, ward: p.ward });
   save();
+  if (onServer()) send("post", `/community/proposals/${encodeURIComponent(id)}/responses`, { body: text });
   return true;
 }
 
@@ -333,6 +289,7 @@ export function votePoll(id, user, optionId) {
   if (!poll.options.some((o) => o.id === optionId)) return false;
   patchList("polls", id, (x) => ({ ...x, votes: { ...x.votes, [user.id]: optionId } }));
   save();
+  if (onServer()) send("post", `/community/polls/${encodeURIComponent(id)}/vote`, { optionId });
   return true;
 }
 
@@ -351,9 +308,10 @@ export function signalIssue(issueId, user, kind) {
   state = { ...state, issueSignals: had === kind ? rest : [...rest, { issueId, userId: user.id, kind, at: now() }] };
   if (had !== kind && kind === "still") {
     trail(user.name, "citizen", { type: "still", issueId, ward: issue.ward, owner: issue.assignedTo || null });
-    logEvent({ actor: user.name, role: "citizen", action: `Reported ${issueId} still happening after the fix`, issueId, kind: "filed" });
+    if (!onServer()) logEvent({ actor: user.name, role: "citizen", action: `Reported ${issueId} still happening after the fix`, issueId, kind: "filed" });
   }
   save();
+  if (onServer()) send("post", `/community/issues/${encodeURIComponent(issueId)}/signal`, { kind });
   return true;
 }
 
@@ -374,7 +332,8 @@ export function noticeLive(n, issues) {
 export const MODERATION_REASONS = ["Personal information", "Offensive", "Off-topic", "Not a city matter", "Duplicate"];
 export const POLL_HOURS = [24, 48, 72, 168];
 const isAdmin = (u) => u?.role === "admin";
-const audit = (by, action) => logEvent({ actor: by, role: "admin", action, kind: "community" });
+// the server writes command's audit rows itself; this is the no-server desk
+const audit = (by, action) => { if (!onServer()) logEvent({ actor: by, role: "admin", action, kind: "community" }); };
 
 /* the proposal becomes a work order on the issue board, filed for its author */
 function issueFromProposal(p, priority, by) {
@@ -401,6 +360,17 @@ export function decideProposal(id, user, status, reason, extra = {}) {
   if (why.length < 6) return { ok: false, reason: "Give the reason people will read (6 characters or more)." };
   if (isMash(why)) return { ok: false, reason: MASH_MESSAGE };
   const decision = { status, reason: why.slice(0, 240), by: user.name, at: now() };
+  if (onServer()) {
+    if (status === "poll") {
+      const opts = (extra.options || []).map((o) => String(o || "").trim()).filter(Boolean);
+      if (opts.length < 2 || opts.length > 4) return { ok: false, reason: "Give 2 to 4 options." };
+    }
+    // the server files the work order or opens the poll, and writes the trail and audit
+    patchList("proposals", id, (x) => ({ ...x, status, decision }));
+    save();
+    send("patch", `/community/proposals/${encodeURIComponent(id)}/decision`, { status, reason: why, priority: extra.priority, question: extra.question, options: extra.options, hours: extra.hours });
+    return { ok: true, ...decision };
+  }
   if (status === "issue") decision.issueId = issueFromProposal(p, extra.priority || "medium", user.name);
   if (status === "poll") {
     const res = openPoll(user, { question: extra.question || p.title, ward: p.ward, options: extra.options, hours: extra.hours, from: { type: "proposal", id: p.id } }, { silent: true });
@@ -432,6 +402,7 @@ export function openPoll(user, { question, ward, options, hours = 48, from = nul
   trail(user.name, "admin", { type: "poll-opened", ref: id, ward: poll.ward });
   audit(user.name, `Opened poll ${id} · ${poll.ward === "all" ? "every zone" : poll.ward} · ${q}${from ? ` (from ${from.id})` : ""}`);
   if (!silent) save();
+  if (onServer() && !silent) send("post", "/community/polls", { question: q, ward: poll.ward, options: opts, hours: Number(hours || 48), from });
   return { ok: true, id };
 }
 
@@ -448,6 +419,7 @@ export function closePoll(id, user, optionId, note) {
   trail(user.name, "admin", { type: "poll-closed", ref: id, ward: poll.ward });
   audit(user.name, `Closed poll ${id} · ${poll.options.find((o) => o.id === optionId).label} · ${why}`);
   save();
+  if (onServer()) send("patch", `/community/polls/${encodeURIComponent(id)}/close`, { optionId, note: why });
   return { ok: true };
 }
 
@@ -464,6 +436,7 @@ export function publishAnnouncement(user, { title, body, zones, citizens = true,
   trail(user.name, "admin", { type: "announced", ref: id, zones, citizens, staff });
   audit(user.name, `Published ${id} · ${zones.includes("all") ? "every zone" : zones.join(", ")} · ${t}`);
   save();
+  if (onServer()) send("post", "/community/announcements", { title: t, body: String(body || "").trim(), zones, citizens, staff, hours: Number(hours) });
   return { ok: true, id };
 }
 
@@ -487,6 +460,7 @@ export function moderate(user, what, reason) {
   trail(user.name, "admin", { type: "moderated", what, reason, label });
   audit(user.name, `Hid ${label} · ${reason}`);
   save();
+  if (onServer()) send("post", "/community/moderate", { what, reason });
   return true;
 }
 
@@ -514,7 +488,8 @@ export function postWorkNotice(user, { issueId, kind, from, to, note }) {
   const n = { id, issueId, ward: issue.ward, kind, from: new Date(a).toISOString(), to: new Date(b).toISOString(), note: text.slice(0, 140), by: user.name, at: now(), hidden: false };
   state = { ...state, notices: [n, ...state.notices] };
   trail(user.name, "staff", { type: "notice", ref: id, ward: issue.ward, issueId });
-  logEvent({ actor: user.name, role: "staff", action: `Posted work notice ${id} on ${issueId} · ${kind}`, issueId, kind: "community" });
+  if (onServer()) send("post", "/community/notices", { issueId, kind, from: n.from, to: n.to, note: n.note });
+  else logEvent({ actor: user.name, role: "staff", action: `Posted work notice ${id} on ${issueId} · ${kind}`, issueId, kind: "community" });
   save();
   return { ok: true, id };
 }
@@ -522,9 +497,10 @@ export function postWorkNotice(user, { issueId, kind, from, to, note }) {
 /* the crew ends its own notice early (work finished sooner) */
 export function endWorkNotice(user, id) {
   const n = state.notices.find((x) => x.id === id);
-  if (!n || !isStaff(user) || n.by !== user.name) return false;
+  if (!n || !isStaff(user) || (n.by !== user.name && n.byId !== user.id)) return false;
   patchList("notices", id, (x) => ({ ...x, to: now() }));
   save();
+  if (onServer()) send("patch", `/community/notices/${encodeURIComponent(id)}/end`, {});
   return true;
 }
 
@@ -542,7 +518,8 @@ export function answerStill(user, issueId, verdict, note) {
   const check = { id: uid("chk"), issueId, verdict, note: text.slice(0, 200), by: user.name, at: now() };
   state = { ...state, checks: [...(state.checks || []), check] };
   trail(user.name, "staff", { type: verdict === "fixed" ? "checked" : "revisit", issueId, ward: issue.ward, ref: check.id });
-  logEvent({ actor: user.name, role: "staff", action: verdict === "fixed" ? `Checked ${issueId} after "still happening": fixed · ${text}` : `Asked to revisit ${issueId} · ${text}`, issueId, kind: "community" });
+  if (onServer()) send("post", `/community/issues/${encodeURIComponent(issueId)}/check`, { verdict, note: text });
+  else logEvent({ actor: user.name, role: "staff", action: verdict === "fixed" ? `Checked ${issueId} after "still happening": fixed · ${text}` : `Asked to revisit ${issueId} · ${text}`, issueId, kind: "community" });
   save();
   return { ok: true };
 }

@@ -63,7 +63,7 @@ export function registerProfile(id, { name, displayName, role }) {
   queueMicrotask(() => listeners.forEach((fn) => fn()));
 }
 
-/** The current display name for an account name ("Priti Sarkar" -> "Ayanokoji"). */
+/** The current display name for an account name ("Rina Ghosh" -> "Rina G"). */
 export function nameFor(name) {
   if (!name) return name;
   return byName.get(name) || name;

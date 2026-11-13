@@ -3,14 +3,14 @@ import { SERVER_ON, SOCKET_URL } from "../config/server";
 import { TAB_ID } from "../lib/api";
 import { createSocket } from "../lib/socket";
 import { REMOTE_EVENTS, STREAM_RESUMED, emitEvent } from "./events";
-import { getToken, subscribeRole } from "../store/authStore";
+import { getSessionKey, subscribeRole, verifySession } from "../store/authStore";
 
 /* ------------------------------------------------------------------
    The live connection to the backend (Socket.io).
 
    Opens by itself when VITE_API_URL is set and the person signed in
    through the server. The token goes in the handshake
-   (auth: { token, tab }), never in a URL. The server's side is in
+   (the httpOnly cookie; auth: { tab }), never in a URL. The server's side is in
    docs/backend/BACKEND-HANDOVER.md · A5.
 
    Every server event in REMOTE_EVENTS (services/events.js) goes to the
@@ -22,7 +22,10 @@ import { getToken, subscribeRole } from "../store/authStore";
    After a drop, the reconnect is announced (STREAM_RESUMED) so stores
    read their data again: events sent while offline are lost by design.
    A refused connection signs nothing out by itself; the next API
-   call's 401 does that (lib/api.js).
+   call's 401 does that (lib/api.js). When the server itself closes the
+   connection (session ended: sign out everywhere, a device removed,
+   away limit, account removed), the session is checked at once, so the
+   desk closes now instead of at its next request.
 
    Status for the top bar:  local | connecting | live | offline
 ------------------------------------------------------------------- */
@@ -59,7 +62,8 @@ function open(token) {
   setStatus("connecting");
   try {
     socket = createSocket(SOCKET_URL, {
-      auth: { token, tab: TAB_ID },
+      auth: { tab: TAB_ID }, // the session itself rides in the httpOnly cookie
+      withCredentials: true,
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -78,7 +82,10 @@ function open(token) {
     if (wasLive) emitEvent(STREAM_RESUMED, {}, { remote: true });
     wasLive = true;
   });
-  socket.on("disconnect", () => setStatus("offline"));
+  socket.on("disconnect", (reason) => {
+    setStatus("offline");
+    if (reason === "io server disconnect") verifySession();
+  });
   socket.on("connect_error", () => setStatus("offline"));
 
   REMOTE_EVENTS.forEach((name) => {
@@ -91,7 +98,7 @@ function open(token) {
 
 /** Open, re-open or close the connection to match the current sign-in. */
 export function syncRealtime() {
-  const token = getToken();
+  const token = getSessionKey();
   if (!SERVER_ON || typeof createSocket !== "function" || !token) {
     close();
     setStatus("local");

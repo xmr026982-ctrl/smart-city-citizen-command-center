@@ -1,6 +1,9 @@
 import { getDesk, setDuty, subscribeDesk } from "./staffDeskStore";
 import { connectDuty, refreshSettings, setSetting, useSettings } from "./settingsStore";
-import { useAuth } from "./authStore";
+import { useAuth, getAccount, updateSessionUser } from "./authStore";
+import { SERVER_ON } from "../config/server";
+import { api } from "../lib/api";
+import { serverNotice } from "../services/notice";
 
 /* ------------------------------------------------------------------
    Duty status: one value, everywhere.
@@ -32,12 +35,25 @@ export function rosterEntryOf(me) {
 
 const stateOf = (p) => p.duty || (p.onDuty ? "on" : "off");
 
+const serverDuty = (me) => SERVER_ON && me?.source === "server" && (me.role === "staff" || me.role === "admin");
+
 connectDuty({
   read(me) {
+    // with the server the account holds duty, for crews and command alike
+    if (serverDuty(me)) return getAccount()?.dutyStatus || "off";
     const p = rosterEntryOf(me);
     return p ? stateOf(p) : null;
   },
   write(me, status) {
+    if (serverDuty(me)) {
+      const p = rosterEntryOf(me);
+      if (p) setDuty(p.id, status, me.name, me.role); // the screen moves at once
+      api
+        .patch("/staff/me/duty", { dutyStatus: status })
+        .then(({ data }) => { if (data?.user) updateSessionUser(data.user); refreshSettings(); })
+        .catch((err) => { if (err?.status !== 401) serverNotice(err?.message || "Your duty status wasn't saved."); refreshSettings(); });
+      return;
+    }
     const p = rosterEntryOf(me);
     if (p) setDuty(p.id, status, me.name, me.role);
   },

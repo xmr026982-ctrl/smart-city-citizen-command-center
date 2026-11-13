@@ -22,11 +22,11 @@ import { getUser } from "../store/authStore";
 import { getFeed } from "./liveFeed";
 import { EMAIL_RE } from "./authService";
 
-/** true when the person is signed in through the server (not a developer desk) */
+/** true when the person is signed in through the server */
 export const onServer = () => SERVER_ON && getUser()?.source === "server";
 
 function need() {
-  if (!onServer()) throw new ApiError("Account changes need a server sign-in. This desk is running on sample data.", 0);
+  if (!onServer()) throw new ApiError("Account changes need a confirmed sign-in. Sign in again to continue.", 0);
 }
 
 const clean = (email) => String(email || "").trim().toLowerCase();
@@ -218,6 +218,7 @@ export async function checkDevice() {
 /** Admin: health of the live data feed. */
 export function feedHealth() {
   const feed = getFeed();
-  const age = Math.round((Date.now() - feed.updatedAt) / 1000);
-  return { mode: feed.mode, age, ok: age < 75 };
+  const at = typeof feed.updatedAt === "number" ? feed.updatedAt : Date.parse(feed.updatedAt || "");
+  const age = Number.isFinite(at) ? Math.round((Date.now() - at) / 1000) : null;
+  return { mode: feed.mode, age, ok: feed.mode === "live" && age !== null && age < 15 * 60 };
 }

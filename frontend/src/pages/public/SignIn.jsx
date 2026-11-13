@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { UserRound, HardHat, ShieldCheck, ArrowRight, Lock, KeyRound, Mail, Wrench } from "lucide-react";
+import { UserRound, HardHat, ShieldCheck, ArrowRight, Lock, KeyRound, Mail } from "lucide-react";
+import ZoneLock from "../../components/public/ZoneLock";
 import { AuthFrame, Field, PasswordInput, ZonePicker, Status, Submit, GoogleButton, Divider } from "../../components/public/PublicKit";
 import { signIn, googleSignIn, forgotPassword, ZONES, EMAIL_RE } from "../../services/authService";
 import { googleIdToken, GOOGLE_ON } from "../../lib/firebase";
-import { setServerSession, openDevDesk, DEV_DESKS, takeSignOutNote } from "../../store/authStore";
-import { ROLE_HOME, DEV_DESK, SUPPORT_EMAIL, PRODUCT, supportMail } from "../../config/server";
+import { setServerSession, takeSignOutNote } from "../../store/authStore";
+import { ROLE_HOME, SUPPORT_EMAIL, PRODUCT, supportMail } from "../../config/server";
 
 /* ------------------------------------------------------------------
    Sign in (Person 1's flow, kept whole):
@@ -130,13 +131,14 @@ export default function SignIn() {
     }
   };
 
-  const finishGoogle = async (e) => {
-    e.preventDefault();
-    if (!ZONES.includes(zone)) { setMsg({ type: "bad", text: "Pick your zone to continue." }); return; }
+  const finishGoogle = async (picked) => {
+    if (!ZONES.includes(picked)) { setMsg({ type: "bad", text: "Lock a zone to continue." }); return; }
+    setZone(picked);
+    setMsg(null);
     setBusy("google");
     try {
-      const data = await googleSignIn({ idToken: google.idToken, zone });
-      if (data?.requiresZone || !data?.token) throw new Error("The server didn't finish the sign-in. Please start again.");
+      const data = await googleSignIn({ idToken: google.idToken, zone: picked });
+      if (data?.requiresZone || !data?.user) throw new Error("The server didn't finish the sign-in. Please start again.");
       done(data);
     } catch (err) {
       setMsg({ type: "bad", text: err?.message || "Google sign-in didn't finish." });
@@ -177,7 +179,6 @@ export default function SignIn() {
         </div>
         <p className="pk-alt">New to {PRODUCT}? <Link to="/register">Create a citizen account</Link></p>
         <p className="pk-alt">Joining the field? <Link to="/staff-request">Apply for staff clearance</Link></p>
-        {DEV_DESK ? <DevDesk onOpen={(id) => { const u = openDevDesk(id); if (u) navigate(ROLE_HOME[u.role], { replace: true }); }} /> : null}
       </AuthFrame>
     );
   }
@@ -208,13 +209,10 @@ export default function SignIn() {
   /* ---------- Google: a new citizen picks a zone ---------- */
   if (step === "zone" && google) {
     return (
-      <AuthFrame tone="citizen" title="Pick your zone" sub={`Signed in with Google as ${google.email || "your account"}.`}>
-        <form onSubmit={finishGoogle} noValidate>
-          <ZonePicker value={zone} onChange={setZone} />
-          <Status msg={msg} />
-          <Submit busy={busy === "google"} tone="citizen" disabled={!zone}>Finish sign-in</Submit>
-        </form>
-        <button type="button" className="pk-link" onClick={() => { setGoogle(null); setStep("cred"); setMsg(null); }}>Use another account</button>
+      <AuthFrame tone="citizen" title="Choose your home zone" sub="Your board, alerts and announcements follow this zone.">
+        <ZoneLock email={google.email} busy={busy === "google"} onEngage={finishGoogle} />
+        <Status msg={msg} />
+        <button type="button" className="pk-link" disabled={busy === "google"} onClick={() => { setGoogle(null); setStep("cred"); setMsg(null); }}>Use another account</button>
       </AuthFrame>
     );
   }
@@ -273,14 +271,3 @@ function SupportNote({ subject, lead }) {
   );
 }
 
-/* Developer desk: npm run dev + VITE_DEV_DESK=true only (config/server.js). Sample data, no server. */
-function DevDesk({ onOpen }) {
-  return (
-    <div className="pk-dev">
-      <p><Wrench size={12} /> Developer desk · this machine only · sample data</p>
-      <div>
-        {DEV_DESKS.map((d) => <button key={d.id} type="button" className={`tone-${d.role}`} onClick={() => onOpen(d.id)}>{d.role}</button>)}
-      </div>
-    </div>
-  );
-}

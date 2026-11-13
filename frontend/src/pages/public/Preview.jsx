@@ -1,18 +1,33 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Siren, Vote, MapPin, Activity, Leaf, Megaphone, Compass, ArrowRight, CircleDot, Lightbulb, Trash2, Construction } from "lucide-react";
+import { Siren, Vote, MapPin, Activity, Leaf, Megaphone, Compass, ArrowRight, CircleDot, Lightbulb, Trash2, Construction, Droplets, Zap, ShieldAlert } from "lucide-react";
+import { api } from "../../lib/api";
+import { SERVER_ON } from "../../config/server";
+import { CATEGORY_LABEL } from "../../constants/issueCategories";
 
 /* ------------------------------------------------------------------
    Preview (Person 1's Platform Preview, every section kept):
-   a sample of the live board, the four features, more than reports,
-   and the call to join. The figures here are an illustration, marked
-   as such: the real ones live behind sign-in.
+   the latest open reports on the live board, the four features, more
+   than reports, and the call to join. The board is real (GET
+   /public/board): kind, zone and public status only, no titles, places
+   or names; full reports live behind sign-in.
 ------------------------------------------------------------------- */
-const SAMPLE = [
-  { icon: Construction, type: "Pothole cluster", place: "Esplanade crossing", zone: "Dharmatala", status: "In progress", tone: "amber" },
-  { icon: Trash2, type: "Overflowing bins", place: "Gariahat market", zone: "Ballygunge", status: "Received", tone: "slate" },
-  { icon: Lightbulb, type: "Streetlight fault", place: "Bidhan Sarani", zone: "Shyambazar", status: "Resolved", tone: "green" },
-];
+const ICON = { roads: Construction, lighting: Lightbulb, waste: Trash2, water: Droplets, electricity: Zap, safety: ShieldAlert, other: CircleDot };
+const STATUS = {
+  submitted: { label: "Received", tone: "slate" },
+  acknowledged: { label: "Acknowledged", tone: "slate" },
+  in_progress: { label: "In progress", tone: "amber" },
+  resolved: { label: "Resolved", tone: "green" },
+};
+// zone centres, placed on the preview map (Kolkata, north at the top)
+const ZONE_XY = {
+  Shyambazar: { x: 66, y: 16 },
+  "College Street": { x: 58, y: 36 },
+  "B.B.D. Bagh": { x: 30, y: 38 },
+  Dharmatala: { x: 36, y: 52 },
+  Ballygunge: { x: 54, y: 68 },
+  "B.P. Township": { x: 72, y: 86 },
+};
 
 const FEATURES = [
   { icon: Siren, title: "Issue solving", text: "Report a civic problem and follow it from the first report to the confirmed fix." },
@@ -21,20 +36,28 @@ const FEATURES = [
   { icon: Activity, title: "Status you can trust", text: "Received, acknowledged, in progress, resolved. Command confirms every close." },
 ];
 
-const PINS = [
-  { x: 28, y: 34, tone: "amber" },
-  { x: 62, y: 58, tone: "slate" },
-  { x: 44, y: 72, tone: "green" },
-];
-
 export default function Preview() {
   const [active, setActive] = useState(0);
+  const [board, setBoard] = useState(SERVER_ON ? null : false); // null = loading, false = unreachable
+  useEffect(() => {
+    if (!SERVER_ON) return undefined;
+    let live = true;
+    api.get("/public/board").then(({ data }) => { if (live) setBoard(data); }).catch(() => { if (live) setBoard(false); });
+    return () => { live = false; };
+  }, []);
+  const items = (board && board.items) || [];
+  const reports = items.map((r, i) => {
+    const st = STATUS[r.status] || STATUS.submitted;
+    const xy = ZONE_XY[r.ward] || { x: 50, y: 50 };
+    return { key: `${r.ward}-${r.at}-${i}`, icon: ICON[r.category] || CircleDot, type: CATEGORY_LABEL[r.category] || "Civic problem", zone: r.ward, status: st.label, tone: st.tone, x: xy.x + (i % 2 ? 4 : -4), y: xy.y + (i % 3) * 3 };
+  });
+  const count = reports.length;
   useEffect(() => {
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) return undefined;
-    const t = setInterval(() => setActive((a) => (a + 1) % SAMPLE.length), 2600);
+    if (reduce || count < 2) return undefined;
+    const t = setInterval(() => setActive((a) => (a + 1) % count), 2600);
     return () => clearInterval(t);
-  }, []);
+  }, [count]);
 
   return (
     <main className="pk-page pk-preview">
@@ -55,28 +78,30 @@ export default function Preview() {
         </div>
       </section>
 
-      <section className="pk-board" aria-label="Sample of the live board">
+      <section className="pk-board" aria-label="The live board">
         <div className="pk-board-map">
-          <header><p className="pk-kick"><i />Live city map</p><span className="pk-live"><i />Sample</span></header>
+          <header><p className="pk-kick"><i />Live city map</p><span className="pk-live"><i />{board ? "Live" : board === null ? "Connecting" : "Offline"}</span></header>
           <div className="pk-map">
             <span className="pk-river" aria-hidden />
-            {PINS.map((p, i) => (
-              <button key={i} type="button" className={`pk-pin ${p.tone}${active === i ? " on" : ""}`} style={{ left: `${p.x}%`, top: `${p.y}%` }} onClick={() => setActive(i)} aria-label={SAMPLE[i].type}>
+            {reports.map((p, i) => (
+              <button key={p.key} type="button" className={`pk-pin ${p.tone}${active === i ? " on" : ""}`} style={{ left: `${p.x}%`, top: `${p.y}%` }} onClick={() => setActive(i)} aria-label={`${p.type} · ${p.zone}`}>
                 <i />
               </button>
             ))}
           </div>
         </div>
         <div className="pk-board-list">
-          <header><p className="pk-kick"><i />Reports near you</p></header>
-          {SAMPLE.map((s, i) => (
-            <button key={s.type} type="button" className={`pk-report ${s.tone}${active === i ? " on" : ""}`} onClick={() => setActive(i)}>
+          <header><p className="pk-kick"><i />Latest reports</p></header>
+          {reports.map((s, i) => (
+            <button key={s.key} type="button" className={`pk-report ${s.tone}${active === i ? " on" : ""}`} onClick={() => setActive(i)}>
               <span className="pk-report-ic"><s.icon size={16} /></span>
-              <span className="pk-report-t"><b>{s.type}</b><small>{s.place} · {s.zone}</small></span>
+              <span className="pk-report-t"><b>{s.type}</b><small>{s.zone}</small></span>
               <span className={`pk-tag ${s.tone}`}><CircleDot size={10} /> {s.status}</span>
             </button>
           ))}
-          <p className="pk-fine">Sample data for this preview. Live reports are visible once you sign in.</p>
+          {board && !count ? <p className="pk-fine">Nothing open on the board right now.</p> : null}
+          {board === false ? <p className="pk-fine">The live board shows here once the city server answers.</p> : null}
+          {board ? <p className="pk-fine">{board.open} open now · {board.resolvedWeek} fixed this week. Sign in for the full reports.</p> : null}
         </div>
       </section>
 

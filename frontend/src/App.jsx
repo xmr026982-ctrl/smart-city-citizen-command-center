@@ -8,6 +8,7 @@ import { UndoBar } from "./components/issues/shared/RemovalKit";
 import FieldAlerts from "./components/layout/FieldAlerts";
 import ServerNotice from "./components/layout/ServerNotice";
 import "./services/issueSync"; // issues with the server, when one is set
+import { LogoMark } from "./components/brand/Logo";
 import { getRole, subscribeRole, verifySession, usePendingSession, retryVerify, logout } from "./store/authStore";
 import { applySettingsEffects } from "./store/settingsStore";
 import { startRealtime } from "./services/realtime";
@@ -63,7 +64,10 @@ function SessionGate({ state }) {
   return (
     <div className="session-gate" role="status" aria-live="polite">
       <div className="session-gate-card">
-        <span className={`session-gate-ring${state === "error" ? " bad" : ""}`} aria-hidden><i /></span>
+        <span className={`session-gate-plate${state === "error" ? " bad" : ""}`}>
+          <LogoMark width={176} />
+          <i className="session-gate-scan" aria-hidden />
+        </span>
         <b>{state === "error" ? "Can't reach the server" : "Confirming your session"}</b>
         <small>{state === "error" ? "Your desk opens once the server answers." : "Checking your sign-in with the server."}</small>
         {state === "error" ? (

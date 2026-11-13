@@ -13,18 +13,19 @@
      staff member signs in for the first time. The desk card switches
      from "Awaiting Uplink" to "Uplinked".
 
-   Until the backend exists, notifyStaffAccepted runs a local stand-in
-   that succeeds after a short delay, so the desk works without a server.
+   The approve answer says whether the email went out ({ sent }); a
+   failed send shows "Key not sent" with a re-transmit button.
 ------------------------------------------------------------------- */
 
-import { getDesk, acceptRequest, setDispatch, markUplinked } from "../store/staffDeskStore";
+import { getDesk, acceptRequest, setDispatch, markUplinked, refreshDesk } from "../store/staffDeskStore";
+import { serverNotice } from "./notice";
 import { SERVER_ON } from "../config/server";
 import { api } from "../lib/api";
 import { expertiseLabel } from "../config/expertise";
 
 
 
-// true once the backend is connected (VITE_API_URL set). The desk hides its demo controls then.
+// true once the backend is connected (VITE_API_URL set)
 export const UPLINK_BACKEND = SERVER_ON;
 
 // Accept = the backend's approve route. It clears the request and emails the
@@ -49,11 +50,7 @@ export const approveRoute = (requestId) => `/staff-requests/${encodeURIComponent
  * Resolves on success, throws on failure (the desk then shows "Key not sent" with a re-transmit button).
  */
 export async function notifyStaffAccepted(payload) {
-  if (!SERVER_ON) {
-    // Local stand-in: no backend connected. Nothing is sent anywhere.
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    return { ok: true, simulated: true };
-  }
+  if (!SERVER_ON) throw new Error("The server isn't configured, so the setup link can't be sent.");
   if (!payload.requestId) throw new Error("This request has no server id, so the setup link can't be sent.");
   const { data } = await api.patch(approveRoute(payload.requestId), {
     rank: payload.rank,
@@ -95,10 +92,7 @@ function payloadFor(person) {
 
 /** A new setup link for an approved person whose first link expired or failed. */
 export async function resendSetupLink(payload) {
-  if (!SERVER_ON) {
-    await new Promise((resolve) => setTimeout(resolve, 900));
-    return { ok: true, simulated: true };
-  }
+  if (!SERVER_ON) throw new Error("The server isn't configured, so the setup link can't be sent.");
   const { data } = await api.post(`/staff-requests/${encodeURIComponent(payload.requestId)}/resend-setup`);
   return data || { ok: true };
 }
@@ -106,11 +100,13 @@ export async function resendSetupLink(payload) {
 async function dispatchKey(person, again = false) {
   setDispatch(person.id, "sending");
   try {
-    if (again) await resendSetupLink(payloadFor(person));
-    else await notifyStaffAccepted(payloadFor(person));
-    setDispatch(person.id, "sent");
-  } catch {
+    const data = again ? await resendSetupLink(payloadFor(person)) : await notifyStaffAccepted(payloadFor(person));
+    setDispatch(person.id, data?.sent === false ? "failed" : "sent");
+  } catch (err) {
     setDispatch(person.id, "failed");
+    if (SERVER_ON && err?.status && err.status !== 401) serverNotice(err.message || "The setup link couldn't be sent.");
+  } finally {
+    if (SERVER_ON) refreshDesk(); // the server's copy replaces the screen's
   }
 }
 
@@ -124,6 +120,7 @@ export function acceptAndDispatch(requestId, rank) {
 /** Send the activation key again (stalled or failed uplink). */
 export function retransmitKey(personId) {
   const person = getDesk().roster.find((p) => p.id === personId);
-  // a failed first send is the approval itself; a sent-but-unused link needs a fresh one
-  if (person && person.uplink === "awaiting") dispatchKey(person, person.dispatch !== "failed");
+  // with a server the person is already cleared, so it's always a fresh link.
+  // Without one: a failed first send is the approval itself; a sent-but-unused link needs a fresh one.
+  if (person && person.uplink === "awaiting") dispatchKey(person, SERVER_ON || person.dispatch !== "failed");
 }

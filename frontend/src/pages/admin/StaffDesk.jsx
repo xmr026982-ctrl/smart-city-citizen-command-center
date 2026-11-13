@@ -14,7 +14,7 @@ import {
   RANKS, EXPERTISE, EXPERIENCE, expertiseLabel, uplinkPhase, isAwaiting, canVerify, UPLINK_STALL_DAYS,
 } from "../../store/staffDeskStore";
 import { useFieldRoster, CAPACITY } from "../../store/fieldRoster";
-import { acceptAndDispatch, retransmitKey, handleStaffUplinked, UPLINK_BACKEND } from "../../services/staffUplinkService";
+import { acceptAndDispatch, retransmitKey } from "../../services/staffUplinkService";
 import { useGlide } from "../../components/issues/admin/CommandKit";
 import "../../styles/staff-desk.css";
 import { nameFor, useNames } from "../../store/profileStore";
@@ -1130,18 +1130,6 @@ function UplinkConsole({ person }) {
           <button type="button" className="sd-retx" disabled={busy} onClick={() => retransmitKey(person.id)}>
             {busy ? <><Send size={14} /> Transmitting…</> : <><RefreshCw size={14} /> Re-transmit key</>}
           </button>
-          {/* Dev-only stand-in: hidden in production builds and once the backend is connected. */}
-          {import.meta.env?.DEV && !UPLINK_BACKEND && (
-            <button
-              type="button"
-              className="sd-sim"
-              disabled={busy}
-              onClick={() => handleStaffUplinked({ email: person.email })}
-              title="Development only. In production the backend signals the first sign-in."
-            >
-              <em>DEV</em> Simulate first sign-in
-            </button>
-          )}
         </div>
       </div>
     </section>

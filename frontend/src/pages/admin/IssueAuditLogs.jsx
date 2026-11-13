@@ -4,11 +4,13 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMinute } from "../../hooks/useMinute";
 import {
   ScrollText, Shield, HardHat, User, FileText, Send, Activity, Flame, UserCog, Download, RotateCcw, FileSearch, Clock,
-  UserRound, ArrowUpRight, Ban, MessageSquareWarning, Users,
+  UserRound, ArrowUpRight, Ban, MessageSquareWarning, Users, Hourglass, IdCard, KeyRound,
 } from "lucide-react";
 import IssueDetailsDrawer from "../../components/issues/shared/IssueDetailsDrawer";
 import StaffDetailsDrawer from "../../components/issues/admin/StaffDetailsDrawer";
 import PolicyEventDrawer, { isPolicyEvent } from "../../components/issues/admin/PolicyEventDrawer";
+import CommunityEventDrawer from "../../components/issues/admin/CommunityEventDrawer";
+import { communityRefOf } from "../../utils/communityRef";
 import {
   Command, CommandHead, LensDeck, SearchBox, Seg, Chips, ResultLine, Pager, Empty, ago, useHoverFx, FxLayer,
 } from "../../components/issues/admin/CommandKit";
@@ -34,6 +36,9 @@ const KINDS = [
   { id: "request", label: "Requests", icon: MessageSquareWarning },
   { id: "removal", label: "Removals", icon: Ban },
   { id: "community", label: "Community", icon: Users },
+  { id: "policy", label: "Service windows", icon: Hourglass },
+  { id: "profile", label: "Accounts", icon: IdCard },
+  { id: "auth", label: "Sign-in", icon: KeyRound },
 ];
 const KIND_ICON = Object.fromEntries(KINDS.map((k) => [k.id, k.icon]));
 
@@ -66,6 +71,7 @@ function IssueAuditLogs() {
   const [size, setSize] = useState(15);
   const [selectedId, setSelectedId] = useState(null);
   const [policyEvent, setPolicyEvent] = useState(null); // a Service Windows change whose file is open
+  const [communityEvent, setCommunityEvent] = useState(null); // a proposal, poll, announcement or notice line whose file is open
   const [subject, setSubject] = useState(null); // { id, name, code } of the person whose file is open
 
   const counts = useMemo(() => {
@@ -219,14 +225,17 @@ function IssueAuditLogs() {
                 const who = subjectOf(e, roster);
                 const issueClick = Boolean(e.issueId && issues.some((x) => x.id === e.issueId));
                 const policy = isPolicyEvent(e);
-                const click = issueClick || Boolean(who) || policy;
+                const cref = communityRefOf(e);
+                const click = issueClick || Boolean(who) || policy || Boolean(cref);
                 const open = issueClick
                   ? () => setSelectedId(e.issueId)
                   : who
                     ? () => setSubject({ id: who.id, name: who.name, code: who.code })
                     : policy
                       ? () => setPolicyEvent(e)
-                      : undefined;
+                      : cref
+                        ? () => setCommunityEvent(e)
+                        : undefined;
                 const Row = click ? "button" : "div";
                 return (
                   <Fragment key={e.id}>
@@ -235,7 +244,7 @@ function IssueAuditLogs() {
                     className={`ac-event k-${e.kind || "status"}${click ? " click" : ""}${fresh.has(e.id) ? " fresh" : ""}`}
                     style={{ animationDelay: `${i * 25}ms` }}
                     onClick={open}
-                    title={who ? (who.person ? `Open ${who.name}'s file` : `Open ${who.name}'s record`) : policy ? "Open the change" : undefined}
+                    title={who ? (who.person ? `Open ${who.name}'s file` : `Open ${who.name}'s record`) : policy ? "Open the change" : cref ? `Open ${cref}` : undefined}
                     data-fx={click ? "" : undefined}
                   >
                     {click ? <FxLayer /> : null}
@@ -252,7 +261,8 @@ function IssueAuditLogs() {
                           </span>
                         ) : null}
                         {policy ? <span className="ac-id windows"><Clock size={10} /> WINDOWS</span> : null}
-                        {click ? <span className="ac-event-go">{who ? (who.person ? "Open file" : "Open record") : policy ? "Open change" : "Open issue"} <ArrowUpRight size={10} /></span> : null}
+                        {cref && !issueClick ? <span className="ac-id"><Users size={10} /> {cref}</span> : null}
+                        {click ? <span className="ac-event-go">{who ? (who.person ? "Open file" : "Open record") : policy ? "Open change" : cref && !issueClick ? `Open ${cref}` : "Open issue"} <ArrowUpRight size={10} /></span> : null}
                       </small>
                     </div>
                     <span className="t">{clock(e.at)}<em>{ago(e.at)}</em></span>
@@ -274,6 +284,7 @@ function IssueAuditLogs() {
 
       <IssueDetailsDrawer issue={selected} onClose={() => setSelectedId(null)} />
       <PolicyEventDrawer event={policyEvent} onClose={() => setPolicyEvent(null)} />
+      <CommunityEventDrawer event={communityEvent} onClose={() => setCommunityEvent(null)} />
       <StaffDetailsDrawer
         person={livePerson}
         record={record}

@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useAuth } from "./authStore";
+import { useAuth, getUser, subscribeRole } from "./authStore";
+import { SERVER_ON } from "../config/server";
+import { api } from "../lib/api";
+import { onEvent, EVENTS } from "../services/events";
 import { useAudit, useAllIssues, possibleDuplicates, openRequest } from "./issueStore";
 import { useDesk } from "./staffDeskStore";
 import { useCommunity, PROPOSAL_STATUS, pollOpen, pollEnded, answerDue } from "./communityStore";
@@ -26,7 +29,10 @@ import { useSettings } from "./settingsStore";
    See docs/backend/BACKEND-HANDOVER.md · B2
 
    Read state, per person: a cursor ("everything before this is read")
-   plus the items opened or marked one by one.
+   plus the items opened or marked one by one. With a server sign-in it
+   is kept on the account (GET/PUT /notifications/read-state), so what
+   you read on one device is read on all of them; this browser keeps a
+   copy so the inbox opens at once.
 ------------------------------------------------------------------- */
 
 const H = 36e5;
@@ -372,7 +378,7 @@ function communityForCitizen(c, me, issues, since, now) {
       }
     } else if (n.type === "announced") {
       const a = ann.get(n.ref);
-      if (a && !a.hidden && a.audience.citizens && (a.zones.includes("all") || a.zones.includes(zone))) hit = { kind: "announcement", tone: "info", title: `City announcement · ${a.zones.includes("all") ? "every zone" : a.zones.join(", ")}`, line: a.title, ref: { type: "announcement", id: a.id }, zone: a.zones.includes("all") ? zone : a.zones[0] };
+      if (a && !a.hidden && a.audience.citizens && (a.zones.includes("all") || a.zones.includes(zone))) hit = { kind: "announcement", tone: "info", title: `Announcement · ${a.zones.includes("all") ? "every zone" : a.zones.join(", ")}`, line: a.title, ref: { type: "announcement", id: a.id }, zone: a.zones.includes("all") ? zone : a.zones[0] };
     } else if (n.type === "notice") {
       const x = notice.get(n.ref);
       const i = issues.find((y) => y.id === n.issueId);
@@ -453,7 +459,7 @@ function communityForStaff(c, me, issues, since) {
     let hit = null;
     if (n.type === "announced") {
       const a = ann.get(n.ref);
-      if (a && !a.hidden && a.audience.staff && (a.zones.includes("all") || a.zones.some((z) => zones.has(z)))) hit = { kind: "announcement", tone: "info", title: `Command announcement · ${a.zones.includes("all") ? "every zone" : a.zones.join(", ")}`, line: a.title, ref: { type: "announcement", id: a.id }, zone: a.zones.includes("all") ? null : a.zones[0] };
+      if (a && !a.hidden && a.audience.staff && (a.zones.includes("all") || a.zones.some((z) => zones.has(z)))) hit = { kind: "announcement", tone: "info", title: `Announcement · ${a.zones.includes("all") ? "every zone" : a.zones.join(", ")}`, line: a.title, ref: { type: "announcement", id: a.id }, zone: a.zones.includes("all") ? null : a.zones[0] };
     } else if (n.type === "still" && n.owner === me.name) {
       const i = issues.find((y) => y.id === n.issueId);
       if (i) hit = { kind: "still", tone: "warn", title: "Still happening after your fix", line: `${i.id} · ${i.title} · a resident says it isn't fixed`, ref: { type: "community-check", id: i.id }, zone: i.ward };
@@ -519,11 +525,42 @@ function loadRS(id) {
   rsCache.set(id, v);
   return v;
 }
+const serverRS = () => SERVER_ON && getUser()?.source === "server";
+let pushTimer = null;
+function pushRS(v) {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { api.put("/notifications/read-state", v).catch(() => { /* kept here; the next change sends it again */ }); }, 700);
+}
 function saveRS(id, v) {
   rsCache.set(id, v);
   try { localStorage.setItem(RS(id), JSON.stringify(v)); } catch { /* storage blocked: kept for this tab */ }
   rsPing();
+  if (serverRS() && getUser()?.id === id) pushRS(v);
 }
+
+/* the account's read state wins (another device may have read more); a first sign-in sends this device's */
+async function pullRS() {
+  const me = getUser();
+  if (!serverRS() || !me?.id) return;
+  try {
+    const { data } = await api.get("/notifications/read-state");
+    if (data && typeof data.c === "number") {
+      const v = { c: data.c, r: Array.isArray(data.r) ? data.r : [], u: Array.isArray(data.u) ? data.u : [] };
+      rsCache.set(me.id, v);
+      try { localStorage.setItem(RS(me.id), JSON.stringify(v)); } catch { /* storage blocked */ }
+      rsPing();
+    } else {
+      pushRS(loadRS(me.id));
+    }
+  } catch { /* offline: this device's copy holds */ }
+}
+let rsWho = "";
+subscribeRole(() => {
+  const next = serverRS() ? `${getUser().id}` : "";
+  if (next && next !== rsWho) pullRS();
+  rsWho = next;
+});
+onEvent(EVENTS.NOTIFICATION_NEW, (e) => { if (e?.remote && e.type === "read") pullRS(); });
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => {
     if (!e.key || !e.key.startsWith("inbox-read-")) return;

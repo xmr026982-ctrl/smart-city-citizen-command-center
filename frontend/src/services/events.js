@@ -37,6 +37,7 @@ export const EVENTS = {
   PROFILE_UPDATED: "profile:updated", // { id, displayName, avatar? }
   POLICY_CHANGED: "policy:changed", // { }                       service window table saved
   NOTIFICATION_NEW: "notification:new", // { id, type }        a stored notification for this person
+  CITY_METRICS: "city:metrics", // { zoneId, aqi?, traffic?, rain?, heat?, feels?, at }  one zone's new City Health readings
 };
 
 /* Every event the server may send. services/realtime.js forwards exactly

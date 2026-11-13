@@ -5,7 +5,9 @@ import AnimatedNumber from "./AnimatedNumber";
 import Sparkline from "./Sparkline";
 import { CITY, envLabel } from "../../config/zones";
 
-export function LiveAlerts({ alerts }) {
+const real = (v) => typeof v === "number" && Number.isFinite(v);
+
+export function LiveAlerts({ alerts, live = true }) {
   return (
     <TiltCard as="section" className="panel alerts">
       <header>
@@ -22,12 +24,13 @@ export function LiveAlerts({ alerts }) {
             </div>
           </li>
         ))}
-        {alerts.length === 0 && <li className="empty">No active alerts</li>}
+        {alerts.length === 0 && <li className="empty">{live ? "No active alerts" : "Waiting for live readings"}</li>}
       </ul>
     </TiltCard>
   );
 }
 
+/* sensors = live feeds that answered in the past hour (air, traffic, weather per zone) */
 export function CityOverview({ sensors }) {
   return (
     <TiltCard as="section" className="panel overview">
@@ -36,8 +39,8 @@ export function CityOverview({ sensors }) {
         <div><dt>Population</dt><dd>{CITY.population}</dd></div>
         <div><dt>Area</dt><dd>{CITY.area}</dd></div>
         <div>
-          <dt>Active Sensors</dt>
-          <dd><AnimatedNumber value={sensors} format={(n) => Math.round(n).toLocaleString("en-US")} /></dd>
+          <dt>Live Feeds</dt>
+          <dd><AnimatedNumber value={real(sensors) ? sensors : null} format={(n) => Math.round(n).toLocaleString("en-IN")} /></dd>
         </div>
       </dl>
       <div className="radar" aria-hidden="true">
@@ -54,23 +57,27 @@ export function CityOverview({ sensors }) {
   );
 }
 
-export function EnvIndex({ value, history }) {
+/* the city's average AQI across the zones reporting right now */
+export function EnvIndex({ value, history, std, calibrating = false }) {
+  const has = real(value);
   return (
     <TiltCard as="section" className="panel env">
-      <h3>Environmental Index</h3>
+      <h3>City Air Index</h3>
       <div className="env-row">
         <div>
-          <div className="big"><AnimatedNumber value={value} /></div>
-          <span className="sub">{envLabel(value)}</span>
+          <div className={`big${has ? "" : " none"}`}><AnimatedNumber value={has ? value : null} /></div>
+          <span className="sub" title={has && calibrating ? "Estimated from the latest station readings. Switches to the official CPCB 24-hour average after 16 hours." : undefined}>{has ? (calibrating ? `${envLabel(value, std)} · Calibrating` : `Avg AQI · ${envLabel(value, std)}`) : "No reading"}</span>
         </div>
-        <Sparkline data={history} color="#16a34a" height={46} live />
+        <Sparkline data={history} color="#16a34a" height={46} live={has} />
       </div>
     </TiltCard>
   );
 }
 
+/* share of successful source checks over the past 24 hours */
 export function Uptime({ value, onRefresh }) {
   const [spin, setSpin] = useState(false);
+  const has = real(value);
   const refresh = () => {
     setSpin(true);
     onRefresh?.();
@@ -78,11 +85,11 @@ export function Uptime({ value, onRefresh }) {
   };
   return (
     <TiltCard as="section" className="panel uptime">
-      <h3>System Uptime</h3>
-      <div className="big"><AnimatedNumber value={value} decimals={1} /><small>%</small></div>
+      <h3>Feed Uptime · 24 h</h3>
+      <div className={`big${has ? "" : " none"}`}><AnimatedNumber value={has ? value : null} decimals={1} />{has ? <small>%</small> : null}</div>
       <div className="uptime-row">
-        <div className="bar"><i style={{ width: `${value}%` }} /></div>
-        <button type="button" aria-label="Refresh" className={spin ? "spin" : ""} onClick={refresh}>
+        <div className="bar"><i style={{ width: `${has ? Math.max(0, Math.min(100, value)) : 0}%` }} /></div>
+        <button type="button" aria-label="Refresh readings" title="Refresh readings" className={spin ? "spin" : ""} onClick={refresh}>
           <RefreshCw size={16} />
         </button>
       </div>
