@@ -16,6 +16,8 @@
                       different sites (e.g. two different domains). It
                       forces Secure, which needs HTTPS.
      COOKIE_SECURE    true to force the Secure flag (always on in production)
+     With "none" the cookie is also Partitioned (CHIPS), so it still works
+     in browsers that block third-party cookies.
 */
 
 const COOKIE_NAME = "sk_session";
@@ -26,6 +28,10 @@ function cookieOptions(expiresAt) {
     : "lax";
   const secure = sameSite === "none" || process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "true";
   const opts = { httpOnly: true, sameSite, secure, path: "/" };
+  // Frontend and API on different sites (e.g. vercel.app + onrender.com):
+  // a Partitioned (CHIPS) cookie keeps working where browsers block ordinary
+  // third-party cookies (Chrome Incognito, Firefox), scoped to our frontend.
+  if (sameSite === "none") opts.partitioned = true;
   if (expiresAt) opts.expires = new Date(expiresAt);
   return opts;
 }

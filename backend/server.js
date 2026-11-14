@@ -51,6 +51,15 @@ const { startCityMetricsPolling } = require("./services/cityMetricsService");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+/* Behind a hosting proxy (Render, Railway, Azure, Nginx) every request
+   arrives from the proxy's address. TRUST_PROXY=1 makes Express read the
+   visitor's real address from X-Forwarded-For, so rate limits and lockouts
+   apply per visitor instead of to everyone at once. Leave it unset locally. */
+const trustProxy = String(process.env.TRUST_PROXY || "").trim();
+if (trustProxy) {
+  app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy === "true" ? true : trustProxy);
+}
+
 // =====================================
 // MIDDLEWARE
 // =====================================
